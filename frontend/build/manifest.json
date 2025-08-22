@@ -1,0 +1,27 @@
+{
+  "short_name": "AK",
+  "name": "Alfred Kastler",
+  "description": "Application de gestion scolaire Alfred Kastler",
+  "icons": [
+    {
+      "src": "/images/logo-ak-removebg-preview (1).png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/logo-ak-removebg-preview (2).png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "categories": ["education", "productivity"],
+  "lang": "fr"
+}
