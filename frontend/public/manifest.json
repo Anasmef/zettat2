@@ -1,27 +1,49 @@
 {
   "short_name": "AK",
-  "name": "Alfred Kastler",
-  "description": "Application de gestion scolaire Alfred Kastler",
+  "name": "Alfred Kastler - Gestion Scolaire",
+  "description": "Application de gestion scolaire Alfred Kastler - Étudiants, Professeurs et Administration",
   "icons": [
     {
-      "src": "/images/logo-ak-removebg-preview (1).png",
+      "src": "/icons/logo-ak-removebg.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/icons/logo-ak-removebg-preview (2).png",
+      "src": "/icons/logo-ak-removebg.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/logo-ak-removebg-preview.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/logo-ak-removebg-preview.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "theme_color": "#e60039",
   "background_color": "#ffffff",
   "scope": "/",
   "categories": ["education", "productivity"],
-  "lang": "fr"
+  "lang": "fr",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
 }

@@ -47,7 +47,7 @@ const ListePresences = () => {
           return;
         }
 
-        const res = await axios.get('http://localhost:5000/api/professeur/presences', {
+        const res = await axios.get('/api/professeur/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 

@@ -13,14 +13,26 @@ import {
   DollarSign,
   Percent,
   Receipt,
-  CreditCard
+  CreditCard,
+  Globe,
+  Briefcase,
+  Bus,
+  UserCheck,
+  Clock,
+  Award
 } from 'lucide-react';
 import Sidebar from '../components/sidebaretudiant';
 import { useNavigate } from 'react-router-dom';
 
 const handleLogout = () => {
-  // Note: In production, use React state instead of localStorage
-  localStorage.removeItem('token');
+  // Note: In production, use React state instead of localStorage for token management
+  // For now, we'll clear any stored tokens and redirect
+  try {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+  } catch (e) {
+    console.log('Storage not available');
+  }
   window.location.href = '/';
 };
 
@@ -30,8 +42,8 @@ const ProfileEtudiant = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const role = localStorage.getItem('role');
-    const token = localStorage.getItem('token');
+    const role = localStorage?.getItem('role');
+    const token = localStorage?.getItem('token');
 
     if (role !== 'etudiant' || !token) {
       navigate('/');
@@ -40,7 +52,7 @@ const ProfileEtudiant = () => {
 
     const fetchProfile = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/etudiant/profile', {
+        const res = await fetch('/api/etudiant/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -81,11 +93,17 @@ const ProfileEtudiant = () => {
     });
   };
 
-  // Ajout du calcul du montant à payer après bourse
   const getMontantAPayer = () => {
     if (!etudiant || !etudiant.prixTotal) return 0;
     const reduction = (etudiant.prixTotal * (etudiant.pourcentageBourse || 0)) / 100;
     return etudiant.prixTotal - reduction;
+  };
+
+  const getStatutPaiement = () => {
+    if (!etudiant) return 'N/A';
+    if (etudiant.paye) return 'Payé';
+    if (etudiant.prixTotal === 0) return 'Gratuit';
+    return 'En attente';
   };
 
   if (loading) {
@@ -110,8 +128,9 @@ const ProfileEtudiant = () => {
     <div style={styles.container}>
       <Sidebar onLogout={handleLogout} />
       <div style={styles.header}>
-        <div style={{ ...styles.headerContent, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <h1 style={{ ...styles.headerTitle, textAlign: 'center', width: '100%' }}>Mon Profil</h1>
+        <div style={styles.headerContent}>
+          <h1 style={styles.headerTitle}>Mon Profil</h1>
+          <p style={styles.headerSubtitle}>Année scolaire {etudiant.anneeScolaire}</p>
         </div>
       </div>
       <div style={styles.mainContent}>
@@ -121,7 +140,7 @@ const ProfileEtudiant = () => {
             <div style={styles.avatarContainer}>
               {etudiant.image ? (
                 <img
-                  src={`http://localhost:5000${etudiant.image}`}
+                  src={`${etudiant.image}`}
                   alt="Profil"
                   style={styles.avatar}
                 />
@@ -141,7 +160,9 @@ const ProfileEtudiant = () => {
             <div style={styles.profileInfo}>
               <h2 style={styles.profileName}>{etudiant.nomComplet}</h2>
               <p style={styles.profileEmail}>{etudiant.email}</p>
-              <div style={styles.statusContainer}>
+              <div style={styles.profileDetails}>
+                <span style={styles.profileLevel}>{etudiant.niveau}</span>
+                <span style={styles.profileSeparator}>•</span>
                 <span style={{
                   ...styles.statusText,
                   color: etudiant.actif ? '#10b981' : '#ef4444'
@@ -163,7 +184,7 @@ const ProfileEtudiant = () => {
             </div>
             <div style={styles.cardContent}>
               <div style={styles.infoItem}>
-                <GraduationCap size={18} color="#6b7280" />
+                <User size={18} color="#6b7280" />
                 <div style={styles.infoDetails}>
                   <span style={styles.infoLabel}>Genre</span>
                   <span style={styles.infoValue}>{etudiant.genre || 'Non renseigné'}</span>
@@ -181,6 +202,20 @@ const ProfileEtudiant = () => {
                 </div>
               </div>
               <div style={styles.infoItem}>
+                <MapPin size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Lieu de naissance</span>
+                  <span style={styles.infoValue}>{etudiant.lieuNaissance || 'Non renseigné'}</span>
+                </div>
+              </div>
+              <div style={styles.infoItem}>
+                <Globe size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Nationalité</span>
+                  <span style={styles.infoValue}>{etudiant.nationalite || 'Non renseigné'}</span>
+                </div>
+              </div>
+              <div style={styles.infoItem}>
                 <Hash size={18} color="#6b7280" />
                 <div style={styles.infoDetails}>
                   <span style={styles.infoLabel}>Code Massar</span>
@@ -193,6 +228,51 @@ const ProfileEtudiant = () => {
                   <div style={styles.infoDetails}>
                     <span style={styles.infoLabel}>Adresse</span>
                     <span style={styles.infoValue}>{etudiant.adresse}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Academic Information */}
+          <div style={styles.infoCard}>
+            <div style={styles.cardHeader}>
+              <GraduationCap size={20} color="#7c3aed" />
+              <h3 style={styles.cardTitle}>Informations Scolaires</h3>
+            </div>
+            <div style={styles.cardContent}>
+              <div style={styles.infoItem}>
+                <Award size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Niveau</span>
+                  <span style={styles.infoValue}>{etudiant.niveau}</span>
+                </div>
+              </div>
+              <div style={styles.infoItem}>
+                <Calendar size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Année scolaire</span>
+                  <span style={styles.infoValue}>{etudiant.anneeScolaire}</span>
+                </div>
+              </div>
+              <div style={styles.infoItem}>
+                <Bus size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Transport scolaire</span>
+                  <span style={{
+                    ...styles.infoValue,
+                    color: etudiant.transport ? '#059669' : '#6b7280'
+                  }}>
+                    {etudiant.transport ? 'Oui' : 'Non'}
+                  </span>
+                </div>
+              </div>
+              {etudiant.creeParAdmin && (
+                <div style={styles.infoItem}>
+                  <UserCheck size={18} color="#6b7280" />
+                  <div style={styles.infoDetails}>
+                    <span style={styles.infoLabel}>Créé par</span>
+                    <span style={styles.infoValue}>{etudiant.creeParAdmin}</span>
                   </div>
                 </div>
               )}
@@ -234,11 +314,53 @@ const ProfileEtudiant = () => {
             </div>
           </div>
 
+          {/* Parents Information */}
+          <div style={styles.infoCard}>
+            <div style={styles.cardHeader}>
+              <Users size={20} color="#f59e0b" />
+              <h3 style={styles.cardTitle}>Informations des Parents</h3>
+            </div>
+            <div style={styles.cardContent}>
+              <div style={styles.infoItem}>
+                <User size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Nom complet du père</span>
+                  <span style={styles.infoValue}>{etudiant.nomCompletPere || 'Non renseigné'}</span>
+                </div>
+              </div>
+              {etudiant.travailPere && (
+                <div style={styles.infoItem}>
+                  <Briefcase size={18} color="#6b7280" />
+                  <div style={styles.infoDetails}>
+                    <span style={styles.infoLabel}>Profession du père</span>
+                    <span style={styles.infoValue}>{etudiant.travailPere}</span>
+                  </div>
+                </div>
+              )}
+              <div style={styles.infoItem}>
+                <User size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Nom complet de la mère</span>
+                  <span style={styles.infoValue}>{etudiant.nomCompletMere || 'Non renseigné'}</span>
+                </div>
+              </div>
+              {etudiant.travailMere && (
+                <div style={styles.infoItem}>
+                  <Briefcase size={18} color="#6b7280" />
+                  <div style={styles.infoDetails}>
+                    <span style={styles.infoLabel}>Profession de la mère</span>
+                    <span style={styles.infoValue}>{etudiant.travailMere}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Courses Information */}
           <div style={styles.infoCard}>
             <div style={styles.cardHeader}>
               <BookOpen size={20} color="#dc2626" />
-              <h3 style={styles.cardTitle}>Mes Classe</h3>
+              <h3 style={styles.cardTitle}>Mes Classes</h3>
             </div>
             <div style={styles.cardContent}>
               {etudiant.cours && etudiant.cours.length > 0 ? (
@@ -255,58 +377,17 @@ const ProfileEtudiant = () => {
               ) : (
                 <div style={styles.noCourses}>
                   <BookOpen size={32} color="#d1d5db" />
-                  <p style={styles.noCoursesText}>Aucun classe inscrit</p>
+                  <p style={styles.noCoursesText}>Aucune matière inscrite</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Account Information */}
-          <div style={styles.infoCard}>
-            <div style={styles.cardHeader}>
-              <CheckCircle size={20} color="#7c3aed" />
-              <h3 style={styles.cardTitle}>Informations du Compte</h3>
-            </div>
-            <div style={styles.cardContent}>
-              <div style={styles.infoItem}>
-                <Calendar size={18} color="#6b7280" />
-                <div style={styles.infoDetails}>
-                  <span style={styles.infoLabel}>Créé le</span>
-                  <span style={styles.infoValue}>
-                    {etudiant.createdAt ? formatDate(etudiant.createdAt) : 'Non disponible'}
-                  </span>
-                </div>
-              </div>
-              {etudiant.lastSeen && (
-                <div style={styles.infoItem}>
-                  <CheckCircle size={18} color="#6b7280" />
-                  <div style={styles.infoDetails}>
-                    <span style={styles.infoLabel}>Dernière connexion</span>
-                    <span style={styles.infoValue}>{formatDate(etudiant.lastSeen)}</span>
-                  </div>
-                </div>
-              )}
-              <div style={styles.infoItem}>
-                <User size={18} color="#6b7280" />
-                <div style={styles.infoDetails}>
-                  <span style={styles.infoLabel}>Statut du compte</span>
-                  <span style={{
-                    ...styles.infoValue,
-                    color: etudiant.actif ? '#059669' : '#dc2626',
-                    fontWeight: '600'
-                  }}>
-                    {etudiant.actif ? 'Actif' : 'Inactif'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Informations financières */}
+          {/* Financial Information */}
           <div style={styles.infoCard}>
             <div style={styles.cardHeader}>
               <DollarSign size={20} color="#059669" />
-              <h3 style={styles.cardTitle}>Informations financières</h3>
+              <h3 style={styles.cardTitle}>Informations Financières</h3>
             </div>
             <div style={styles.cardContent}>
               <div style={styles.infoItem}>
@@ -323,7 +404,9 @@ const ProfileEtudiant = () => {
                   <span style={styles.infoValue}>
                     {etudiant.pourcentageBourse ?? 0}%
                     {etudiant.pourcentageBourse > 0 && (
-                      <span> (Réduction: {((etudiant.prixTotal ?? 0) * (etudiant.pourcentageBourse ?? 0) / 100).toFixed(2)} Dh)</span>
+                      <span style={styles.bourseReduction}>
+                        {' '}(Réduction: {((etudiant.prixTotal ?? 0) * (etudiant.pourcentageBourse ?? 0) / 100).toFixed(2)} Dh)
+                      </span>
                     )}
                   </span>
                 </div>
@@ -332,29 +415,76 @@ const ProfileEtudiant = () => {
                 <Receipt size={18} color="#3b82f6" />
                 <div style={styles.infoDetails}>
                   <span style={styles.infoLabel}>Montant à payer</span>
-                  <span style={styles.infoValue}>{getMontantAPayer()} Dh</span>
+                  <span style={styles.infoValue}>{getMontantAPayer().toFixed(2)} Dh</span>
                 </div>
               </div>
               <div style={styles.infoItem}>
                 <CreditCard size={18} color="#8b5cf6" />
                 <div style={styles.infoDetails}>
-                  <span style={styles.infoLabel}>Type paiement</span>
+                  <span style={styles.infoLabel}>Type de paiement</span>
                   <span style={styles.infoValue}>{etudiant.typePaiement || 'Cash'}</span>
-                </div>
-              </div>
-              <div style={styles.infoItem}>
-                <Calendar size={18} color="#10b981" />
-                <div style={styles.infoDetails}>
-                  <span style={styles.infoLabel}>Année scolaire</span>
-                  <span style={styles.infoValue}>{etudiant.anneeScolaire || 'N/A'}</span>
                 </div>
               </div>
               <div style={styles.infoItem}>
                 <CheckCircle size={18} color="#059669" />
                 <div style={styles.infoDetails}>
                   <span style={styles.infoLabel}>Statut paiement</span>
+                  <span style={{
+                    ...styles.infoValue,
+                    color: etudiant.paye ? '#059669' : (etudiant.prixTotal === 0 ? '#6b7280' : '#dc2626'),
+                    fontWeight: '600'
+                  }}>
+                    {getStatutPaiement()}
+                  </span>
+                </div>
+              </div>
+              {etudiant.dateReglement && (
+                <div style={styles.infoItem}>
+                  <Calendar size={18} color="#10b981" />
+                  <div style={styles.infoDetails}>
+                    <span style={styles.infoLabel}>Date de règlement</span>
+                    <span style={styles.infoValue}>{formatDate(etudiant.dateReglement)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Account Information */}
+          <div style={styles.infoCard}>
+            <div style={styles.cardHeader}>
+              <Clock size={20} color="#6b7280" />
+              <h3 style={styles.cardTitle}>Informations du Compte</h3>
+            </div>
+            <div style={styles.cardContent}>
+              <div style={styles.infoItem}>
+                <Calendar size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Créé le</span>
                   <span style={styles.infoValue}>
-                    {etudiant.paye ? 'Payé' : (etudiant.prixTotal === 0 ? 'Gratuit' : 'En attente')}
+                    {etudiant.createdAt ? formatDate(etudiant.createdAt) : 'Non disponible'}
+                  </span>
+                </div>
+              </div>
+              {etudiant.lastSeen && (
+                <div style={styles.infoItem}>
+                  <Clock size={18} color="#6b7280" />
+                  <div style={styles.infoDetails}>
+                    <span style={styles.infoLabel}>Dernière connexion</span>
+                    <span style={styles.infoValue}>{formatDate(etudiant.lastSeen)}</span>
+                  </div>
+                </div>
+              )}
+              <div style={styles.infoItem}>
+                <CheckCircle size={18} color="#6b7280" />
+                <div style={styles.infoDetails}>
+                  <span style={styles.infoLabel}>Statut du compte</span>
+                  <span style={{
+                    ...styles.infoValue,
+                    color: etudiant.actif ? '#059669' : '#dc2626',
+                    fontWeight: '600'
+                  }}>
+                    {etudiant.actif ? 'Actif' : 'Inactif'}
                   </span>
                 </div>
               </div>
@@ -376,7 +506,7 @@ const styles = {
   header: {
     backgroundColor: '#ffffff',
     borderBottom: '1px solid #e5e7eb',
-    padding: '1rem 0',
+    padding: '1.5rem 0',
     position: 'sticky',
     top: 0,
     zIndex: 10,
@@ -387,12 +517,19 @@ const styles = {
     maxWidth: '1200px',
     margin: '0 auto',
     padding: '0 1rem',
+    textAlign: 'center',
   },
   
   headerTitle: {
-    fontSize: '32px',
+    fontSize: '2rem',
     fontWeight: '700',
     color: '#1f2937',
+    margin: '0 0 0.5rem 0',
+  },
+
+  headerSubtitle: {
+    fontSize: '1rem',
+    color: '#6b7280',
     margin: 0,
   },
   
@@ -467,13 +604,27 @@ const styles = {
   profileEmail: {
     fontSize: '1rem',
     color: '#6b7280',
-    margin: '0 0 0.5rem 0',
+    margin: '0 0 0.75rem 0',
   },
-  
-  statusContainer: {
+
+  profileDetails: {
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem',
+    flexWrap: 'wrap',
+  },
+
+  profileLevel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#4f46e5',
+    backgroundColor: '#eef2ff',
+    padding: '0.25rem 0.75rem',
+    borderRadius: '1rem',
+  },
+
+  profileSeparator: {
+    color: '#d1d5db',
   },
   
   statusText: {
@@ -483,7 +634,7 @@ const styles = {
   
   cardsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
     gap: '1.5rem',
   },
   
@@ -493,6 +644,7 @@ const styles = {
     padding: '1.5rem',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
     border: '1px solid #f3f4f6',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
   },
   
   cardHeader: {
@@ -540,6 +692,11 @@ const styles = {
     fontSize: '0.875rem',
     color: '#1f2937',
     fontWeight: '500',
+  },
+
+  bourseReduction: {
+    color: '#059669',
+    fontSize: '0.8rem',
   },
   
   coursesList: {
@@ -636,6 +793,11 @@ styleSheet.textContent = `
     100% { transform: rotate(360deg); }
   }
   
+  .info-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
   @media (max-width: 768px) {
     .profile-header {
       flex-direction: column;
@@ -644,6 +806,41 @@ styleSheet.textContent = `
     
     .cards-grid {
       grid-template-columns: 1fr;
+    }
+    
+    .profile-details {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    
+    .header-content {
+      padding: 0 1rem;
+    }
+    
+    .main-content {
+      padding: 1rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .profile-card,
+    .info-card {
+      padding: 1rem;
+    }
+    
+    .header-title {
+      font-size: 1.5rem;
+    }
+    
+    .profile-name {
+      font-size: 1.25rem;
+    }
+    
+    .avatar,
+    .avatar-placeholder {
+      width: 60px;
+      height: 60px;
     }
   }
 `;

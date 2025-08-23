@@ -118,7 +118,7 @@ const [filters, setFilters] = useState({
   const fetchPaiements = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/paiements', {
+      const res = await fetch('/api/paiements', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -132,7 +132,7 @@ const [filters, setFilters] = useState({
   const fetchExpirés = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/paiements/exp', {
+      const res = await fetch('/api/paiements/exp', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -407,7 +407,7 @@ const generatePDF = (p) => {
   doc.setTextColor(...colors.dark);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('CENTRE DE FORMATION ALFRED KASTLER', 40, 17);
+  doc.text('Groupe Scolaire Alfred Kastler', 40, 17);
   
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');

@@ -89,7 +89,7 @@ const ListeProfesseurs = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/professeurs', {
+      const res = await axios.get('/api/professeurs', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(res.data);
@@ -103,7 +103,7 @@ const ListeProfesseurs = () => {
   const fetchCours = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/cours', {
+      const res = await axios.get('/api/cours', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListeCours(res.data);
@@ -208,7 +208,7 @@ const ListeProfesseurs = () => {
       formAjout.cours.forEach(c => formData.append('cours[]', c));
       if (imageFile) formData.append('image', imageFile);
 
-      const response = await axios.post('http://localhost:5000/api/professeurs', formData, {
+      const response = await axios.post('/api/professeurs', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -319,7 +319,7 @@ const ListeProfesseurs = () => {
       formModifier.cours.forEach(c => formData.append('cours[]', c));
       if (imageFileModifier) formData.append('image', imageFileModifier);
 
-      const response = await axios.put(`http://localhost:5000/api/professeurs/${professeurAModifier._id}`, formData, {
+      const response = await axios.put(`/api/professeurs/${professeurAModifier._id}`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -345,7 +345,7 @@ const ListeProfesseurs = () => {
   const handleToggleActif = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(`http://localhost:5000/api/professeurs/${id}/actif`, {}, {
+      const res = await axios.patch(`/api/professeurs/${id}/actif`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(professeurs.map(p => p._id === id ? res.data : p));
@@ -359,7 +359,7 @@ const ListeProfesseurs = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/professeurs/${id}`, {
+      await axios.delete(`/api/professeurs/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(professeurs.filter(p => p._id !== id));
@@ -595,7 +595,7 @@ const ListeProfesseurs = () => {
                     <td className="image-colonne">
                       {p.image ? (
                         <img 
-                          src={`http://localhost:5000${p.image}`} 
+                          src={`${p.image}`} 
                           alt="professeur" 
                           className="image-etudiant"
                         />
@@ -644,7 +644,7 @@ const ListeProfesseurs = () => {
                     <div className="carte-image">
                       {p.image ? (
                         <img 
-                          src={`http://localhost:5000${p.image}`} 
+                          src={`${p.image}`} 
                           alt="professeur" 
                           className="carte-photo"
                         />
@@ -971,7 +971,7 @@ const ListeProfesseurs = () => {
           <div className="etudiant-image-section">
             {professeurSelectionne.image ? (
               <img 
-                src={`http://localhost:5000${professeurSelectionne.image}`} 
+                src={`${professeurSelectionne.image}`} 
                 alt="Photo du professeur" 
                 className="etudiant-image-large"
               />
@@ -1205,7 +1205,7 @@ const ListeProfesseurs = () => {
             <div className="image-actuelle">
               <small>Image actuelle :</small>
               <img 
-                src={`http://localhost:5000${professeurAModifier.image}`} 
+                src={`${professeurAModifier.image}`} 
                 alt="Image actuelle" 
                 className="image-preview"
                 style={{width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px'}}

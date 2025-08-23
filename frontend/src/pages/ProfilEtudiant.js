@@ -20,16 +20,20 @@ import {
   Hash,
   UserCheck,
   Percent,
-  Receipt
+  Receipt,
+  GraduationCap,
+  Bus, // Pour le transport
+  Flag // Pour la nationalité
 } from 'lucide-react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 
- const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/';
+};
+
 const ProfilEtudiant = () => {
   const { id } = useParams();
   
@@ -50,20 +54,20 @@ const ProfilEtudiant = () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         // Récupération des données de l'étudiant
-        const resEtudiant = await axios.get(`http://localhost:5000/api/etudiants/${id}`, config);
+        const resEtudiant = await axios.get(`/api/etudiants/${id}`, config);
         setEtudiant(resEtudiant.data);
 
         // Récupération des paiements spécifiques à cet étudiant (OPTIMISÉ)
-        const resPaiements = await axios.get(`http://localhost:5000/api/paiements/etudiant/${id}`, config);
+        const resPaiements = await axios.get(`/api/paiements/etudiant/${id}`, config);
         setPaiements(resPaiements.data);
 
         // Récupération des paiements expirés puis filtrage
-        const resExp = await axios.get(`http://localhost:5000/api/paiements/exp`, config);
+        const resExp = await axios.get(`/api/paiements/exp`, config);
         const expirésEtudiant = resExp.data.filter(p => p.etudiant?._id === id);
         setExpirés(expirésEtudiant);
 
         // Récupération des présences pour cet étudiant
-        const resPres = await axios.get(`http://localhost:5000/api/presences/etudiant/${id}`, config);
+        const resPres = await axios.get(`/api/presences/etudiant/${id}`, config);
         setPresences(resPres.data);
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
@@ -75,6 +79,18 @@ const ProfilEtudiant = () => {
 
     fetchData();
   }, [id]);
+
+  // Fonction pour calculer l'âge
+  const calculerAge = (dateNaissance) => {
+    const dob = new Date(dateNaissance);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  };
 
   // Fonction pour calculer les statistiques de présence
   const getPresenceStats = () => {
@@ -150,7 +166,7 @@ const ProfilEtudiant = () => {
 
   return (
     <div style={styles.pageContainer}>
-      {/* Header avec informations principales */}      <Sidebar onLogout={handleLogout} />
+      <Sidebar onLogout={handleLogout} />
       
       <div style={styles.headerSection}>
         <div style={styles.headerContent}>
@@ -158,7 +174,7 @@ const ProfilEtudiant = () => {
             <div style={styles.avatarSection}>
               {etudiant.image ? (
                 <img
-                  src={`http://localhost:5000${etudiant.image}`}
+                  src={`${etudiant.image}`}
                   alt="Profil étudiant"
                   style={styles.avatar}
                 />
@@ -178,7 +194,7 @@ const ProfilEtudiant = () => {
             <div style={styles.studentInfo}>
               <h1 style={styles.studentName}>{etudiant.nomComplet}</h1>
               
-              {/* Informations personnelles de base */}
+              {/* ✅ INFORMATIONS PERSONNELLES MISES À JOUR */}
               <div style={styles.infoCards}>
                 <div style={styles.infoCard}>
                   <User size={18} color="#8b5cf6" />
@@ -198,6 +214,33 @@ const ProfilEtudiant = () => {
                   </div>
                 </div>
 
+                {/* ✅ AJOUT: Âge calculé */}
+                <div style={styles.infoCard}>
+                  <Calendar size={18} color="#10b981" />
+                  <div>
+                    <span style={styles.infoLabel}>Âge</span>
+                    <span style={styles.infoValue}>{calculerAge(etudiant.dateNaissance)} ans</span>
+                  </div>
+                </div>
+
+                {/* ✅ AJOUT: Lieu de naissance */}
+                <div style={styles.infoCard}>
+                  <MapPin size={18} color="#ec4899" />
+                  <div>
+                    <span style={styles.infoLabel}>Lieu de naissance</span>
+                    <span style={styles.infoValue}>{etudiant.lieuNaissance || 'Non spécifié'}</span>
+                  </div>
+                </div>
+
+                {/* ✅ AJOUT: Nationalité */}
+                <div style={styles.infoCard}>
+                  <Flag size={18} color="#f59e0b" />
+                  <div>
+                    <span style={styles.infoLabel}>Nationalité</span>
+                    <span style={styles.infoValue}>{etudiant.nationalite || 'Non spécifiée'}</span>
+                  </div>
+                </div>
+
                 <div style={styles.infoCard}>
                   <Mail size={18} color="#06b6d4" />
                   <div>
@@ -213,9 +256,66 @@ const ProfilEtudiant = () => {
                     <span style={styles.infoValue}>{etudiant.codeMassar}</span>
                   </div>
                 </div>
+
+                {/* ✅ AJOUT: Niveau scolaire */}
+                <div style={styles.infoCard}>
+                  <GraduationCap size={18} color="#8b5cf6" />
+                  <div>
+                    <span style={styles.infoLabel}>Niveau scolaire</span>
+                    <span style={styles.infoValue}>{etudiant.niveau || 'Non défini'}</span>
+                  </div>
+                </div>
+
+                {/* ✅ AJOUT: Année scolaire */}
+                <div style={styles.infoCard}>
+                  <Calendar size={18} color="#059669" />
+                  <div>
+                    <span style={styles.infoLabel}>Année scolaire</span>
+                    <span style={styles.infoValue}>{etudiant.anneeScolaire || 'Non définie'}</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Informations de contact */}
+              {/* ✅ INFORMATIONS FAMILIALES MISES À JOUR */}
+              <div style={styles.contactSection}>
+                <h3 style={styles.sectionSubtitle}>Informations familiales</h3>
+                <div style={styles.infoCards}>
+                  <div style={styles.infoCard}>
+                    <User size={18} color="#3b82f6" />
+                    <div>
+                      <span style={styles.infoLabel}>Nom du père</span>
+                      <span style={styles.infoValue}>{etudiant.nomCompletPere || 'Non spécifié'}</span>
+                    </div>
+                  </div>
+
+                  <div style={styles.infoCard}>
+                    <User size={18} color="#ec4899" />
+                    <div>
+                      <span style={styles.infoLabel}>Nom de la mère</span>
+                      <span style={styles.infoValue}>{etudiant.nomCompletMere || 'Non spécifié'}</span>
+                    </div>
+                  </div>
+
+                  {/* ✅ AJOUT: Travail des parents - TOUJOURS AFFICHÉS */}
+                  <div style={styles.infoCard}>
+                    <FileText size={18} color="#059669" />
+                    <div>
+                      <span style={styles.infoLabel}>Travail du père</span>
+                      <span style={styles.infoValue}>{etudiant.travailPere || 'Non spécifié'}</span>
+                    </div>
+                  </div>
+
+                  <div style={styles.infoCard}>
+                    <FileText size={18} color="#dc2626" />
+                    <div>
+                      <span style={styles.infoLabel}>Travail de la mère</span>
+                      <span style={styles.infoValue}>{etudiant.travailMere || 'Non spécifié'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* INFORMATIONS DE CONTACT MISES À JOUR */}
               <div style={styles.contactSection}>
                 <h3 style={styles.sectionSubtitle}>Contacts</h3>
                 <div style={styles.infoCards}>
@@ -227,50 +327,67 @@ const ProfilEtudiant = () => {
                     </div>
                   </div>
 
-                  {etudiant.telephonePere && (
-                    <div style={styles.infoCard}>
-                      <Phone size={18} color="#3b82f6" />
-                      <div>
-                        <span style={styles.infoLabel}>Téléphone père</span>
-                        <span style={styles.infoValue}>{etudiant.telephonePere}</span>
-                      </div>
+                  {/* ✅ CORRECTION: TOUJOURS AFFICHÉS MÊME SI VIDES */}
+                  <div style={styles.infoCard}>
+                    <Phone size={18} color="#3b82f6" />
+                    <div>
+                      <span style={styles.infoLabel}>Téléphone père</span>
+                      <span style={styles.infoValue}>{etudiant.telephonePere || 'Non spécifié'}</span>
                     </div>
-                  )}
+                  </div>
 
-                  {etudiant.telephoneMere && (
-                    <div style={styles.infoCard}>
-                      <Phone size={18} color="#ec4899" />
-                      <div>
-                        <span style={styles.infoLabel}>Téléphone mère</span>
-                        <span style={styles.infoValue}>{etudiant.telephoneMere}</span>
-                      </div>
+                  <div style={styles.infoCard}>
+                    <Phone size={18} color="#ec4899" />
+                    <div>
+                      <span style={styles.infoLabel}>Téléphone mère</span>
+                      <span style={styles.infoValue}>{etudiant.telephoneMere || 'Non spécifié'}</span>
                     </div>
-                  )}
+                  </div>
 
-                  {etudiant.adresse && (
-                    <div style={styles.infoCard}>
-                      <MapPin size={18} color="#ef4444" />
-                      <div>
-                        <span style={styles.infoLabel}>Adresse</span>
-                        <span style={styles.infoValue}>{etudiant.adresse}</span>
-                      </div>
+                  {/* ✅ CORRECTION: TOUJOURS AFFICHÉ */}
+                  <div style={styles.infoCard}>
+                    <MapPin size={18} color="#ef4444" />
+                    <div>
+                      <span style={styles.infoLabel}>Adresse</span>
+                      <span style={styles.infoValue}>{etudiant.adresse || 'Non spécifiée'}</span>
                     </div>
-                  )}
+                  </div>
+
+                  {/* ✅ AJOUT: Transport scolaire */}
+                  <div style={styles.infoCard}>
+                    <Bus size={18} color="#8b5cf6" />
+                    <div>
+                      <span style={styles.infoLabel}>Transport scolaire</span>
+                      <span style={{
+                        ...styles.infoValue,
+                        color: etudiant.transport ? '#059669' : '#dc2626',
+                        fontWeight: '700'
+                      }}>
+                        {etudiant.transport ? '✅ Oui' : '❌ Non'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Informations académiques */}
+              {/* INFORMATIONS ACADÉMIQUES */}
               <div style={styles.contactSection}>
                 <h3 style={styles.sectionSubtitle}>Informations académiques</h3>
                 <div style={styles.infoCards}>
                   <div style={styles.infoCard}>
                     <BookOpen size={18} color="#f59e0b" />
                     <div>
-                      <span style={styles.infoLabel}>Cours inscrits</span>
+                      <span style={styles.infoLabel}>Classes inscrites</span>
                       <div style={styles.coursesGrid}>
-                        {etudiant.cours?.map((cours, index) => (
-                          <span key={index} style={styles.courseTag}>{cours}</span>
-                        ))}
+                        {etudiant.cours && etudiant.cours.length > 0 ? (
+                          etudiant.cours.map((cours, index) => (
+                            <span key={index} style={styles.courseTag}>{cours}</span>
+                          ))
+                        ) : (
+                          <span style={{...styles.infoValue, color: '#6b7280', fontStyle: 'italic'}}>
+                            Aucune classe inscrite
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -374,14 +491,14 @@ const ProfilEtudiant = () => {
                   </div>
                 </div>
 
-                {etudiant.dateEtReglement && (
+                {etudiant.dateReglement && (
                   <div style={styles.financialCard}>
                     <div style={styles.financialIcon}>
                       <Calendar size={20} color="#10b981" />
                     </div>
                     <div style={styles.financialContent}>
                       <span style={styles.financialLabel}>Date de règlement</span>
-                      <span style={styles.financialValue}>{etudiant.dateEtReglement}</span>
+                      <span style={styles.financialValue}>{etudiant.dateReglement}</span>
                     </div>
                   </div>
                 )}
@@ -1016,7 +1133,7 @@ const styles = {
   // Statistiques de présence
   presenceStatsContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minWidth(180px, 1fr))',
     gap: '16px',
     padding: '20px 32px',
     backgroundColor: '#f8fafc',

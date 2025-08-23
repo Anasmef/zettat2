@@ -346,7 +346,7 @@ function QREtudiant() {
             horaire: currentSession.horaire
           });
 
-          const res = await fetch('http://localhost:5000/api/etudiant/qr-presence', {
+          const res = await fetch('/api/etudiant/qr-presence', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

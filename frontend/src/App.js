@@ -95,12 +95,24 @@ function AppContent() {
     
     const hasRedirectedOnce = localStorage.getItem('hasRedirectedToLogin') === '1';
     
+    // Debug info
+    console.log('🔍 Debug PWA:', {
+      pathname: location.pathname,
+      isStandalone,
+      isInstalled,
+      canInstall,
+      hasServiceWorker: 'serviceWorker' in navigator,
+      hasManifest: !!document.querySelector('link[rel="manifest"]'),
+      protocol: location.protocol,
+      hostname: location.hostname
+    });
+    
     // Si l'app est en mode standalone ET qu'on n'a jamais redirigé
     if (isStandalone && !hasRedirectedOnce && location.pathname === '/') {
       localStorage.setItem('hasRedirectedToLogin', '1');
       navigate('/login', { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, isInstalled, canInstall]);
 
   // Écoute du prompt et de l'installation
   useEffect(() => {
@@ -137,34 +149,95 @@ function AppContent() {
     if (location.pathname !== '/login') {
       setCanInstall(false);
     } else if (!isInstalled) {
-      // Afficher le bouton sur /login même sans beforeinstallprompt
+      // Afficher le bouton sur /login même sans prompt (pour les instructions)
       setCanInstall(true);
     }
   }, [location.pathname, isInstalled]);
 
+  // Fonction pour détecter si l'installation est possible
+  const isInstallable = () => {
+    // Vérifier les critères PWA basiques
+    const hasServiceWorker = 'serviceWorker' in navigator;
+    const hasManifest = document.querySelector('link[rel="manifest"]');
+    const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+    
+    return hasServiceWorker && hasManifest && isHTTPS;
+  };
+
   // Clic sur "Installer"
   const handleInstallClick = async () => {
     const deferredPrompt = deferredPromptRef.current;
-    if (!deferredPrompt) {
-      // Si pas de prompt disponible, afficher les instructions
-      alert('Pour installer cette application:\n\n1. Sur Chrome/Edge: Cliquez sur l\'icône d\'installation dans la barre d\'adresse\n2. Ou utilisez le menu "Installer l\'application"\n3. Sur mobile: Utilisez "Ajouter à l\'écran d\'accueil" dans le menu du navigateur');
+    
+    if (deferredPrompt) {
+      // Si on a un prompt, l'utiliser directement
+      setCanInstall(false);
+      deferredPrompt.prompt();
+
+      try {
+        const choice = await deferredPrompt.userChoice;
+        deferredPromptRef.current = null;
+
+        if (choice?.outcome === 'accepted') {
+          console.log('✅ PWA installée par l\'utilisateur');
+          setIsInstalled(true);
+          localStorage.setItem('pwaInstalled', '1');
+          localStorage.removeItem('hasRedirectedToLogin');
+          navigate('/login', { replace: true });
+        } else {
+          console.log('❌ Installation refusée par l\'utilisateur');
+          // Réafficher le bouton après un délai
+          setTimeout(() => {
+            if (location.pathname === '/login' && !isInstalled) {
+              setCanInstall(true);
+            }
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Erreur lors de l\'installation:', error);
+        deferredPromptRef.current = null;
+      }
       return;
     }
 
-    setCanInstall(false);
-    deferredPrompt.prompt();
+    // Si pas de prompt, donner des instructions
+    const isChrome = /Chrome/.test(navigator.userAgent);
+    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+    const isFirefox = /Firefox/.test(navigator.userAgent);
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    const choice = await deferredPrompt.userChoice.catch(() => null);
-    deferredPromptRef.current = null;
-
-    if (choice?.outcome === 'accepted') {
-      // Considérer comme installée dès l'acceptation (plus fluide)
-      setIsInstalled(true);
-      localStorage.setItem('pwaInstalled', '1');
-      // Marquer pour redirection au prochain lancement
-      localStorage.removeItem('hasRedirectedToLogin');
-      navigate('/login', { replace: true });
+    let instructions = 'Pour installer cette application:\n\n';
+    
+    if (isMobile) {
+      if (isSafari) {
+        instructions += '📱 Sur Safari iOS:\n';
+        instructions += '• Appuyez sur le bouton Partager 📤\n';
+        instructions += '• Sélectionnez "Sur l\'écran d\'accueil"\n';
+        instructions += '• Confirmez l\'ajout';
+      } else {
+        instructions += '📱 Sur mobile:\n';
+        instructions += '• Appuyez sur les 3 points du menu\n';
+        instructions += '• Sélectionnez "Ajouter à l\'écran d\'accueil"\n';
+        instructions += '• Ou "Installer l\'application"';
+      }
+    } else {
+      if (isChrome) {
+        instructions += '💻 Sur Chrome/Edge:\n';
+        instructions += '• Cliquez sur les 3 points (⋮) en haut à droite\n';
+        instructions += '• Sélectionnez "Installer Alfred Kastler"\n';
+        instructions += '• Ou cherchez l\'icône 📥 dans la barre d\'adresse';
+      } else if (isFirefox) {
+        instructions += '💻 Sur Firefox:\n';
+        instructions += '• Cliquez sur les 3 lignes (≡) en haut à droite\n';
+        instructions += '• Sélectionnez "Installer cette application"';
+      } else {
+        instructions += '💻 Sur votre navigateur:\n';
+        instructions += '• Utilisez le menu principal\n';
+        instructions += '• Cherchez "Installer l\'application"\n';
+        instructions += '• Ou "Ajouter à l\'écran d\'accueil"';
+      }
     }
+
+    alert(instructions);
   };
 
   // Masquer le bouton si déjà en mode standalone
@@ -173,7 +246,11 @@ function AppContent() {
     window.navigator.standalone === true;
 
   const shouldShowInstallButton =
-    !isStandalone && !isInstalled && canInstall && location.pathname === '/login';
+    !isStandalone && 
+    !isInstalled && 
+    canInstall && 
+    location.pathname === '/login' &&
+    isInstallable(); // Vérifier que les conditions PWA sont remplies
 
   return (
     <>
@@ -186,7 +263,7 @@ function AppContent() {
             bottom: '20px',
             right: '20px',
             padding: '12px 18px',
-background: 'linear-gradient(to right, #e60039, #8a2be2)',
+            background: 'linear-gradient(to right, #e60039, #8a2be2)',
             color: 'white',
             fontWeight: 'bold',
             border: 'none',
@@ -196,12 +273,22 @@ background: 'linear-gradient(to right, #e60039, #8a2be2)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            zIndex: 999
+            zIndex: 999,
+            transition: 'all 0.3s ease',
+            fontSize: '14px'
           }}
-          title="Installer l'application"
+          onMouseOver={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
+          }}
+          onMouseOut={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+          }}
+          title="Installer l'application sur cet appareil"
         >
           <Download size={18} />
-          Installer l'application
+          Installer l'app
         </button>
       )}
 
