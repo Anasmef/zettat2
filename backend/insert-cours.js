@@ -9,9 +9,9 @@ const coursSchema = new mongoose.Schema({
     type: String,
     enum: [
       // Collège
-      "6ème Collège", "5ème Collège", "4ème Collège", "3ème Collège",
-      // Lycée Tronc Commun
-      "Tronc Commun Scientifique", "Tronc Commun Littéraire", "Tronc Commun Technique",
+      "1AC", "2AC", "3AC",
+      // Tronc Commun
+      "Tronc Commun",
       // 1ère Bac
       "1BAC SM", "1BAC PC", "1BAC SVT", "1BAC Lettres", "1BAC Économie", "1BAC Technique",
       // 2ème Bac
@@ -26,15 +26,12 @@ const Cours = mongoose.model('Cours', coursSchema);
 // === Données des CLASSES à insérer ===
 const classesData = [
   // === COLLÈGE ===
-  { nom: "6ème Collège", niveau: "6ème Collège" },
-  { nom: "5ème Collège", niveau: "5ème Collège" },
-  { nom: "4ème Collège", niveau: "4ème Collège" },
-  { nom: "3ème Collège", niveau: "3ème Collège" },
+  { nom: "1AC", niveau: "1AC" },
+  { nom: "2AC", niveau: "2AC" },
+  { nom: "3AC", niveau: "3AC" },
 
   // === TRONC COMMUN ===
-  { nom: "Tronc Commun Scientifique", niveau: "Tronc Commun Scientifique" },
-  { nom: "Tronc Commun Littéraire", niveau: "Tronc Commun Littéraire" },
-  { nom: "Tronc Commun Technique", niveau: "Tronc Commun Technique" },
+  { nom: "Tronc Commun", niveau: "Tronc Commun" },
 
   // === 1ÈRE BAC ===
   { nom: "1BAC SM", niveau: "1BAC SM" },
@@ -115,12 +112,12 @@ async function insertClasses() {
     const toutesLesClasses = await Cours.find({}).sort({ niveau: 1, nom: 1 });
     
     console.log('\n📚 COLLÈGE:');
-    toutesLesClasses.filter(c => c.niveau.includes('Collège')).forEach(classe => {
+    toutesLesClasses.filter(c => c.niveau.includes('AC')).forEach(classe => {
       console.log(`   - ${classe.nom}`);
     });
 
     console.log('\n📖 TRONC COMMUN:');
-    toutesLesClasses.filter(c => c.niveau.includes('Tronc Commun')).forEach(classe => {
+    toutesLesClasses.filter(c => c.niveau === 'Tronc Commun').forEach(classe => {
       console.log(`   - ${classe.nom}`);
     });
 
@@ -155,6 +152,8 @@ async function insertClassesPersonnalisees() {
       { nom: "2BAC Économie B", niveau: "2BAC Économie" },
       { nom: "1BAC PC A", niveau: "1BAC PC" },
       { nom: "1BAC PC B", niveau: "1BAC PC" },
+      { nom: "Tronc Commun A", niveau: "Tronc Commun" },
+      { nom: "Tronc Commun B", niveau: "Tronc Commun" },
       // Ajoutez d'autres classes selon vos besoins...
     ];
 

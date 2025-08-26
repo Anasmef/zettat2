@@ -52,7 +52,7 @@ const [formAjout, setFormAjout] = useState({
   telephoneMere: '',
   codeMassar: '',
   adresse: '',
-  email: '',
+  email: '@gmail.com',
   motDePasse: '',
   transport: false,
   cours: [],
@@ -61,7 +61,7 @@ const [formAjout, setFormAjout] = useState({
   paye: false,
   pourcentageBourse: 0,
   typePaiement: 'Cash',
-  anneeScolaire: ''
+  anneeScolaire: '2025/2026'
 });
   const [vueMode, setVueMode] = useState('tableau'); // 'tableau' ou 'carte'
 
@@ -101,7 +101,7 @@ const [formAjout, setFormAjout] = useState({
   paye: false,
   pourcentageBourse: 0,
   typePaiement: 'Cash',
-  anneeScolaire: ''
+  anneeScolaire: '2025/2026'
 });
   const [imageFileModifier, setImageFileModifier] = useState(null);
   const [messageModifier, setMessageModifier] = useState('');
@@ -112,31 +112,31 @@ const [formAjout, setFormAjout] = useState({
 
   // Niveaux disponibles mis à jour selon vos spécifications
   const niveauxDisponibles = [
-    // Collège
-    "6ème Collège",
-    "5ème Collège", 
-    "4ème Collège",
-    "3ème Collège",
-    // Lycée Tronc Commun
-    "Tronc Commun Scientifique",
-    "Tronc Commun Littéraire",
-    "Tronc Commun Technique",
-    // 1ère Bac
-    "1BAC SM",
-    "1BAC PC",
-    "1BAC SVT",
-    "1BAC Lettres",
-    "1BAC Économie",
-    "1BAC Technique",
-    // 2ème Bac
-    "2BAC SMA",
-    "2BAC SMB",
-    "2BAC PC",
-    "2BAC SVT",
-    "2BAC Lettres",
-    "2BAC Économie",
-    "2BAC Technique"
-  ];
+  // Collège
+  "1AC",
+  "2AC",
+  "3AC",
+
+  // Tronc Commun (واحد فقط)
+  "Tronc Commun",
+
+  // 1ère Bac
+  "1BAC SM",
+  "1BAC PC",
+  "1BAC SVT",
+  "1BAC Lettres",
+  "1BAC Économie",
+  "1BAC Technique",
+
+  // 2ème Bac
+  "2BAC SMA",
+  "2BAC SMB",
+  "2BAC PC",
+  "2BAC SVT",
+  "2BAC Lettres",
+  "2BAC Économie",
+  "2BAC Technique"
+];
 
   useEffect(() => {
     fetchEtudiants();
@@ -246,7 +246,7 @@ if (recherche) {
     paye: false,
     pourcentageBourse: 0,
     typePaiement: 'Cash',
-    anneeScolaire: ''
+    anneeScolaire: '2025/2026'
   });
   setImageFile(null);
   setMessageAjout('');
@@ -339,7 +339,7 @@ const handleSubmitAjout = async (e) => {
       paye: false,
       pourcentageBourse: 0,
       typePaiement: 'Cash',
-      anneeScolaire: ''
+      anneeScolaire: '2025/2026'
     });
     setImageFile(null);
 
@@ -386,7 +386,7 @@ const openEditModal = (etudiant) => {
     paye: etudiant.paye === true,
     pourcentageBourse: etudiant.pourcentageBourse || 0,
     typePaiement: etudiant.typePaiement || 'Cash',
-    anneeScolaire: etudiant.anneeScolaire || ''
+    anneeScolaire: etudiant.anneeScolaire || '2025/2026'
   });
   console.log('✅ Transport original:', etudiant.transport, 'Converti:', etudiant.transport === true);
   console.log('✅ Actif original:', etudiant.actif, 'Converti:', etudiant.actif === true);
@@ -424,7 +424,7 @@ const closeEditModal = () => {
     paye: false,
     pourcentageBourse: 0,
     typePaiement: 'Cash',
-    anneeScolaire: ''
+    anneeScolaire: '2025/2026'
   });
   setImageFileModifier(null);
   setMessageModifier('');
@@ -1092,6 +1092,31 @@ const closeEditModal = () => {
               </div>
 
               <div className="form-row">
+                {/* Dans le modal d'ajout - remplacer la section téléphones */}
+                <div className="form-group">
+                  <label>Téléphone Père</label>
+                  <input
+                    type="text"
+                    name="telephonePere"
+                    placeholder="Téléphone du père (optionnel)"
+                    value={formAjout.telephonePere}
+                    onChange={handleChangeAjout}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Téléphone Mère</label>
+                  <input
+                    type="text"
+                    name="telephoneMere"
+                    placeholder="Téléphone de la mère (optionnel)"
+                    value={formAjout.telephoneMere}
+                    onChange={handleChangeAjout}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
                   <label>Téléphone Étudiant *</label>
                   <input
@@ -1140,30 +1165,6 @@ const closeEditModal = () => {
                     onChange={handleChangeAjout}
                     required
                     minLength="6"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Téléphone Père</label>
-                  <input
-                    type="text"
-                    name="telephonePere"
-                    placeholder="Téléphone du père (optionnel)"
-                    value={formAjout.telephonePere}
-                    onChange={handleChangeAjout}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Téléphone Mère</label>
-                  <input
-                    type="text"
-                    name="telephoneMere"
-                    placeholder="Téléphone de la mère (optionnel)"
-                    value={formAjout.telephoneMere}
-                    onChange={handleChangeAjout}
                   />
                 </div>
               </div>
@@ -1456,6 +1457,31 @@ const closeEditModal = () => {
               </div>
 
               <div className="form-row">
+                {/* Dans le modal de modification - remplacer la section téléphones */}
+                <div className="form-group">
+                  <label>Téléphone Père</label>
+                  <input
+                    type="text"
+                    name="telephonePere"
+                    placeholder="Téléphone du père"
+                    value={formModifier.telephonePere}
+                    onChange={handleChangeModifier}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Téléphone Mère</label>
+                  <input
+                    type="text"
+                    name="telephoneMere"
+                    placeholder="Téléphone de la mère"
+                    value={formModifier.telephoneMere}
+                    onChange={handleChangeModifier}
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
                   <label>Téléphone Étudiant *</label>
                   <input
@@ -1507,30 +1533,6 @@ const closeEditModal = () => {
                   <small style={{color: '#666', fontSize: '12px'}}>
                     Laisser vide pour conserver le mot de passe actuel
                   </small>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Téléphone Père</label>
-                  <input
-                    type="text"
-                    name="telephonePere"
-                    placeholder="Téléphone du père"
-                    value={formModifier.telephonePere}
-                    onChange={handleChangeModifier}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Téléphone Mère</label>
-                  <input
-                    type="text"
-                    name="telephoneMere"
-                    placeholder="Téléphone de la mère"
-                    value={formModifier.telephoneMere}
-                    onChange={handleChangeModifier}
-                  />
                 </div>
               </div>
 
