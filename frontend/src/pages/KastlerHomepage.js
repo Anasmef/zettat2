@@ -886,7 +886,7 @@ const KastlerHomepage = () => {
               <div style={styles.statLabel}>Élèves Accompagnés</div>
             </div>
             <div>
-              <div style={styles.statNumber}>95%</div>
+              <div style={styles.statNumber}>100%</div>
               <div style={styles.statLabel}>Taux de Réussite</div>
             </div>
             <div>
