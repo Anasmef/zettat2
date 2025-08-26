@@ -5013,7 +5013,117 @@ app.get('/api/professeur/me', authProfesseur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
+// ===== ROUTES PROFILE ADMIN =====
+console.log('🔧 Ajout des routes profile admin...');
 
+app.get('/api/admin/profile', authAdmin, async (req, res) => {
+  try {
+    console.log('📝 Route profile GET appelée - Admin ID:', req.adminId);
+    
+    const admin = await Admin.findById(req.adminId).select('-motDePasse');
+    if (!admin) {
+      console.log('❌ Admin non trouvé');
+      return res.status(404).json({ error: 'Admin non trouvé' });
+    }
+    
+    console.log('✅ Admin trouvé:', admin.nom);
+    res.json(admin);
+  } catch (err) {
+    console.error('❌ Erreur route profile GET:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/admin/profile', authAdmin, async (req, res) => {
+  try {
+    console.log('📝 Route profile PUT appelée - Admin ID:', req.adminId);
+    console.log('📝 Body reçu:', req.body);
+    
+    const { nom, email, ancienMotDePasse, nouveauMotDePasse } = req.body;
+    const admin = await Admin.findById(req.adminId);
+    
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin non trouvé' });
+    }
+    
+    const updates = {};
+    
+    if (nom && nom.trim() !== admin.nom) {
+      updates.nom = nom.trim();
+    }
+    
+    if (email && email.trim() !== admin.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ error: 'Format d\'email invalide' });
+      }
+      
+      const existingAdmin = await Admin.findOne({ 
+        email: email.trim(),
+        _id: { $ne: req.adminId } 
+      });
+      if (existingAdmin) {
+        return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      }
+      
+      updates.email = email.trim();
+    }
+    
+    if (ancienMotDePasse && nouveauMotDePasse) {
+      const isValidPassword = await admin.comparePassword(ancienMotDePasse);
+      if (!isValidPassword) {
+        return res.status(400).json({ error: 'Ancien mot de passe incorrect' });
+      }
+      
+      if (nouveauMotDePasse.length < 6) {
+        return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
+      }
+      
+      const salt = await bcrypt.genSalt(10);
+      updates.motDePasse = await bcrypt.hash(nouveauMotDePasse, salt);
+    } else if (ancienMotDePasse && !nouveauMotDePasse) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe est requis' });
+    } else if (!ancienMotDePasse && nouveauMotDePasse) {
+      return res.status(400).json({ error: 'L\'ancien mot de passe est requis' });
+    }
+    
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Aucune modification détectée' });
+    }
+    
+    console.log('📝 Mises à jour à appliquer:', Object.keys(updates));
+    
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+      req.adminId,
+      updates,
+      { new: true, runValidators: true }
+    ).select('-motDePasse');
+    
+    console.log('✅ Admin mis à jour avec succès');
+    
+    res.json({
+      message: 'Profil mis à jour avec succès',
+      admin: updatedAdmin,
+      modifiedFields: Object.keys(updates)
+    });
+    
+  } catch (err) {
+    console.error('❌ Erreur route profile PUT:', err);
+    
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ error: errors.join(', ') });
+    }
+    
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+    }
+    
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour' });
+  }
+});
+
+console.log('✅ Routes profile admin ajoutées');
 
 // Lancer le serveur
 const PORT = process.env.PORT || 5004;
