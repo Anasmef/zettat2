@@ -373,7 +373,7 @@ function AppContent() {
         <Route path="/etudiant/live/:cours" element={<EtudiantLiveCours />} />
 
 
-        <Route path="/inscripteur" element={<InscripteurDashboard />} />
+        <Route path="/admin/inscripteurs" element={<InscripteurDashboard />} />
       </Routes>
     </>
   );
