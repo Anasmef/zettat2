@@ -45,7 +45,12 @@ const etudiantSchema = new mongoose.Schema(
 
     // Références
     creeParAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
-
+// Dans etudiantModel.js et professeurModel.js
+creeParInscripteur: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Inscripteur',
+  default: null
+},
     // Paiements
     prixTotal: { type: Number, default: 0, min: 0 },
     paye: { type: Boolean, default: false },

@@ -16,14 +16,13 @@ import {
   LogOut,
   Menu,
   X,
-   MessageCircle,
+  MessageCircle,
   Home,
   User,
   Shield,
   QrCode,
-      Newspaper
-
-  
+  Newspaper,
+  UserPlus
 } from 'lucide-react';
 
 const Sidebar = ({ onLogout }) => {
@@ -31,6 +30,13 @@ const Sidebar = ({ onLogout }) => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [userRole, setUserRole] = useState('');
+
+  // Get user role from localStorage
+  useEffect(() => {
+    const role = localStorage.getItem('role');
+    setUserRole(role || '');
+  }, []);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -38,7 +44,6 @@ const Sidebar = ({ onLogout }) => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
       
-      // Sur desktop, ouvrir par défaut
       if (!mobile) {
         setIsOpen(true);
       } else {
@@ -68,7 +73,8 @@ const Sidebar = ({ onLogout }) => {
     }
   };
 
-  const navigationItems = [
+  // Navigation items for Admin
+  const adminNavigationItems = [
     {
       path: '/admin',
       label: 'Dashboard',
@@ -76,12 +82,12 @@ const Sidebar = ({ onLogout }) => {
     },
     {
       path: '/update-profil',
-      label: 'profil',
-      icon:  Shield,
-
-    }, {
+      label: 'Profil',
+      icon: Shield,
+    },
+    {
       path: '/liste-classe',
-      label: 'classe',
+      label: 'Classes',
       icon: BookOpen
     },
     {
@@ -94,36 +100,30 @@ const Sidebar = ({ onLogout }) => {
       label: 'Professeurs',
       icon: User
     },
- 
     {
       path: '/ajouter-paiement',
       label: 'Nouveau Paiement',
       icon: Plus
     },
-
     {
       path: '/liste-paiements',
       label: 'Paiements',
       icon: CreditCard
     },
-   
     {
       path: '/paiements-exp',
-      label: 'Paiementsexp',
-      icon:  AlertTriangle
-
+      label: 'Paiements Expirés',
+      icon: AlertTriangle
     },
-        {
+    {
       path: '/admin/seances',
       label: 'Séances',
-      icon:  Clock
+      icon: Clock
     },
-   
-      {
+    {
       path: '/admin/messages',
-      label: 'messages',
-      icon:   MessageCircle
-
+      label: 'Messages',
+      icon: MessageCircle
     },
     {
       path: '/calendrier',
@@ -132,38 +132,110 @@ const Sidebar = ({ onLogout }) => {
     },
     {
       path: '/liste-presences',
-      label: 'Liste présences',
+      label: 'Liste Présences',
       icon: ClipboardList
-    } ,
-     {
+    },
+    {
       path: '/admin/VieScolaire',
       label: 'Vie Scolaire',
       icon: School
-
-
     },
- {
+    {
       path: '/admin/actualites',
       label: 'Actualités',
       icon: Newspaper
-
     },
- 
-     {
+    {
       path: '/admin/Bulletin',
       label: 'Bulletin',
       icon: FileText
-    }
-    ,
-     {
+    },
+    {
       path: '/admin/Manager',
       label: 'Manager',
       icon: Wallet
+    },
+    {
+      path: '/admin/inscripteurs',
+      label: 'Inscripteurs',
+      icon: UserPlus
     }
- 
   ];
 
-  // Utiliser location.pathname au lieu d'un state local
+  // Navigation items for Inscripteur (limited permissions)
+  const inscripteurNavigationItems = [
+    {
+      path: '/inscripteur',
+      label: 'Dashboard',
+      icon: Home
+    },
+    {
+      path: '/liste-classe',
+      label: 'Classes',
+      icon: BookOpen
+    },
+    {
+      path: '/liste-etudiants',
+      label: 'Étudiants',
+      icon: Users
+    },
+    {
+      path: '/liste-professeurs',
+      label: 'Professeurs',
+      icon: User
+    }
+  ];
+
+  // Get navigation items based on role
+  const getNavigationItems = () => {
+    switch (userRole) {
+      case 'admin':
+        return adminNavigationItems;
+      case 'inscripteur':
+        return inscripteurNavigationItems;
+      default:
+        return adminNavigationItems; // Default fallback
+    }
+  };
+
+  const navigationItems = getNavigationItems();
+
+  // Get sidebar title based on role
+  const getSidebarTitle = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Alfred Kastler - Admin';
+      case 'inscripteur':
+        return 'Alfred Kastler - Inscripteur';
+      case 'prof':
+        return 'Alfred Kastler - Professeur';
+      case 'etudiant':
+        return 'Alfred Kastler - Étudiant';
+      case 'paiement_manager':
+        return 'Alfred Kastler - Manager';
+      default:
+        return 'Alfred Kastler';
+    }
+  };
+
+  // Get header color based on role - maintenant tous en bleu
+  const getHeaderGradient = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
+      case 'inscripteur':
+        return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // Changé en bleu
+      case 'prof':
+        return 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
+      case 'etudiant':
+        return 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
+      case 'paiement_manager':
+        return 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)';
+      default:
+        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
+    }
+  };
+
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
@@ -175,25 +247,24 @@ const Sidebar = ({ onLogout }) => {
 
   return (
     <div>
- 
- <style jsx>{`
+      <style jsx>{`
         /* Variables CSS */
         :root {
           --sidebar-width: 280px;
           --sidebar-bg: #ffffff;
           --sidebar-border: #e5e7eb;
           --sidebar-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          --primary-color: #4f46e5;
+          --primary-color: #4f46e5; /* Couleur bleue pour tous les rôles */
           --primary-hover: #4338ca;
           --primary-light: #eef2ff;
           --text-primary: #1f2937;
           --text-secondary: #6b7280;
           --text-muted: #9ca3af;
           --hover-bg: #f9fafb;
-          --active-bg: #eef2ff;
+          --active-bg: #eef2ff; /* Couleur bleue pour tous les rôles */
           --border-radius: 12px;
           --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          --header-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+          --header-gradient: ${getHeaderGradient()};
           --logout-color: #dc2626;
           --logout-hover: #b91c1c;
           --logout-bg: #fef2f2;
@@ -204,7 +275,7 @@ const Sidebar = ({ onLogout }) => {
           box-sizing: border-box;
         }
 
-        /* Toggle Button - Positionné en dehors de la sidebar */
+        /* Toggle Button */
         .sidebar-toggle {
           position: fixed;
           top: 20px;
@@ -225,7 +296,6 @@ const Sidebar = ({ onLogout }) => {
           height: 48px;
         }
 
-        /* Sur mobile, le bouton reste à gauche */
         @media (max-width: 768px) {
           .sidebar-toggle {
             left: 20px !important;
@@ -316,12 +386,14 @@ const Sidebar = ({ onLogout }) => {
           display: flex;
           align-items: center;
           gap: 12px;
-          font-size: 20px;
+          font-size: ${userRole === 'inscripteur' ? '18px' : '20px'};
           font-weight: 700;
           color: white;
           margin: 0;
           position: relative;
           z-index: 1;
+          flex-direction: column;
+          text-align: center;
         }
 
         .sidebar-title .header-icon {
@@ -334,6 +406,18 @@ const Sidebar = ({ onLogout }) => {
           display: flex;
           align-items: center;
           justify-content: center;
+          margin-bottom: 8px;
+        }
+
+        .role-badge {
+          display: inline-block;
+          padding: 4px 8px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          margin-top: 4px;
+          backdrop-filter: blur(10px);
         }
 
         /* Navigation */
@@ -429,7 +513,7 @@ const Sidebar = ({ onLogout }) => {
         }
 
         .nav-item.active .nav-icon-wrapper {
-          background: #c7d2fe;
+          background: #c7d2fe; /* Couleur bleue pour tous les rôles */
         }
 
         .nav-item.active .nav-icon {
@@ -579,9 +663,7 @@ const Sidebar = ({ onLogout }) => {
         }
       `}</style>
 
-
-
-      {/* Toggle Button - Toujours visible */}
+      {/* Toggle Button */}
       <button
         className="sidebar-toggle"
         onClick={toggleSidebar}
@@ -603,9 +685,12 @@ const Sidebar = ({ onLogout }) => {
         <div className="sidebar-header">
           <h3 className="sidebar-title">
             <div className="header-icon">
-              <GraduationCap size={20} />
+              {userRole === 'inscripteur' ? <UserPlus size={20} /> : <GraduationCap size={20} />}
             </div>
             Alfred Kastler
+            <span className="role-badge">
+              {userRole === 'inscripteur' ? 'Inscripteur' : 'Administrateur'}
+            </span>
           </h3>
         </div>
 

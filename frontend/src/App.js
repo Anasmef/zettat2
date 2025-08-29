@@ -67,6 +67,9 @@ import AdminVieScolairemanager from './pages/AdminVieScolairemanager';
 import AdminActualitesmanager from './pages/AdminActualitesmanager';
 import EtudiantProfil from './pages/EtudiantProfil';
 import ProfesseurProfil from './pages/ProfesseurProfil';
+import InscripteurPage from './pages/InscripteurPage';
+import InscripteurDashboard from './pages/InscripteurDashboard';
+
 
 function AppContent() {
   const location = useLocation();
@@ -340,6 +343,7 @@ function AppContent() {
         <Route path="/admin/VieScolaire" element={<AdminVieScolaire />} />
         <Route path="/admin/actualites" element={<AdminActualites />} />
         <Route path="/manager/actualites" element={<AdminActualitesmanager />} />
+        <Route path="/admin/inscripteur" element={<InscripteurPage />} />
 
         {/* Routes Professeur */}
         <Route path="/professeur" element={<ProfesseurDashboard />} />
@@ -367,6 +371,9 @@ function AppContent() {
         <Route path="/etudiant/exercices/upload" element={<TeleverserExerciceEtudiant />} />
         <Route path="/etudiant/live" element={<LiveCoursEtudiant />} />
         <Route path="/etudiant/live/:cours" element={<EtudiantLiveCours />} />
+
+
+        <Route path="/inscripteur" element={<InscripteurDashboard />} />
       </Routes>
     </>
   );

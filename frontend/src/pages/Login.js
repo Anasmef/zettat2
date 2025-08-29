@@ -54,11 +54,13 @@ const handleLogin = async () => {
       setTimeout(() => {
         if (data.role === 'admin') {
           window.location.href = '/admin';
+        } else if (data.role === 'inscripteur') { // ✅ Nouveau cas ajouté
+          window.location.href = '/inscripteur';
         } else if (data.role === 'prof') {
           window.location.href = '/professeur';
         } else if (data.role === 'etudiant') {
           window.location.href = '/etudiant';
-        }else if (data.role === 'paiement_manager') { // Nouveau cas
+        } else if (data.role === 'paiement_manager') {
           window.location.href = '/manager';
         } else {
           setMessage('error|Rôle utilisateur inconnu');

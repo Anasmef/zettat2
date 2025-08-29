@@ -7,7 +7,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const Actualite = require('./models/Actualite');
+const authInscripteur = require('./middlewares/authInscripteur');
 const Commercial = require('./models/commercialModel');
+const Inscripteur = require('./models/inscripteurModel');
+const authAdminOrInscripteur = require('./middlewares/authAdminOrInscripteur');
 const Bulletin = require('./models/Bulletin'); // Ajustez le chemin selon votre structure
 const { NotificationSupprimee, Configuration } = require('./models/notificationModel');
 const authPaiementManager = require('./middlewares/authPaiementManager');
@@ -222,6 +225,41 @@ app.post('/api/login', async (req, res) => {
       });
     }
 
+    // ✅ Essayer comme inscripteur
+    console.log('🔍 Recherche inscripteur...');
+    const inscripteur = await Inscripteur.findOne({ email: normalizedEmail });
+    console.log('📝 Inscripteur trouvé:', !!inscripteur);
+    
+    if (inscripteur && await bcrypt.compare(motDePasse, inscripteur.motDePasse)) {
+      if (!inscripteur.actif) {
+        console.log('❌ Inscripteur inactif');
+        return res.status(403).json({ 
+          message: '⛔ Votre compte inscripteur est inactif. Contactez l\'administration.' 
+        });
+      }
+
+      console.log('✅ Inscripteur authentifié avec succès');
+      
+      // Mise à jour de lastSeen
+      inscripteur.lastSeen = new Date();
+      await inscripteur.save();
+
+      const token = jwt.sign(
+        { id: inscripteur._id, role: 'inscripteur' }, 
+        'jwt_secret_key', 
+        { expiresIn: '7d' }
+      );
+      
+      const inscripteurSafe = { ...inscripteur.toObject() };
+      delete inscripteurSafe.motDePasse;
+
+      return res.json({ 
+        user: inscripteurSafe, 
+        token, 
+        role: 'inscripteur' 
+      });
+    }
+
     // ✅ Essayer comme gestionnaire de paiement
     console.log('🔍 Recherche gestionnaire de paiement...');
     const paiementManager = await PaiementManager.findOne({ email: normalizedEmail });
@@ -361,7 +399,6 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
-
 app.get('/api/etudiant/notifications', authEtudiant, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.etudiantId);
@@ -468,7 +505,7 @@ app.post('/api/admin/logout', (req, res) => {
 
 // ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
 // ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
-app.post('/api/etudiants', authAdmin, upload.single('image'), async (req, res) => {
+app.post('/api/etudiants', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
   console.log('🔍 === DÉBUT ROUTE POST ===');
   console.log('🔍 req.body reçu:', req.body);
   console.log('🔍 req.file:', req.file);
@@ -707,6 +744,7 @@ app.post('/api/etudiants', authAdmin, upload.single('image'), async (req, res) =
       image: imagePath,
       actif: actifBool, // ✅
       creeParAdmin: req.adminId,
+      
       prixTotal: prixTotalNum,
       paye: payeBool, // ✅
       pourcentageBourse: pourcentageBourseNum,
@@ -789,7 +827,7 @@ app.post('/api/etudiants', authAdmin, upload.single('image'), async (req, res) =
 });
 
 // ===== ROUTE PUT - MISE À JOUR D'UN ÉTUDIANT =====
-app.put('/api/etudiants/:id', authAdmin, upload.single('image'), async (req, res) => {
+app.put('/api/etudiants/:id', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
   try {
     const {
       // Identité
@@ -1323,19 +1361,10 @@ app.get('/api/bulletins', authAdmin, async (req, res) => {
   }
 });
 // Lister tous les étudiants
-app.get('/api/etudiants', authAdmin, async (req, res) => {
-  try {
-    const etudiants = await Etudiant.find()
-      .select('-motDePasse') // ❌ إخفاء كلمة المرور
-      .populate('creeParAdmin', 'nom email');
-    res.json(etudiants);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
-app.post('/api/cours', authAdmin, async (req, res) => {
+
+app.post('/api/cours', authAdminOrInscripteur, async (req, res) => {
   try {
     let { nom, professeur } = req.body;
 
@@ -1373,7 +1402,7 @@ app.post('/api/cours', authAdmin, async (req, res) => {
   }
 });
 
-app.patch('/api/etudiants/:id/actif', authAdmin, async (req, res) => {
+app.patch('/api/etudiants/:id/actif', authAdminOrInscripteur, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.params.id);
     if (!etudiant) return res.status(404).json({ message: 'Étudiant non trouvé' });
@@ -1388,7 +1417,7 @@ app.patch('/api/etudiants/:id/actif', authAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/etudiants/:id', authAdmin, async (req, res) => {
+app.delete('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
   try {
     await Etudiant.findByIdAndDelete(req.params.id);
     res.json({ message: 'Étudiant supprimé' });
@@ -1397,10 +1426,32 @@ app.delete('/api/etudiants/:id', authAdmin, async (req, res) => {
   }
 });
 // ✅ Obtenir un seul étudiant
-app.get('/api/etudiants/:id', authAdmin, async (req, res) => {
+// Lister tous les étudiants (Admin OU Inscripteur)
+app.get('/api/etudiants', authAdminOrInscripteur, async (req, res) => {
   try {
-    const etudiant = await Etudiant.findById(req.params.id);
-    if (!etudiant) return res.status(404).json({ message: 'Étudiant non trouvé' });
+    const etudiants = await Etudiant.find()
+      .select('-motDePasse') // Masquer le mot de passe
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email')
+      .sort({ createdAt: -1 });
+    
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Obtenir un étudiant spécifique (Admin OU Inscripteur)
+app.get('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id)
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email');
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
     res.json(etudiant);
   } catch (err) {
     res.status(500).json({ message: 'Erreur serveur' });
@@ -1552,6 +1603,423 @@ app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+// ==================== ROUTES INSCRIPTEURS (Admin seulement) ====================
+
+// CREATE - Créer un inscripteur
+app.post('/api/admin/inscripteurs', authAdmin, async (req, res) => {
+  try {
+    const { nom, email, motDePasse, telephone } = req.body;
+
+    // Validation des champs requis
+    if (!nom || !email || !motDePasse) {
+      return res.status(400).json({ message: 'Nom, email et mot de passe requis' });
+    }
+
+    // Validation format email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ message: 'Format d\'email invalide' });
+    }
+
+    // Validation mot de passe
+    if (motDePasse.length < 6) {
+      return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+    }
+
+    // Vérifier si l'email existe déjà (tous modèles confondus)
+    const [inscripteurExiste, adminExiste] = await Promise.all([
+      Inscripteur.findOne({ email: email.toLowerCase().trim() }),
+      Admin.findOne({ email: email.toLowerCase().trim() })
+    ]);
+
+    if (inscripteurExiste || adminExiste) {
+      return res.status(400).json({ message: 'Email déjà utilisé' });
+    }
+
+    // Hasher le mot de passe
+    const hashed = await bcrypt.hash(motDePasse, 12);
+    
+    const inscripteur = new Inscripteur({
+      nom: nom.trim(),
+      email: email.toLowerCase().trim(),
+      telephone: telephone?.trim() || '',
+      motDePasse: hashed,
+      creeParAdmin: req.adminId
+    });
+
+    await inscripteur.save();
+    
+    // Retourner sans le mot de passe
+    const inscripteurResponse = inscripteur.toObject();
+    delete inscripteurResponse.motDePasse;
+
+    res.status(201).json({ 
+      message: 'Inscripteur créé avec succès', 
+      inscripteur: inscripteurResponse 
+    });
+  } catch (err) {
+    console.error('Erreur création inscripteur:', err);
+    
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email déjà utilisé' });
+    }
+    
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la création',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// READ - Lister tous les inscripteurs avec pagination
+app.get('/api/admin/inscripteurs', authAdmin, async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search, actif } = req.query;
+    
+    // Construire le filtre de recherche
+    let filter = {};
+    
+    if (search) {
+      filter.$or = [
+        { nom: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    if (actif !== undefined) {
+      filter.actif = actif === 'true';
+    }
+    
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const [inscripteurs, total] = await Promise.all([
+      Inscripteur.find(filter)
+        .select('-motDePasse')
+        .populate('creeParAdmin', 'nom email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Inscripteur.countDocuments(filter)
+    ]);
+    
+    res.json({
+      inscripteurs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (err) {
+    console.error('Erreur liste inscripteurs:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la récupération',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// READ - Obtenir un inscripteur spécifique
+app.get('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validation de l'ID MongoDB
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID d\'inscripteur invalide' });
+    }
+    
+    const inscripteur = await Inscripteur.findById(id)
+      .select('-motDePasse')
+      .populate('creeParAdmin', 'nom email');
+    
+    if (!inscripteur) {
+      return res.status(404).json({ message: 'Inscripteur introuvable' });
+    }
+    
+    res.json(inscripteur);
+  } catch (err) {
+    console.error('Erreur récupération inscripteur:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la récupération',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// UPDATE - Modifier un inscripteur
+app.put('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nom, email, motDePasse, telephone, actif } = req.body;
+    
+    // Validation de l'ID MongoDB
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID d\'inscripteur invalide' });
+    }
+    
+    // Vérifier que l'inscripteur existe
+    const inscripteurExistant = await Inscripteur.findById(id);
+    if (!inscripteurExistant) {
+      return res.status(404).json({ message: 'Inscripteur introuvable' });
+    }
+    
+    // Préparer les mises à jour
+    const updates = {};
+    
+    if (nom && nom.trim() !== inscripteurExistant.nom) {
+      updates.nom = nom.trim();
+    }
+    
+    if (email && email.trim() !== inscripteurExistant.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: 'Format d\'email invalide' });
+      }
+      
+      // Vérifier unicité de l'email
+      const [inscripteurEmail, adminEmail] = await Promise.all([
+        Inscripteur.findOne({ email: email.toLowerCase().trim(), _id: { $ne: id } }),
+        Admin.findOne({ email: email.toLowerCase().trim() })
+      ]);
+      
+      if (inscripteurEmail || adminEmail) {
+        return res.status(400).json({ message: 'Email déjà utilisé' });
+      }
+      
+      updates.email = email.toLowerCase().trim();
+    }
+    
+    if (telephone !== undefined) {
+      updates.telephone = telephone?.trim() || '';
+    }
+    
+    if (typeof actif !== 'undefined') {
+      updates.actif = Boolean(actif);
+    }
+    
+    // Gestion du mot de passe
+    if (motDePasse && motDePasse.trim() !== '') {
+      if (motDePasse.length < 6) {
+        return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+      }
+      
+      updates.motDePasse = await bcrypt.hash(motDePasse, 12);
+    }
+    
+    // Vérifier qu'il y a des modifications
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'Aucune modification détectée' });
+    }
+    
+    // Mettre à jour
+    const inscripteurModifie = await Inscripteur.findByIdAndUpdate(
+      id,
+      { ...updates, updatedAt: new Date() },
+      { new: true, runValidators: true }
+    ).select('-motDePasse').populate('creeParAdmin', 'nom email');
+    
+    res.json({
+      message: 'Inscripteur modifié avec succès',
+      inscripteur: inscripteurModifie,
+      champsModifies: Object.keys(updates)
+    });
+    
+  } catch (err) {
+    console.error('Erreur modification inscripteur:', err);
+    
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'Email déjà utilisé' });
+    }
+    
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Erreur de validation', errors });
+    }
+    
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la modification',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// PATCH - Activer/Désactiver un inscripteur
+app.patch('/api/admin/inscripteurs/:id/toggle', authAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validation de l'ID MongoDB
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID d\'inscripteur invalide' });
+    }
+    
+    const inscripteur = await Inscripteur.findById(id);
+    if (!inscripteur) {
+      return res.status(404).json({ message: 'Inscripteur introuvable' });
+    }
+    
+    // Inverser le statut actif
+    inscripteur.actif = !inscripteur.actif;
+    inscripteur.updatedAt = new Date();
+    await inscripteur.save();
+    
+    const response = inscripteur.toObject();
+    delete response.motDePasse;
+    
+    res.json({
+      message: `Inscripteur ${inscripteur.actif ? 'activé' : 'désactivé'} avec succès`,
+      inscripteur: response
+    });
+  } catch (err) {
+    console.error('Erreur toggle inscripteur:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors du changement de statut',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// DELETE - Supprimer un inscripteur
+app.delete('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validation de l'ID MongoDB
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID d\'inscripteur invalide' });
+    }
+    
+    const inscripteur = await Inscripteur.findById(id);
+    if (!inscripteur) {
+      return res.status(404).json({ message: 'Inscripteur introuvable' });
+    }
+    
+    // Vérifier s'il a créé des étudiants ou professeurs
+    const [etudiantsCount, professeursCount] = await Promise.all([
+      Etudiant.countDocuments({ creeParInscripteur: id }),
+      Professeur.countDocuments({ creeParInscripteur: id })
+    ]);
+    
+    // Optionnel : empêcher la suppression s'il a des créations
+    if (etudiantsCount > 0 || professeursCount > 0) {
+      return res.status(400).json({
+        message: `Impossible de supprimer: cet inscripteur a créé ${etudiantsCount} étudiant(s) et ${professeursCount} professeur(s)`,
+        details: {
+          etudiants: etudiantsCount,
+          professeurs: professeursCount
+        }
+      });
+    }
+    
+    // Supprimer l'inscripteur
+    await Inscripteur.findByIdAndDelete(id);
+    
+    res.json({
+      message: 'Inscripteur supprimé avec succès',
+      inscripteurSupprime: {
+        id: inscripteur._id,
+        nom: inscripteur.nom,
+        email: inscripteur.email
+      }
+    });
+    
+  } catch (err) {
+    console.error('Erreur suppression inscripteur:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la suppression',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// PATCH - Réinitialiser le mot de passe d'un inscripteur
+app.patch('/api/admin/inscripteurs/:id/reset-password', authAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nouveauMotDePasse } = req.body;
+    
+    // Validation
+    if (!nouveauMotDePasse || nouveauMotDePasse.length < 6) {
+      return res.status(400).json({ message: 'Le nouveau mot de passe doit contenir au moins 6 caractères' });
+    }
+    
+    // Validation de l'ID MongoDB
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID d\'inscripteur invalide' });
+    }
+    
+    const inscripteur = await Inscripteur.findById(id);
+    if (!inscripteur) {
+      return res.status(404).json({ message: 'Inscripteur introuvable' });
+    }
+    
+    // Hasher le nouveau mot de passe
+    const hashed = await bcrypt.hash(nouveauMotDePasse, 12);
+    
+    inscripteur.motDePasse = hashed;
+    inscripteur.updatedAt = new Date();
+    await inscripteur.save();
+    
+    res.json({
+      message: 'Mot de passe réinitialisé avec succès',
+      inscripteurId: inscripteur._id,
+      nom: inscripteur.nom
+    });
+    
+  } catch (err) {
+    console.error('Erreur reset password:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la réinitialisation',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+});
+
+// GET - Statistiques des inscripteurs (optionnel)
+app.get('/api/admin/inscripteurs-stats', authAdmin, async (req, res) => {
+  try {
+    const [
+      totalInscripteurs,
+      inscripteursActifs,
+      inscripteursInactifs,
+      etudiantsParInscripteur,
+      professeursParInscripteur
+    ] = await Promise.all([
+      Inscripteur.countDocuments(),
+      Inscripteur.countDocuments({ actif: true }),
+      Inscripteur.countDocuments({ actif: false }),
+      Etudiant.aggregate([
+        { $match: { creeParInscripteur: { $exists: true, $ne: null } } },
+        { $group: { _id: '$creeParInscripteur', count: { $sum: 1 } } }
+      ]),
+      Professeur.aggregate([
+        { $match: { creeParInscripteur: { $exists: true, $ne: null } } },
+        { $group: { _id: '$creeParInscripteur', count: { $sum: 1 } } }
+      ])
+    ]);
+    
+    res.json({
+      totalInscripteurs,
+      inscripteursActifs,
+      inscripteursInactifs,
+      activite: {
+        etudiantsParInscripteur: etudiantsParInscripteur.length,
+        professeursParInscripteur: professeursParInscripteur.length,
+        totalCreations: etudiantsParInscripteur.reduce((sum, item) => sum + item.count, 0) +
+                       professeursParInscripteur.reduce((sum, item) => sum + item.count, 0)
+      }
+    });
+  } catch (err) {
+    console.error('Erreur stats inscripteurs:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors du calcul des statistiques',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -2137,7 +2605,7 @@ app.put('/api/professeur/exercices/:id/remarque', authProfesseur, async (req, re
 });
 
 
-app.delete('/api/cours/:id', authAdmin, async (req, res) => {
+app.delete('/api/cours/:id', authAdminOrInscripteur, async (req, res) => {
   try {
     const coursId = req.params.id;
 
@@ -2272,7 +2740,7 @@ app.get('/api/notifications/deleted', authAdmin, (req, res) => {
 });
 // route: POST /api/professeurs
 // accessible uniquement par Admin
-app.post('/api/professeurs', authAdmin, upload.single('image'), async (req, res) => {
+app.post('/api/professeurs', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
   try {
     const {
       nom,
@@ -2489,7 +2957,7 @@ app.post('/api/professeurs/login', async (req, res) => {
 
 
 
-app.put('/api/professeurs/:id', authAdmin, upload.single('image'), async (req, res) => {
+app.put('/api/professeurs/:id', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
   try {
     const professeurId = req.params.id;
     const {
@@ -2575,7 +3043,7 @@ app.put('/api/professeurs/:id', authAdmin, upload.single('image'), async (req, r
 
 
 // routes/professeurs.js
-app.patch('/api/professeurs/:id/actif', authAdmin, async (req, res) => {
+app.patch('/api/professeurs/:id/actif',authAdminOrInscripteur, async (req, res) => {
   try {
     const prof = await Professeur.findById(req.params.id);
     if (!prof) return res.status(404).json({ message: 'Professeur introuvable' });
@@ -2633,7 +3101,7 @@ app.get('/api/etudiant/paiements', authEtudiant, async (req, res) => {
 
 
 
-app.delete('/api/professeurs/:id', authAdmin, async (req, res) => {
+app.delete('/api/professeurs/:id', authAdminOrInscripteur, async (req, res) => {
   try {
     await Professeur.findByIdAndDelete(req.params.id);
     res.json({ message: 'Professeur supprimé avec succès' });
@@ -2666,7 +3134,7 @@ app.get('/api/presences/etudiant/:id', authAdmin, async (req, res) => {
 // Récupérer un seul cours avec détails
 // 📌 Route: GET /api/cours/:id
 // ✅ Lister tous les cours (IMPORTANT!)
-app.get('/api/cours', authAdmin, async (req, res) => {
+app.get('/api/cours', authAdminOrInscripteur, async (req, res) => {
   try {
     const cours = await Cours.find();
     res.json(cours);
@@ -2697,7 +3165,7 @@ app.get('/api/professeur/profile', authProfesseur, async (req, res) => {
 });
 
 
-app.get('/api/cours/:id', authAdmin, async (req, res) => {
+app.get('/api/cours/:id', authAdminOrInscripteur, async (req, res) => {
   try {
     const cours = await Cours.findById(req.params.id).populate('creePar', 'nom email');
     if (!cours) return res.status(404).json({ message: 'Cours introuvable' });
@@ -2706,13 +3174,82 @@ app.get('/api/cours/:id', authAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.get('/api/professeurs', authAdmin, async (req, res) => {
+// Lister tous les professeurs (Admin OU Inscripteur)
+app.get('/api/professeurs', authAdminOrInscripteur, async (req, res) => {
   try {
-    const professeurs = await Professeur.find().sort({ createdAt: -1 });
+    const professeurs = await Professeur.find()
+      .select('-motDePasse')
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email')
+      .sort({ createdAt: -1 });
+    
     res.json(professeurs);
   } catch (err) {
-    console.error('❌ Erreur lors de l\'affichage des professeurs:', err);
+    console.error('Erreur lors de l\'affichage des professeurs:', err);
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// Obtenir un professeur spécifique (Admin OU Inscripteur)
+app.get('/api/professeurs/:id', authAdminOrInscripteur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id)
+      .select('-motDePasse')
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email');
+    
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+    
+    res.json(professeur);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+// Dashboard inscripteur avec statistiques complètes
+app.get('/api/inscripteur/dashboard', authInscripteur, async (req, res) => {
+  try {
+    const inscripteur = await Inscripteur.findById(req.inscripteurId).select('-motDePasse');
+    
+    // Statistiques complètes (pas seulement ce qu'il a créé)
+    const [
+      totalEtudiants,
+      etudiantsActifs,
+      totalProfesseurs,
+      professeursActifs,
+      totalCours,
+      etudiantsCreesParInscripteur,
+      professeursCreesParInscripteur
+    ] = await Promise.all([
+      Etudiant.countDocuments(),
+      Etudiant.countDocuments({ actif: true }),
+      Professeur.countDocuments(),
+      Professeur.countDocuments({ actif: true }),
+      Cours.countDocuments(),
+      Etudiant.countDocuments({ creeParInscripteur: req.inscripteurId }),
+      Professeur.countDocuments({ creeParInscripteur: req.inscripteurId })
+    ]);
+    
+    res.json({ 
+      message: 'Dashboard inscripteur',
+      inscripteur,
+      statistiques: {
+        // Stats globales
+        totalEtudiants,
+        etudiantsActifs,
+        totalProfesseurs,
+        professeursActifs,
+        totalCours,
+        // Stats personnelles
+        mesCreations: {
+          etudiants: etudiantsCreesParInscripteur,
+          professeurs: professeursCreesParInscripteur
+        }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 // Enhanced API route with pagination
@@ -3212,7 +3749,7 @@ app.post('/api/messages/upload', authEtudiant, uploadMessageFile.single('fichier
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
-app.get('/api/paiements/etudiant/:etudiantId', authAdmin, async (req, res) => {
+app.get('/api/paiements/etudiant/:etudiantId', authAdminOrInscripteur, async (req, res) => {
   try {
     const paiements = await Paiement.find({ etudiant: req.params.etudiantId });
     res.json(paiements);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, BookOpen, User, Eye, X, Users, GraduationCap, Trash2 } from 'lucide-react';
+import { Plus, BookOpen, User, Eye, X, Users, GraduationCap, Trash2, Filter, Search } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 const ListeCours = () => {
@@ -10,11 +10,19 @@ const ListeCours = () => {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [professeurs_selectionnes, setProfesseursSelectionnes] = useState([]);
 
+  // États pour le filtre
+  const [filtreActif, setFiltreActif] = useState(false);
+  const [professeurFiltre, setProfesseurFiltre] = useState('');
+  const [coursFiltre, setCoursFiltre] = useState('');
+
   // États pour le modal d'ajout de cours
   const [showAjoutModal, setShowAjoutModal] = useState(false);
   const [nom, setNom] = useState('');
-  // const [professeur, setProfesseur] = useState(''); // ❌ plus utilisé
   const [message, setMessage] = useState('');
+  
+  // États pour le select avec recherche des professeurs
+  const [professeurSearch, setProfesseurSearch] = useState('');
+  const [showProfesseurDropdown, setShowProfesseurDropdown] = useState(false);
 
   // États pour le modal de confirmation de suppression
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,6 +56,38 @@ const ListeCours = () => {
     fetchCoursEtEtudiants();
   }, []);
 
+  // Fonction de filtrage des cours
+  const coursFiltres = cours.filter(c => {
+    // Filtre par cours sélectionné
+    const correspondCours = coursFiltre === '' || c.nom === coursFiltre;
+
+    // Filtre par professeur
+    let correspondProfesseur = true;
+    if (professeurFiltre !== '') {
+      const professeursCours = Array.isArray(c.professeur) ? c.professeur : [c.professeur];
+      correspondProfesseur = professeursCours.some(prof => 
+        prof && prof.toLowerCase().includes(professeurFiltre.toLowerCase())
+      );
+    }
+
+    return correspondCours && correspondProfesseur;
+  });
+
+  // Fonction pour réinitialiser les filtres
+  const reinitialiserFiltres = () => {
+    setProfesseurFiltre('');
+    setCoursFiltre('');
+    setFiltreActif(false);
+  };
+
+  // Compter le nombre de filtres actifs
+  const nombreFiltresActifs = () => {
+    let count = 0;
+    if (professeurFiltre !== '') count++;
+    if (coursFiltre !== '') count++;
+    return count;
+  };
+
   const afficherDetails = (coursSelectionne) => {
     setCoursActuel(coursSelectionne);
   };
@@ -61,10 +101,10 @@ const ListeCours = () => {
   const handleAjoutCours = async (e) => {
     e.preventDefault();
 
-  if (!nom.trim()) {
-  setMessage('❌ Veuillez remplir le nom du cours');
-  return;
-}
+    if (!nom.trim()) {
+      setMessage('❌ Veuillez remplir le nom du cours');
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -76,7 +116,7 @@ const ListeCours = () => {
         },
         body: JSON.stringify({
           nom: nom.trim(),
-          professeur: professeurs_selectionnes // tableau de noms
+          professeur: professeurs_selectionnes
         })
       });
 
@@ -123,7 +163,6 @@ const ListeCours = () => {
       });
       
       if (response.ok) {
-        // Mettre à jour la liste des cours en supprimant le cours supprimé
         setCours(cours.filter(c => c._id !== coursASupprimer._id));
         
         setDeleteMessage('✅ Cours supprimé avec succès');
@@ -149,6 +188,28 @@ const ListeCours = () => {
     setNom('');
     setProfesseursSelectionnes([]);
     setMessage('');
+    setProfesseurSearch('');
+    setShowProfesseurDropdown(false);
+  };
+
+  // Filtrer les professeurs selon la recherche
+  const professeursFiltres = professeurs.filter(p =>
+    p.nom.toLowerCase().includes(professeurSearch.toLowerCase()) ||
+    p.matiere.toLowerCase().includes(professeurSearch.toLowerCase())
+  );
+
+  // Fonction pour ajouter un professeur à la sélection
+  const ajouterProfesseur = (professeur) => {
+    if (!professeurs_selectionnes.includes(professeur.nom)) {
+      setProfesseursSelectionnes([...professeurs_selectionnes, professeur.nom]);
+    }
+    setProfesseurSearch('');
+    setShowProfesseurDropdown(false);
+  };
+
+  // Fonction pour retirer un professeur de la sélection
+  const retirerProfesseur = (nomProfesseur) => {
+    setProfesseursSelectionnes(professeurs_selectionnes.filter(nom => nom !== nomProfesseur));
   };
 
   // Fonction pour fermer le modal de suppression
@@ -165,7 +226,7 @@ const ListeCours = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
       padding: '0',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     },
@@ -179,7 +240,7 @@ const ListeCours = () => {
       backgroundColor: 'white',
       borderRadius: '1rem',
       border: '1px solid rgba(255, 255, 255, 0.2)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
       padding: '1.5rem',
       marginBottom: '2rem'
     },
@@ -218,12 +279,114 @@ const ListeCours = () => {
       borderRadius: '0.75rem',
       fontWeight: '600',
       cursor: 'pointer',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
       display: 'flex',
       alignItems: 'center',
       gap: '0.5rem',
       transition: 'all 0.2s ease',
       fontSize: '1rem'
+    },
+    // Styles pour la section des filtres
+    filterSection: {
+      backdropFilter: 'blur(10px)',
+      backgroundColor: 'white',
+      borderRadius: '1rem',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      padding: '1.5rem',
+      marginBottom: '2rem'
+    },
+    filterHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '1rem'
+    },
+    filterTitle: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      fontSize: '1.125rem',
+      fontWeight: '600',
+      color: '#1f2937'
+    },
+    filterToggle: {
+      background: filtreActif ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #6b7280, #4b5563)',
+      color: 'white',
+      border: 'none',
+      padding: '0.5rem 1rem',
+      borderRadius: '0.5rem',
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease'
+    },
+    filterContent: {
+      display: filtreActif ? 'block' : 'none'
+    },
+    filterGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+      gap: '1rem',
+      marginBottom: '1rem'
+    },
+    filterGroup: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '0.5rem'
+    },
+    filterLabel: {
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      color: '#374151'
+    },
+    filterInput: {
+      padding: '0.75rem',
+      border: '1px solid #d1d5db',
+      borderRadius: '0.5rem',
+      fontSize: '0.875rem',
+      backgroundColor: '#f9fafb',
+      transition: 'all 0.2s ease',
+      outline: 'none'
+    },
+    filterSelect: {
+      padding: '0.75rem',
+      border: '1px solid #d1d5db',
+      borderRadius: '0.5rem',
+      fontSize: '0.875rem',
+      backgroundColor: '#f9fafb',
+      transition: 'all 0.2s ease',
+      outline: 'none',
+      cursor: 'pointer'
+    },
+    filterActions: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: '1rem',
+      borderTop: '1px solid #f3f4f6'
+    },
+    filterBadge: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      backgroundColor: '#dbeafe',
+      color: '#1e40af',
+      padding: '0.5rem 0.75rem',
+      borderRadius: '0.5rem',
+      fontSize: '0.875rem',
+      fontWeight: '500'
+    },
+    resetButton: {
+      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+      color: 'white',
+      border: 'none',
+      padding: '0.5rem 1rem',
+      borderRadius: '0.5rem',
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease'
     },
     coursGrid: {
       display: 'grid',
@@ -235,7 +398,7 @@ const ListeCours = () => {
       backgroundColor: 'white',
       borderRadius: '1rem',
       border: '1px solid rgba(255, 255, 255, 0.2)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
       cursor: 'pointer',
       transition: 'all 0.3s ease',
       overflow: 'hidden',
@@ -244,7 +407,7 @@ const ListeCours = () => {
     coursCardHovered: {
       backgroundColor: 'white',
       transform: 'translateY(-8px)',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
     },
     coursCardContent: {
       padding: '1.5rem',
@@ -309,7 +472,6 @@ const ListeCours = () => {
       fontWeight: '500',
       display: 'inline-block'
     },
-    // Nouveau style pour le bouton de suppression
     deleteButton: {
       padding: '0.5rem',
       backgroundColor: '#fef2f2',
@@ -372,7 +534,6 @@ const ListeCours = () => {
       alignItems: 'center',
       justifyContent: 'center'
     },
-    // Style pour l'icône de suppression dans le modal
     deleteModalIconContainer: {
       padding: '0.5rem',
       background: 'linear-gradient(135deg, #dc2626, #ef4444)',
@@ -482,7 +643,6 @@ const ListeCours = () => {
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
       transition: 'all 0.2s ease'
     },
-    // Bouton de suppression dans le modal
     deleteSubmitButton: {
       flex: 1,
       padding: '0.75rem 1rem',
@@ -574,7 +734,6 @@ const ListeCours = () => {
       alignItems: 'center',
       justifyContent: 'center'
     },
-    // Style pour le texte de confirmation de suppression
     deleteConfirmationText: {
       fontSize: '0.875rem',
       color: '#6b7280',
@@ -586,6 +745,105 @@ const ListeCours = () => {
       color: '#dc2626',
       fontWeight: '600',
       marginBottom: '1rem'
+    },
+    // Styles pour le select avec recherche
+    searchableSelect: {
+      position: 'relative',
+      width: '100%'
+    },
+    searchInput: {
+      width: '100%',
+      padding: '0.75rem 1rem',
+      border: '1px solid #d1d5db',
+      borderRadius: '0.75rem',
+      fontSize: '0.875rem',
+      backgroundColor: '#f9fafb',
+      transition: 'all 0.2s ease',
+      outline: 'none',
+      boxSizing: 'border-box'
+    },
+    dropdown: {
+      position: 'absolute',
+      top: '100%',
+      left: 0,
+      right: 0,
+      backgroundColor: 'white',
+      border: '1px solid #d1d5db',
+      borderRadius: '0.5rem',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+      zIndex: 1000,
+      maxHeight: '200px',
+      overflowY: 'auto',
+      marginTop: '4px'
+    },
+    dropdownItem: {
+      padding: '0.75rem',
+      cursor: 'pointer',
+      borderBottom: '1px solid #f3f4f6',
+      transition: 'background-color 0.2s ease'
+    },
+    dropdownItemHover: {
+      backgroundColor: '#f3f4f6'
+    },
+    professeurItem: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    professeurInfo: {
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    professeurNom: {
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      color: '#1f2937'
+    },
+    professeurMatiere: {
+      fontSize: '0.75rem',
+      color: '#6b7280'
+    },
+    selectedProfesseurs: {
+      marginTop: '1rem'
+    },
+    selectedTitle: {
+      fontSize: '0.875rem',
+      fontWeight: '600',
+      color: '#374151',
+      marginBottom: '0.5rem'
+    },
+    selectedList: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '0.5rem'
+    },
+    selectedTag: {
+      backgroundColor: '#dbeafe',
+      color: '#1e40af',
+      padding: '0.25rem 0.75rem',
+      borderRadius: '9999px',
+      fontSize: '0.75rem',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+      border: '1px solid #bfdbfe'
+    },
+    removeTagButton: {
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: '#1e40af',
+      cursor: 'pointer',
+      fontSize: '0.875rem',
+      fontWeight: 'bold',
+      padding: '0',
+      width: '16px',
+      height: '16px',
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'background-color 0.2s ease'
     }
   };
 
@@ -601,7 +859,7 @@ const ListeCours = () => {
               <div style={styles.iconContainer}>
               </div>
               <div>
-                <h1 style={{ ...styles.title, textAlign: 'center', width: '100%' }}>Gestion des classe</h1>
+                <h1 style={{ ...styles.title, textAlign: 'center', width: '100%' }}>Gestion des Classes</h1>
               </div>
             </div>
             <button
@@ -617,14 +875,146 @@ const ListeCours = () => {
               }}
             >
               <Plus size={20} />
-              Nouveau classe
+              Nouveau Classe
             </button>
           </div>
         </div>
 
-        {/* Grille des cours */}
+        {/* Section des filtres */}
+        <div style={styles.filterSection}>
+          <div style={styles.filterHeader}>
+            <div style={styles.filterTitle}>
+              <Filter size={20} color="#2563eb" />
+              Filtres
+            </div>
+            <button
+              onClick={() => setFiltreActif(!filtreActif)}
+              style={styles.filterToggle}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              {filtreActif ? 'Masquer les filtres' : 'Afficher les filtres'}
+            </button>
+          </div>
+
+          <div style={styles.filterContent}>
+            <div style={styles.filterGrid}>
+              {/* Sélection de cours */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>
+                  <BookOpen size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                  Sélectionner un cours
+                </label>
+                <select
+                  value={coursFiltre}
+                  onChange={(e) => setCoursFiltre(e.target.value)}
+                  style={styles.filterSelect}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6';
+                    e.target.style.backgroundColor = 'white';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="">Tous les cours</option>
+                  {cours.map((c) => (
+                    <option key={c._id} value={c.nom}>{c.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtre par professeur */}
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>
+                  <GraduationCap size={16} style={{ display: 'inline', marginRight: '0.5rem' }} />
+                  Filtre par professeur
+                </label>
+                <select
+                  value={professeurFiltre}
+                  onChange={(e) => setProfesseurFiltre(e.target.value)}
+                  style={styles.filterSelect}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6';
+                    e.target.style.backgroundColor = 'white';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.backgroundColor = '#f9fafb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="">Tous les professeurs</option>
+                  {/* Obtenir tous les professeurs uniques des cours */}
+                  {[...new Set(
+                    cours.flatMap(c => 
+                      Array.isArray(c.professeur) ? c.professeur : [c.professeur]
+                    ).filter(prof => prof && prof.trim() !== '')
+                  )].sort().map((prof, index) => (
+                    <option key={index} value={prof}>{prof}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Actions des filtres */}
+            <div style={styles.filterActions}>
+              {nombreFiltresActifs() > 0 && (
+                <div style={styles.filterBadge}>
+                  <Filter size={16} />
+                  {nombreFiltresActifs()} filtre{nombreFiltresActifs() > 1 ? 's' : ''} actif{nombreFiltresActifs() > 1 ? 's' : ''}
+                </div>
+              )}
+              
+              {nombreFiltresActifs() > 0 && (
+                <button
+                  onClick={reinitialiserFiltres}
+                  style={styles.resetButton}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  Réinitialiser les filtres
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Résultats de la sélection */}
+        {(coursFiltre !== '' || professeurFiltre !== '') && (
+          <div style={{
+            backgroundColor: '#f0f9ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '0.75rem',
+            padding: '1rem',
+            marginBottom: '2rem',
+            textAlign: 'center'
+          }}>
+            <p style={{ color: '#1e40af', fontWeight: '500', margin: 0 }}>
+              {coursFiltres.length} cours trouvé{coursFiltres.length > 1 ? 's' : ''} 
+              {coursFiltre && ` pour le cours "${coursFiltre}"`}
+              {professeurFiltre && ` avec le professeur "${professeurFiltre}"`}
+            </p>
+          </div>
+        )}
+
+        {/* Grille des cours filtrés */}
         <div style={styles.coursGrid}>
-          {cours.map((c) => {
+          {coursFiltres.map((c) => {
             const nombreEtudiants = etudiants.filter(e => e.cours.includes(c.nom)).length;
             const isHovered = hoveredCard === c._id;
             
@@ -668,13 +1058,13 @@ const ListeCours = () => {
                     </h3>
                     
                     <div style={styles.professeurInfo}>
-  <User size={16} />
-  <span>
-    {Array.isArray(c.professeur)
-      ? c.professeur.join(', ')
-      : c.professeur || 'Non assigné'}
-  </span>
-</div>
+                      <User size={16} />
+                      <span>
+                        {Array.isArray(c.professeur)
+                          ? c.professeur.join(', ')
+                          : c.professeur || 'Non assigné'}
+                      </span>
+                    </div>
 
                   </div>
                   
@@ -686,7 +1076,7 @@ const ListeCours = () => {
                     {/* Bouton de suppression */}
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // Empêche l'ouverture du modal de détails
+                        e.stopPropagation();
                         ouvrirModalSuppression(c);
                       }}
                       style={styles.deleteButton}
@@ -698,7 +1088,7 @@ const ListeCours = () => {
                         e.target.style.color = '#dc2626';
                         e.target.style.borderColor = '#fecaca';
                       }}
-                      title="Supprimer ce cours"
+                      title="Supprimer ce classe"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -709,7 +1099,40 @@ const ListeCours = () => {
           })}
         </div>
 
-        {/* Message si aucun cours */}
+        {/* Message si aucun cours après filtrage */}
+        {coursFiltres.length === 0 && cours.length > 0 && (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyIcon}>
+              <Filter size={24} color="#9ca3af" />
+            </div>
+            <h3 style={{fontSize: '1.25rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem'}}>
+              Aucun cours ne correspond aux critères
+            </h3>
+            <p style={{color: '#9ca3af', marginBottom: '1rem'}}>
+              Essayez de modifier vos sélections pour voir plus de résultats
+            </p>
+            <button
+              onClick={reinitialiserFiltres}
+              style={{
+                ...styles.resetButton,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              <X size={16} />
+              Réinitialiser les filtres
+            </button>
+          </div>
+        )}
+
+        {/* Message si aucun cours du tout */}
         {cours.length === 0 && (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>
@@ -718,7 +1141,7 @@ const ListeCours = () => {
             <h3 style={{fontSize: '1.25rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.5rem'}}>
               Aucun cours disponible
             </h3>
-            <p style={{color: '#9ca3af'}}>Commencez par ajouter votre premier cours</p>
+            <p style={{color: '#9ca3af'}}>Commencez par ajouter votre premier classe</p>
           </div>
         )}
       </div>
@@ -733,7 +1156,7 @@ const ListeCours = () => {
                   <div style={styles.modalIconContainer}>
                     <Plus size={20} color="white" />
                   </div>
-                  <h2 style={styles.modalTitle}>Nouveau Cours</h2>
+                  <h2 style={styles.modalTitle}>Nouveau classe</h2>
                 </div>
                 <button
                   onClick={fermerModalAjout}
@@ -753,7 +1176,7 @@ const ListeCours = () => {
             <div style={styles.modalBody}>
               <form onSubmit={handleAjoutCours}>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Nom du cours</label>
+                  <label style={styles.label}>Nom du classe</label>
                   <input
                     type="text"
                     placeholder="Ex: Mathématiques, Physique..."
@@ -773,86 +1196,130 @@ const ListeCours = () => {
                   />
                 </div>
 
-                {/* Professeurs avec checkboxes */}
+                {/* Professeurs avec select recherchable */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Professeurs</label>
-                  <div style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.75rem',
-                    padding: '8px',
-                    backgroundColor: '#f9fafb'
-                  }}>
-                    {professeurs.map((p) => (
-                      <label key={p._id} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '8px',
-                        cursor: 'pointer',
-                        borderRadius: '0.5rem',
-                        transition: 'background-color 0.2s ease'
+                  
+                  <div style={styles.searchableSelect}>
+                    <input
+                      type="text"
+                      placeholder="Rechercher et sélectionner un professeur..."
+                      value={professeurSearch}
+                      onChange={(e) => {
+                        setProfesseurSearch(e.target.value);
+                        setShowProfesseurDropdown(e.target.value.length > 0);
                       }}
-                        onMouseEnter={e => { e.target.style.backgroundColor = '#e5e7eb'; }}
-                        onMouseLeave={e => { e.target.style.backgroundColor = 'transparent'; }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={professeurs_selectionnes.includes(p.nom)}
-                          onChange={() => {
-                            setProfesseursSelectionnes(prev =>
-                              prev.includes(p.nom)
-                                ? prev.filter(nom => nom !== p.nom)
-                                : [...prev, p.nom]
-                            );
-                          }}
-                          style={{
-                            marginRight: '12px',
-                            width: '16px',
-                            height: '16px',
-                            accentColor: '#3b82f6'
-                          }}
-                        />
-                        <span style={{ fontSize: '0.875rem' }}>
-                          {p.nom} - {p.matiere}
-                        </span>
-                      </label>
-                    ))}
+                      onFocus={() => {
+                        if (professeurSearch.length > 0) {
+                          setShowProfesseurDropdown(true);
+                        }
+                      }}
+                      style={styles.searchInput}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3b82f6';
+                        e.target.style.backgroundColor = 'white';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                        if (professeurSearch.length > 0) {
+                          setShowProfesseurDropdown(true);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        // Délai pour permettre le clic sur un élément de la dropdown
+                        setTimeout(() => {
+                          e.target.style.borderColor = '#d1d5db';
+                          e.target.style.backgroundColor = '#f9fafb';
+                          e.target.style.boxShadow = 'none';
+                          setShowProfesseurDropdown(false);
+                        }, 200);
+                      }}
+                    />
+                    
+                    {/* Dropdown des résultats */}
+                    {showProfesseurDropdown && professeursFiltres.length > 0 && (
+                      <div style={styles.dropdown}>
+                        {professeursFiltres.map((p) => (
+                          <div
+                            key={p._id}
+                            style={styles.dropdownItem}
+                            onClick={() => ajouterProfesseur(p)}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = '#f3f4f6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <div style={styles.professeurItem}>
+                              <div style={styles.professeurInfo}>
+                                <div style={styles.professeurNom}>{p.nom}</div>
+                                <div style={styles.professeurMatiere}>{p.matiere}</div>
+                              </div>
+                              {professeurs_selectionnes.includes(p.nom) && (
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: '#10b981',
+                                  fontWeight: '500'
+                                }}>
+                                  ✓ Sélectionné
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Message si aucun résultat */}
+                    {showProfesseurDropdown && professeurSearch.length > 0 && professeursFiltres.length === 0 && (
+                      <div style={styles.dropdown}>
+                        <div style={{
+                          padding: '1rem',
+                          textAlign: 'center',
+                          color: '#6b7280',
+                          fontSize: '0.875rem'
+                        }}>
+                          Aucun professeur trouvé pour "{professeurSearch}"
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {/* Affichage des sélections */}
+
+                  {/* Affichage des professeurs sélectionnés */}
                   {professeurs_selectionnes.length > 0 && (
-                    <div style={{ marginTop: '10px' }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }}>
+                    <div style={styles.selectedProfesseurs}>
+                      <div style={styles.selectedTitle}>
                         {professeurs_selectionnes.length} professeur(s) sélectionné(s)
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                        {professeurs_selectionnes.map((nom, index) => (
-                          <span key={index} style={{
-                            backgroundColor: '#dbeafe',
-                            color: '#1e40af',
-                            padding: '4px 8px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            border: '1px solid #bfdbfe'
-                          }}>
-                            {nom}
-                            <button
-                              type="button"
-                              onClick={() => setProfesseursSelectionnes(prev => prev.filter(n => n !== nom))}
-                              style={{
-                                marginLeft: '5px',
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                color: '#1e40af',
-                                fontWeight: 'bold'
-                              }}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
+                      <div style={styles.selectedList}>
+                        {professeurs_selectionnes.map((nomProfesseur, index) => {
+                          const professeur = professeurs.find(p => p.nom === nomProfesseur);
+                          return (
+                            <div key={index} style={styles.selectedTag}>
+                              <span>{nomProfesseur}</span>
+                              {professeur && (
+                                <span style={{ fontSize: '0.625rem', opacity: 0.8 }}>
+                                  - {professeur.matiere}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => retirerProfesseur(nomProfesseur)}
+                                style={styles.removeTagButton}
+                                onMouseEnter={(e) => {
+                                  e.target.style.backgroundColor = '#1e40af';
+                                  e.target.style.color = 'white';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.target.style.backgroundColor = 'transparent';
+                                  e.target.style.color = '#1e40af';
+                                }}
+                                title="Retirer ce professeur"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -992,14 +1459,14 @@ const ListeCours = () => {
                   </div>
                   <div>
                     <h2 style={styles.modalTitle}>{coursActuel.nom}</h2>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem'}}>
-  <User size={16} />
-  <span>
-    {Array.isArray(coursActuel.professeur)
-      ? coursActuel.professeur.join(', ')
-      : coursActuel.professeur || 'Non assigné'}
-  </span>
-</div>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem'}}>
+                      <User size={16} />
+                      <span>
+                        {Array.isArray(coursActuel.professeur)
+                          ? coursActuel.professeur.join(', ')
+                          : coursActuel.professeur || 'Non assigné'}
+                      </span>
+                    </div>
 
                   </div>
                 </div>

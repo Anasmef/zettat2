@@ -7,6 +7,7 @@ const professeurSchema = new mongoose.Schema({
     required: true
   },
   
+  
     genre: {
     type: String,
     enum: ['Homme', 'Femme'],
@@ -44,7 +45,22 @@ const professeurSchema = new mongoose.Schema({
   matiere: {
   type: String,
   required: true // أو false إذا أردت تركه اختياري
-},
+}
+,
+  
+  // AJOUTEZ CES CHAMPS :
+  creeParAdmin: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
+  creeParInscripteur: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Inscripteur',
+    default: null
+  },
+  
+
 
   lastSeen: {
   type: Date,
