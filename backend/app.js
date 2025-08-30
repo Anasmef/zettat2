@@ -1441,6 +1441,45 @@ app.get('/api/etudiants', authAdminOrInscripteur, async (req, res) => {
   }
 });
 
+// Route pour que les professeurs récupèrent leurs étudiants
+app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Récupérer les étudiants qui ont au moins un cours en commun avec ce professeur
+    const etudiants = await Etudiant.find({
+      cours: { $in: professeur.cours },
+      actif: true
+    }).select('-motDePasse'); // Exclure le mot de passe
+
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des étudiants:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});// Route pour que les professeurs récupèrent leurs étudiants
+app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Récupérer les étudiants qui ont au moins un cours en commun avec ce professeur
+    const etudiants = await Etudiant.find({
+      cours: { $in: professeur.cours },
+      actif: true
+    }).select('-motDePasse'); // Exclure le mot de passe
+
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des étudiants:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
 // Obtenir un étudiant spécifique (Admin OU Inscripteur)
 app.get('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
   try {

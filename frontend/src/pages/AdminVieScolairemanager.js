@@ -67,7 +67,7 @@ const AdminVieScolairemanager = () => {
 
   const fetchActivities = async () => {
     try {
-      const res = await fetch('/api/vie-scolaire');
+      const res = await fetch('http://localhost:5000/api/vie-scolaire');
       const data = await res.json();
       setActivities(data.data);
     } catch (err) {
@@ -87,8 +87,8 @@ const AdminVieScolairemanager = () => {
     images.forEach((img) => data.append('images', img));
 
     const url = editingId
-      ? `/api/vie-scolaire/${editingId}`
-      : '/api/vie-scolaire';
+      ? `http://localhost:5000/api/vie-scolaire/${editingId}`
+      : 'http://localhost:5000/api/vie-scolaire';
 
     const method = editingId ? 'PUT' : 'POST';
 
@@ -132,7 +132,7 @@ const AdminVieScolairemanager = () => {
     if (!window.confirm('Supprimer cette activité ?')) return;
 
     try {
-      const res = await fetch(`/api/vie-scolaire/${id}`, {
+      const res = await fetch(`http://localhost:5000/api/vie-scolaire/${id}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,

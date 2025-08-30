@@ -211,7 +211,7 @@ const [audioBlob, setAudioBlob] = useState(null);
       }
 
       try {
-        const response = await fetch('/api/professeur/me', {
+        const response = await fetch('http://localhost:5000/api/professeur/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -240,7 +240,7 @@ const [audioBlob, setAudioBlob] = useState(null);
 
       setIsLoadingEtudiants(true);
       try {
-        const response = await fetch('/api/professeur/mes-etudiants-messages', {
+        const response = await fetch('http://localhost:5000/api/professeur/mes-etudiants-messages', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -276,7 +276,7 @@ const [audioBlob, setAudioBlob] = useState(null);
       if (!token) return;
 
       try {
-        const response = await fetch('/api/messages/unread-by-sender', {
+        const response = await fetch('http://localhost:5000/api/messages/unread-by-sender', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -298,7 +298,7 @@ const [audioBlob, setAudioBlob] = useState(null);
       if (!token) return;
 
       try {
-        const response = await fetch('/api/users/online-status', {
+        const response = await fetch('http://localhost:5000/api/users/online-status', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -326,7 +326,7 @@ const [audioBlob, setAudioBlob] = useState(null);
 
       setIsLoadingMessages(true);
       try {
-        const response = await fetch(`/api/messages/professeur/${selectedEtudiant._id}`, {
+        const response = await fetch(`http://localhost:5000/api/messages/professeur/${selectedEtudiant._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -338,7 +338,7 @@ const [audioBlob, setAudioBlob] = useState(null);
         setMessages(Array.isArray(data) ? data : []);
         
         // Marquer les messages comme lus
-        await fetch('/api/messages/mark-conversation-read', {
+        await fetch('http://localhost:5000/api/messages/mark-conversation-read', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -380,7 +380,7 @@ const [audioBlob, setAudioBlob] = useState(null);
     if (fichier) formData.append('fichier', fichier);
 
     try {
-      const response = await fetch('/api/messages/upload-prof', {
+      const response = await fetch('http://localhost:5000/api/messages/upload-prof', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData
@@ -427,7 +427,7 @@ const [audioBlob, setAudioBlob] = useState(null);
     }
 
     try {
-      const response = await fetch(`/api/messages/${messageToDelete}`, {
+      const response = await fetch(`http://localhost:5000/api/messages/${messageToDelete}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -488,7 +488,7 @@ const stopRecording = () => {
       formData.append('fichier', file);
 
       try {
-        const response = await fetch('/api/messages/upload-prof', {
+        const response = await fetch('http://localhost:5000/api/messages/upload-prof', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData

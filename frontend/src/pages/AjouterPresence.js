@@ -42,7 +42,7 @@ const AjouterPresence = () => {
           return;
         }
 
-        const res = await axios.get('/api/professeur/mes-cours', {
+        const res = await axios.get('http://localhost:5000/api/professeur/mes-cours', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -260,32 +260,36 @@ const AjouterPresence = () => {
     window.location.href = '/';
   };
 
-  const handleCoursChange = async (e) => {
-    setSelectedCours(e.target.value);
-    setPresences([]);
-    setMessage('');
+ const handleCoursChange = async (e) => {
+  setSelectedCours(e.target.value);
+  setPresences([]);
+  setMessage('');
 
-    if (!e.target.value) return;
+  if (!e.target.value) return;
 
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/etudiants', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Utilisez la route spécifique pour les professeurs
+    const res = await axios.get('http://localhost:5000/api/professeur/etudiants', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      const filtered = res.data.filter(et => et.actif && et.cours.includes(e.target.value));
+    // Filtrer par le cours sélectionné
+    const filtered = res.data.filter(et => et.cours.includes(e.target.value));
 
-      const initialPresences = filtered.map(et => ({
-        etudiant: et._id,
-        nom: et.nomComplet,
-        present: true,
-        remarque: '',
-      }));
-      setPresences(initialPresences);
-    } catch (error) {
-      console.error('Erreur lors du chargement des étudiants:', error);
-    }
-  };
+    const initialPresences = filtered.map(et => ({
+      etudiant: et._id,
+      nom: et.nomComplet,
+      present: true,
+      remarque: '',
+    }));
+    setPresences(initialPresences);
+  } catch (error) {
+    console.error('Erreur lors du chargement des étudiants:', error);
+    setMessage('error');
+  }
+};
 
   const handlePresenceChange = (index, field, value) => {
     const updated = [...presences];
@@ -314,7 +318,7 @@ const AjouterPresence = () => {
 
     try {
       for (const pres of presences) {
-        await axios.post('/api/presences', {
+        await axios.post('http://localhost:5000/api/presences', {
           etudiant: pres.etudiant,
           cours: selectedCours,
           dateSession,

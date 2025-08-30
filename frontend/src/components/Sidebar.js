@@ -165,7 +165,7 @@ const Sidebar = ({ onLogout }) => {
   // Navigation items for Inscripteur (limited permissions)
   const inscripteurNavigationItems = [
     {
-      path: '/inscripteur',
+      path: '/admin/inscripteurs',
       label: 'Dashboard',
       icon: Home
     },

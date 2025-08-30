@@ -35,7 +35,7 @@ const handleLogin = async () => {
   setMessage('');
 
   try {
-    const res = await fetch('/api/login', {
+    const res = await fetch('http://localhost:5000/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ const handleLogin = async () => {
         if (data.role === 'admin') {
           window.location.href = '/admin';
         } else if (data.role === 'inscripteur') { // ✅ Nouveau cas ajouté
-          window.location.href = '/inscripteur';
+          window.location.href = '/admin/inscripteurs';
         } else if (data.role === 'prof') {
           window.location.href = '/professeur';
         } else if (data.role === 'etudiant') {
