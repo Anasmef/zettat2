@@ -54,20 +54,20 @@ const ProfilEtudiant = () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         // Récupération des données de l'étudiant
-        const resEtudiant = await axios.get(`http://localhost:5000/api/etudiants/${id}`, config);
+        const resEtudiant = await axios.get(`/api/etudiants/${id}`, config);
         setEtudiant(resEtudiant.data);
 
         // Récupération des paiements spécifiques à cet étudiant (OPTIMISÉ)
-        const resPaiements = await axios.get(`http://localhost:5000/api/paiements/etudiant/${id}`, config);
+        const resPaiements = await axios.get(`/api/paiements/etudiant/${id}`, config);
         setPaiements(resPaiements.data);
 
         // Récupération des paiements expirés puis filtrage
-        const resExp = await axios.get(`http://localhost:5000/api/paiements/exp`, config);
+        const resExp = await axios.get(`/api/paiements/exp`, config);
         const expirésEtudiant = resExp.data.filter(p => p.etudiant?._id === id);
         setExpirés(expirésEtudiant);
 
         // Récupération des présences pour cet étudiant
-        const resPres = await axios.get(`http://localhost:5000/api/presences/etudiant/${id}`, config);
+        const resPres = await axios.get(`/api/presences/etudiant/${id}`, config);
         setPresences(resPres.data);
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);

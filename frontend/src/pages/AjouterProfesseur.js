@@ -10,7 +10,7 @@ const AjouterProfesseur = () => {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_BASE = 'http://localhost:5000/api';
+  const API_BASE = '/api';
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');

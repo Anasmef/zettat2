@@ -36,7 +36,7 @@ const ProfileProfesseur = () => {
 
     const fetchProfile = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/professeur/profile', {
+        const res = await fetch('/api/professeur/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
