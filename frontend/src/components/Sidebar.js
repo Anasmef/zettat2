@@ -156,7 +156,7 @@ const Sidebar = ({ onLogout }) => {
       icon: Wallet
     },
     {
-      path: '/admin/inscripteurs',
+      path: '/admin/inscripteur',
       label: 'Inscripteurs',
       icon: UserPlus
     }
