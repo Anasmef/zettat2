@@ -10,12 +10,12 @@ const Actualite = require('./models/Actualite');
 const authInscripteur = require('./middlewares/authInscripteur');
 const Commercial = require('./models/commercialModel');
 const Inscripteur = require('./models/inscripteurModel');
-const authAdminOrInscripteur = require('./middlewares/authAdminOrInscripteur');
+const authAdminOrInscripteurOrPaiementManager = require('./middlewares/authAdminOrInscripteurOrPaiementManager');
 const Bulletin = require('./models/Bulletin'); // Ajustez le chemin selon votre structure
 const { NotificationSupprimee, Configuration } = require('./models/notificationModel');
 const authPaiementManager = require('./middlewares/authPaiementManager');
 const authAdminOrPaiementManager = require('./middlewares/authAdminOrPaiementManager');
-
+const { checkFieldPermissions } = require('./middlewares/checkFieldPermissions');
 const ContactMessage = require('./models/contactModel');
 const Activity = require('./models/Activity');
 
@@ -487,7 +487,7 @@ app.get('/api/etudiant/notifications', authEtudiant, async (req, res) => {
 
 
 // ✅ Route protégée : Dashboard admin
-app.get('/api/admin/dashboard', authAdmin, async (req, res) => {
+app.get('/api/admin/dashboard', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const admin = await Admin.findById(req.adminId).select('-motDePasse');
     res.json({ message: 'Bienvenue sur le tableau de bord', admin });
@@ -505,7 +505,7 @@ app.post('/api/admin/logout', (req, res) => {
 
 // ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
 // ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
-app.post('/api/etudiants', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
+app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.single('image'), checkFieldPermissions, async (req, res) => {
   console.log('🔍 === DÉBUT ROUTE POST ===');
   console.log('🔍 req.body reçu:', req.body);
   console.log('🔍 req.file:', req.file);
@@ -825,9 +825,80 @@ app.post('/api/etudiants', authAdminOrInscripteur, upload.single('image'), async
     });
   }
 });
+app.patch('/api/etudiants/:id/finance', authAdminOrPaiementManager, async (req, res) => {
+  try {
+    const { prixTotal, paye, pourcentageBourse, typePaiement } = req.body;
+    
+    // Validation
+    if (prixTotal < 0) {
+      return res.status(400).json({ message: 'Le prix total ne peut pas être négatif' });
+    }
+    if (pourcentageBourse < 0 || pourcentageBourse > 100) {
+      return res.status(400).json({ message: 'Le pourcentage de bourse doit être entre 0 et 100' });
+    }
+    
+    const typesValides = ['Cash', 'Virement', 'Chèque', 'En ligne'];
+    if (typePaiement && !typesValides.includes(typePaiement)) {
+      return res.status(400).json({ message: 'Type de paiement invalide' });
+    }
+    
+    const updateData = {};
+    if (prixTotal !== undefined) updateData.prixTotal = prixTotal;
+    if (paye !== undefined) updateData.paye = paye;
+    if (pourcentageBourse !== undefined) updateData.pourcentageBourse = pourcentageBourse;
+    if (typePaiement) updateData.typePaiement = typePaiement;
+    
+    const etudiant = await Etudiant.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
+    res.json({
+      message: 'Informations financières mises à jour',
+      etudiant: etudiant
+    });
+    
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// ========================================
+// 4. ROUTE SPÉCIALE POUR RÉCUPÉRER ÉTUDIANTS
+// ========================================
+
+// Route pour récupérer étudiants avec filtrage selon le rôle
+app.get('/api/etudiants/filtered', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const userRole = req.userRole || req.user?.role;
+    
+    // Sélectionner les champs selon le rôle
+    let selectFields = '-motDePasse';
+    
+    if (userRole === 'inscripteur') {
+      // Exclure les champs financiers pour les inscripteurs
+      selectFields = '-motDePasse -prixTotal -paye -pourcentageBourse -typePaiement -dateReglement';
+    }
+    
+    const etudiants = await Etudiant.find()
+      .select(selectFields)
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email')
+      .sort({ createdAt: -1 });
+    
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ===== ROUTE PUT - MISE À JOUR D'UN ÉTUDIANT =====
-app.put('/api/etudiants/:id', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
+app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'),checkFieldPermissions, async (req, res) => {
   try {
     const {
       // Identité
@@ -1325,7 +1396,7 @@ app.get('/api/bulletins/professeur', authProfesseur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
-app.get('/api/bulletins', authAdmin, async (req, res) => {
+app.get('/api/bulletins', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const bulletins = await Bulletin.find()
       .populate({
@@ -1364,7 +1435,7 @@ app.get('/api/bulletins', authAdmin, async (req, res) => {
 
 
 
-app.post('/api/cours', authAdminOrInscripteur, async (req, res) => {
+app.post('/api/cours', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     let { nom, professeur } = req.body;
 
@@ -1402,7 +1473,7 @@ app.post('/api/cours', authAdminOrInscripteur, async (req, res) => {
   }
 });
 
-app.patch('/api/etudiants/:id/actif', authAdminOrInscripteur, async (req, res) => {
+app.patch('/api/etudiants/:id/actif', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.params.id);
     if (!etudiant) return res.status(404).json({ message: 'Étudiant non trouvé' });
@@ -1417,7 +1488,7 @@ app.patch('/api/etudiants/:id/actif', authAdminOrInscripteur, async (req, res) =
   }
 });
 
-app.delete('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
+app.delete('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     await Etudiant.findByIdAndDelete(req.params.id);
     res.json({ message: 'Étudiant supprimé' });
@@ -1427,7 +1498,7 @@ app.delete('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
 });
 // ✅ Obtenir un seul étudiant
 // Lister tous les étudiants (Admin OU Inscripteur)
-app.get('/api/etudiants', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/etudiants', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiants = await Etudiant.find()
       .select('-motDePasse') // Masquer le mot de passe
@@ -1481,7 +1552,7 @@ app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
   }
 });
 // Obtenir un étudiant spécifique (Admin OU Inscripteur)
-app.get('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.params.id)
       .populate('creeParAdmin', 'nom email')
@@ -1496,7 +1567,7 @@ app.get('/api/etudiants/:id', authAdminOrInscripteur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
-app.post('/api/evenements', authAdmin, async (req, res) => {
+app.post('/api/evenements', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { titre, description, dateDebut, dateFin, type } = req.body;
 
@@ -1515,7 +1586,7 @@ app.post('/api/evenements', authAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.get('/api/evenements', authAdmin, async (req, res) => {
+app.get('/api/evenements', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const evenements = await Evenement.find().sort({ dateDebut: 1 });
     res.json(evenements);
@@ -1524,7 +1595,7 @@ app.get('/api/evenements', authAdmin, async (req, res) => {
   }
 });
 // ✅ Route pour modifier un événement
-app.put('/api/evenements/:id', authAdmin, async (req, res) => {
+app.put('/api/evenements/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { titre, description, dateDebut, dateFin, type } = req.body;
     
@@ -1563,7 +1634,7 @@ app.put('/api/evenements/:id', authAdmin, async (req, res) => {
 });
 
 // ✅ Route pour supprimer un événement
-app.delete('/api/evenements/:id', authAdmin, async (req, res) => {
+app.delete('/api/evenements/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     // Vérifier que l'événement existe
     const evenement = await Evenement.findById(req.params.id);
@@ -1593,7 +1664,7 @@ app.delete('/api/evenements/:id', authAdmin, async (req, res) => {
 });
 
 // ✅ Route pour obtenir un seul événement (optionnel - pour les détails)
-app.get('/api/evenements/:id', authAdmin, async (req, res) => {
+app.get('/api/evenements/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const evenement = await Evenement.findById(req.params.id).populate('creePar', 'nom email');
     
@@ -1617,7 +1688,7 @@ app.get('/api/professeur/presences', authProfesseur, async (req, res) => {
   const data = await Presence.find({ creePar: req.professeurId }).populate('etudiant', 'nomComplet');
   res.json(data);
 });
-app.get('/api/presences', authAdmin, async (req, res) => {
+app.get('/api/presences', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const data = await Presence.find().populate('etudiant', 'nomComplet');
     res.json(data);
@@ -1647,7 +1718,7 @@ app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
 // ==================== ROUTES INSCRIPTEURS (Admin seulement) ====================
 
 // CREATE - Créer un inscripteur
-app.post('/api/admin/inscripteurs', authAdmin, async (req, res) => {
+app.post('/api/admin/inscripteurs', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { nom, email, motDePasse, telephone } = req.body;
 
@@ -1713,7 +1784,7 @@ app.post('/api/admin/inscripteurs', authAdmin, async (req, res) => {
 });
 
 // READ - Lister tous les inscripteurs avec pagination
-app.get('/api/admin/inscripteurs', authAdmin, async (req, res) => {
+app.get('/api/admin/inscripteurs', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { page = 1, limit = 10, search, actif } = req.query;
     
@@ -1763,7 +1834,7 @@ app.get('/api/admin/inscripteurs', authAdmin, async (req, res) => {
 });
 
 // READ - Obtenir un inscripteur spécifique
-app.get('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+app.get('/api/admin/inscripteurs/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1791,7 +1862,7 @@ app.get('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
 });
 
 // UPDATE - Modifier un inscripteur
-app.put('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+app.put('/api/admin/inscripteurs/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     const { nom, email, motDePasse, telephone, actif } = req.body;
@@ -1888,7 +1959,7 @@ app.put('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
 });
 
 // PATCH - Activer/Désactiver un inscripteur
-app.patch('/api/admin/inscripteurs/:id/toggle', authAdmin, async (req, res) => {
+app.patch('/api/admin/inscripteurs/:id/toggle', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1924,7 +1995,7 @@ app.patch('/api/admin/inscripteurs/:id/toggle', authAdmin, async (req, res) => {
 });
 
 // DELETE - Supprimer un inscripteur
-app.delete('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
+app.delete('/api/admin/inscripteurs/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -1977,7 +2048,7 @@ app.delete('/api/admin/inscripteurs/:id', authAdmin, async (req, res) => {
 });
 
 // PATCH - Réinitialiser le mot de passe d'un inscripteur
-app.patch('/api/admin/inscripteurs/:id/reset-password', authAdmin, async (req, res) => {
+app.patch('/api/admin/inscripteurs/:id/reset-password', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     const { nouveauMotDePasse } = req.body;
@@ -2020,7 +2091,7 @@ app.patch('/api/admin/inscripteurs/:id/reset-password', authAdmin, async (req, r
 });
 
 // GET - Statistiques des inscripteurs (optionnel)
-app.get('/api/admin/inscripteurs-stats', authAdmin, async (req, res) => {
+app.get('/api/admin/inscripteurs-stats', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const [
       totalInscripteurs,
@@ -2089,7 +2160,7 @@ app.get('/api/professeur/absences', authProfesseur, async (req, res) => {
 // ==================== BULLETINS ====================
 
 // 📌 Récupérer tous les bulletins (Admin uniquement)
-app.get('/api/bulletins', authAdmin, async (req, res) => {
+app.get('/api/bulletins', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const bulletins = await Bulletin.find()
       .populate('etudiant', 'nomComplet email')
@@ -2205,7 +2276,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
 });
 
 
-app.get('/api/debug/notifications', authAdmin, async (req, res) => {
+app.get('/api/debug/notifications', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const aujourdHui = new Date();
     const debutMois = new Date(aujourdHui.getFullYear(), aujourdHui.getMonth(), 1);
@@ -2253,7 +2324,7 @@ app.get('/api/debug/notifications', authAdmin, async (req, res) => {
 });
 
 // ✅ Route pour les statistiques du dashboard
-app.get('/api/dashboard/stats', authAdmin, async (req, res) => {
+app.get('/api/dashboard/stats', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const aujourdHui = new Date();
     
@@ -2318,7 +2389,7 @@ app.get('/api/dashboard/stats', authAdmin, async (req, res) => {
 });
 
 // ✅ Route pour marquer une notification comme lue (optionnel)
-app.post('/api/notifications/:id/mark-read', authAdmin, (req, res) => {
+app.post('/api/notifications/:id/mark-read', authAdminOrInscripteurOrPaiementManager, (req, res) => {
   // Dans une vraie application, vous stockeriez l'état "lu" en base
   // Pour l'instant, on retourne juste un succès
   res.json({ message: 'Notification marquée comme lue', id: req.params.id });
@@ -2486,7 +2557,7 @@ app.delete('/api/etudiant/exercices/:id', authEtudiant, async (req, res) => {
 });
 
 // ✅ Route pour obtenir le nombre de notifications non lues
-app.get('/api/notifications/unread-count', authAdmin, async (req, res) => {
+app.get('/api/notifications/unread-count', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     // Cette route utilise la même logique que /api/notifications
     // mais retourne seulement le nombre
@@ -2555,7 +2626,7 @@ app.get('/api/notifications/unread-count', authAdmin, async (req, res) => {
   }
 });
 // ✅ Route pour supprimer une notification
-app.delete('/api/notifications/:id', authAdmin, async (req, res) => {
+app.delete('/api/notifications/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const notificationId = req.params.id;
     
@@ -2644,7 +2715,7 @@ app.put('/api/professeur/exercices/:id/remarque', authProfesseur, async (req, re
 });
 
 
-app.delete('/api/cours/:id', authAdminOrInscripteur, async (req, res) => {
+app.delete('/api/cours/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const coursId = req.params.id;
 
@@ -2758,7 +2829,7 @@ app.get('/api/professeur/notifications', authProfesseur, async (req, res) => {
 });
 
 // ✅ Route pour obtenir la liste des notifications supprimées (debug)
-app.get('/api/notifications/deleted', authAdmin, (req, res) => {
+app.get('/api/notifications/deleted', authAdminOrInscripteurOrPaiementManager, (req, res) => {
   try {
     if (!global.deletedNotifications) {
       global.deletedNotifications = new Set();
@@ -2779,7 +2850,7 @@ app.get('/api/notifications/deleted', authAdmin, (req, res) => {
 });
 // route: POST /api/professeurs
 // accessible uniquement par Admin
-app.post('/api/professeurs', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
+app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.single('image'), async (req, res) => {
   try {
     const {
       nom,
@@ -2860,7 +2931,7 @@ app.post('/api/professeurs', authAdminOrInscripteur, upload.single('image'), asy
   }
 });
 
-app.post('/api/seances', authAdmin, async (req, res) => {
+app.post('/api/seances', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     // ✅ AJOUT: Inclure matiere et salle dans la destructuration
     const { jour, heureDebut, heureFin, cours, professeur, matiere, salle } = req.body;
@@ -2896,7 +2967,7 @@ app.post('/api/seances', authAdmin, async (req, res) => {
 });
 
 // Route pour modifier une séance - CORRIGÉE
-app.put('/api/seances/:id', authAdmin, async (req, res) => {
+app.put('/api/seances/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     // ✅ AJOUT: Inclure matiere et salle dans la destructuration
     const { jour, heureDebut, heureFin, cours, professeur, matiere, salle } = req.body;
@@ -2933,7 +3004,7 @@ app.put('/api/seances/:id', authAdmin, async (req, res) => {
 });
 
 // Route pour récupérer toutes les séances (pour admin) - INCHANGÉE
-app.get('/api/seances', authAdmin, async (req, res) => {
+app.get('/api/seances', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const seances = await Seance.find()
       .populate('professeur', 'nom')
@@ -2996,7 +3067,7 @@ app.post('/api/professeurs/login', async (req, res) => {
 
 
 
-app.put('/api/professeurs/:id', authAdminOrInscripteur, upload.single('image'), async (req, res) => {
+app.put('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'), async (req, res) => {
   try {
     const professeurId = req.params.id;
     const {
@@ -3082,7 +3153,7 @@ app.put('/api/professeurs/:id', authAdminOrInscripteur, upload.single('image'), 
 
 
 // routes/professeurs.js
-app.patch('/api/professeurs/:id/actif',authAdminOrInscripteur, async (req, res) => {
+app.patch('/api/professeurs/:id/actif',authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const prof = await Professeur.findById(req.params.id);
     if (!prof) return res.status(404).json({ message: 'Professeur introuvable' });
@@ -3140,7 +3211,7 @@ app.get('/api/etudiant/paiements', authEtudiant, async (req, res) => {
 
 
 
-app.delete('/api/professeurs/:id', authAdminOrInscripteur, async (req, res) => {
+app.delete('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     await Professeur.findByIdAndDelete(req.params.id);
     res.json({ message: 'Professeur supprimé avec succès' });
@@ -3150,7 +3221,7 @@ app.delete('/api/professeurs/:id', authAdminOrInscripteur, async (req, res) => {
   }
 });
 
-app.get('/api/presences/:etudiantId', authAdmin, async (req, res) => {
+app.get('/api/presences/:etudiantId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const result = await Presence.find({ etudiant: req.params.etudiantId }).sort({ dateSession: -1 });
     res.json(result);
@@ -3158,7 +3229,7 @@ app.get('/api/presences/:etudiantId', authAdmin, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-app.get('/api/presences/etudiant/:id', authAdmin, async (req, res) => {
+app.get('/api/presences/etudiant/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const presences = await Presence.find({ etudiant: req.params.id }).sort({ dateSession: -1 });
     res.json(presences);
@@ -3173,7 +3244,7 @@ app.get('/api/presences/etudiant/:id', authAdmin, async (req, res) => {
 // Récupérer un seul cours avec détails
 // 📌 Route: GET /api/cours/:id
 // ✅ Lister tous les cours (IMPORTANT!)
-app.get('/api/cours', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/cours', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const cours = await Cours.find();
     res.json(cours);
@@ -3204,7 +3275,7 @@ app.get('/api/professeur/profile', authProfesseur, async (req, res) => {
 });
 
 
-app.get('/api/cours/:id', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/cours/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const cours = await Cours.findById(req.params.id).populate('creePar', 'nom email');
     if (!cours) return res.status(404).json({ message: 'Cours introuvable' });
@@ -3214,7 +3285,7 @@ app.get('/api/cours/:id', authAdminOrInscripteur, async (req, res) => {
   }
 });
 // Lister tous les professeurs (Admin OU Inscripteur)
-app.get('/api/professeurs', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/professeurs', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const professeurs = await Professeur.find()
       .select('-motDePasse')
@@ -3230,7 +3301,7 @@ app.get('/api/professeurs', authAdminOrInscripteur, async (req, res) => {
 });
 
 // Obtenir un professeur spécifique (Admin OU Inscripteur)
-app.get('/api/professeurs/:id', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const professeur = await Professeur.findById(req.params.id)
       .select('-motDePasse')
@@ -3334,6 +3405,58 @@ app.get('/api/actualites', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
+// Route pour modifier uniquement les infos financières
+app.patch('/api/etudiants/:id/finance', authAdminOrPaiementManager, async (req, res) => {
+  try {
+    const { prixTotal, paye, pourcentageBourse, typePaiement } = req.body;
+    
+    const updateData = {};
+    if (prixTotal !== undefined) updateData.prixTotal = parseFloat(prixTotal);
+    if (paye !== undefined) updateData.paye = Boolean(paye);
+    if (pourcentageBourse !== undefined) updateData.pourcentageBourse = parseFloat(pourcentageBourse);
+    if (typePaiement) updateData.typePaiement = typePaiement;
+    
+    const etudiant = await Etudiant.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
+    res.json({
+      message: 'Informations financières mises à jour',
+      etudiant: etudiant
+    });
+    
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+// Route pour récupérer étudiants avec filtrage selon le rôle
+app.get('/api/etudiants/filtered', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const userRole = req.userRole;
+    
+    let selectFields = '-motDePasse';
+    
+    if (userRole === 'inscripteur') {
+      selectFields = '-motDePasse -prixTotal -paye -pourcentageBourse -typePaiement -dateReglement';
+    }
+    
+    const etudiants = await Etudiant.find()
+      .select(selectFields)
+      .populate('creeParAdmin', 'nom email')
+      .populate('creeParInscripteur', 'nom email')
+      .sort({ createdAt: -1 });
+    
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 app.post('/api/actualites', authAdminOrPaiementManager, upload.single('image'), async (req, res) => {
   try {
     const { title, excerpt, content, category, author, date, tags, type, isPinned } = req.body;
@@ -3421,7 +3544,7 @@ const mettreAJourStatutPaiement = async (etudiantId) => {
 };
 
 // 2️⃣ REMPLACER votre route POST /api/paiements par ça :
-app.post('/api/paiements', authAdmin, async (req, res) => {
+app.post('/api/paiements', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     // 🔍 DEBUG - Afficher ce qu'on reçoit
     console.log('🔍 Données reçues:', req.body);
@@ -3588,7 +3711,7 @@ app.put('/api/etudiant/profil', authEtudiant, async (req, res) => {
     });
   }
 });
-app.post('/api/commerciaux', authAdmin, async (req, res) => {
+app.post('/api/commerciaux', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { nom, telephone, email } = req.body;
     const nouveau = new Commercial({ nom, telephone, email });
@@ -3702,7 +3825,7 @@ app.put('/api/professeur/profil', authProfesseur, async (req, res) => {
   }
 });
 // ✅ Lister tous les commerciaux
-app.get('/api/commerciaux', authAdmin, async (req, res) => {
+app.get('/api/commerciaux', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const commerciaux = await Commercial.find().sort({ nom: 1 });
     res.json(commerciaux);
@@ -3788,7 +3911,7 @@ app.post('/api/messages/upload', authEtudiant, uploadMessageFile.single('fichier
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
-app.get('/api/paiements/etudiant/:etudiantId', authAdminOrInscripteur, async (req, res) => {
+app.get('/api/paiements/etudiant/:etudiantId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const paiements = await Paiement.find({ etudiant: req.params.etudiantId });
     res.json(paiements);
@@ -3796,8 +3919,55 @@ app.get('/api/paiements/etudiant/:etudiantId', authAdminOrInscripteur, async (re
     res.status(500).json({ message: "Erreur lors de la récupération des paiements", error: err.message });
   }
 });
+// Keep this version - it's more comprehensive
+app.get('/api/paiement-manager/stats', authAdminOrPaiementManager, async (req, res) => {
+  try {
+    console.log('🔍 Route stats paiement-manager appelée');
+    
+    // Récupérer tous les étudiants actifs
+    const etudiants = await Etudiant.find({ actif: true });
+    console.log('📊 Étudiants actifs trouvés:', etudiants.length);
+    
+    // Récupérer tous les paiements
+    const paiements = await Paiement.find();
+    console.log('💰 Paiements trouvés:', paiements.length);
+    
+    // Calculs
+    const totalEtudiants = etudiants.length;
+    const etudiantsPayes = etudiants.filter(e => e.paye === true).length;
+    const montantTotal = etudiants.reduce((acc, e) => acc + (e.prixTotal || 0), 0);
+    const montantCollecte = paiements.reduce((acc, p) => acc + (p.montant || 0), 0);
+    
+    // Simple calcul d'expirés (étudiants non payés)
+    const paiementsExpires = totalEtudiants - etudiantsPayes;
+    
+    const statsData = {
+      totalEtudiants,
+      etudiantsPayes,
+      montantTotal,
+      montantCollecte,
+      paiementsExpires,
+      tauxCollection: montantTotal > 0 ? ((montantCollecte / montantTotal) * 100).toFixed(1) : 0
+    };
+    
+    console.log('📈 Stats calculées:', statsData);
+    res.json(statsData);
+    
+  } catch (err) {
+    console.error('❌ Erreur route stats:', err);
+    res.status(500).json({ 
+      error: err.message,
+      totalEtudiants: 0,
+      etudiantsPayes: 0,
+      montantTotal: 0,
+      montantCollecte: 0,
+      paiementsExpires: 0,
+      tauxCollection: 0
+    });
+  }
+});
 // ✅ Lister les paiements
-app.get('/api/paiements', authAdmin, async (req, res) => {
+app.get('/api/paiements', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const paiements = await Paiement.find()
       .populate('etudiant', 'prenom nomDeFamille nomComplet telephoneEtudiant') // ✅ telephoneEtudiant
@@ -3809,7 +3979,7 @@ app.get('/api/paiements', authAdmin, async (req, res) => {
   }
 });
 
-app.get('/api/paiements/exp', authAdmin, async (req, res) => {
+app.get('/api/paiements/exp', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiants = await Etudiant.find({ actif: true });
     const paiements = await Paiement.find({}).lean();
@@ -3959,7 +4129,7 @@ app.delete('/api/messages/:messageId', async (req, res) => {
 
 
 // Route pour supprimer une notification avec sauvegarde du contexte
-app.delete('/api/notifications/:id', authAdmin, async (req, res) => {
+app.delete('/api/notifications/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -4004,7 +4174,7 @@ app.delete('/api/notifications/:id', authAdmin, async (req, res) => {
 });
 
 // Route pour restaurer les notifications supprimées
-app.post('/api/notifications/reset-deleted', authAdmin, async (req, res) => {
+app.post('/api/notifications/reset-deleted', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const result = await NotificationSupprimee.deleteMany({});
     
@@ -4023,7 +4193,7 @@ app.post('/api/notifications/reset-deleted', authAdmin, async (req, res) => {
 });
 
 // Route pour configurer les seuils d'absence
-app.post('/api/notifications/seuils-absence', authAdmin, async (req, res) => {
+app.post('/api/notifications/seuils-absence', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { normal, urgent, critique } = req.body;
     
@@ -4061,7 +4231,7 @@ app.post('/api/notifications/seuils-absence', authAdmin, async (req, res) => {
 });
 
 // Route de statistiques détaillées pour les absences
-app.get('/api/notifications/stats-absences', authAdmin, async (req, res) => {
+app.get('/api/notifications/stats-absences', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiantsActifs = await Etudiant.find({ actif: true });
     const stats = {
@@ -4199,6 +4369,27 @@ app.get('/api/messages/unread-by-sender', async (req, res) => {
     res.json(unreadCounts);
   } catch (err) {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+// Route pour récupérer les nouveaux étudiants (à ajouter dans votre app.js)
+app.get('/api/paiement-manager/etudiants-nouveaux', authAdminOrPaiementManager, async (req, res) => {
+  try {
+    const etudiants = await Etudiant.find({ 
+      actif: true,
+      $or: [
+        { prixTotal: { $exists: false } },
+        { prixTotal: 0 },
+        { prixTotal: null }
+      ]
+    })
+    .select('-motDePasse')
+    .sort({ createdAt: -1 })
+    .limit(10); // Limiter aux 10 plus récents
+    
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur récupération nouveaux étudiants:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 app.put('/api/rappels/:id', async (req, res) => {
@@ -4809,7 +5000,7 @@ app.get('/api/messages/notifications-etudiant', authEtudiant, async (req, res) =
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
-app.post('/api/admin/paiement-managers', authAdmin, async (req, res) => {
+app.post('/api/admin/paiement-managers', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { nom, email, telephone, motDePasse, actif = true } = req.body;
 
@@ -4874,7 +5065,7 @@ app.post('/api/admin/paiement-managers', authAdmin, async (req, res) => {
 });
 
 // 2. Lire tous les gestionnaires de paiement (GET)
-app.get('/api/admin/paiement-managers', authAdmin, async (req, res) => {
+app.get('/api/admin/paiement-managers', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { page = 1, limit = 50, actif, search } = req.query;
     
@@ -4917,7 +5108,7 @@ app.get('/api/admin/paiement-managers', authAdmin, async (req, res) => {
 });
 
 // 3. Lire un gestionnaire spécifique (GET)
-app.get('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
+app.get('/api/admin/paiement-managers/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -4948,7 +5139,7 @@ app.get('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
 });
 
 // 4. Mettre à jour un gestionnaire (PUT)
-app.put('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
+app.put('/api/admin/paiement-managers/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     const { nom, email, telephone, motDePasse, actif } = req.body;
@@ -5043,7 +5234,7 @@ app.put('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
 });
 
 // 5. Supprimer un gestionnaire (DELETE)
-app.delete('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
+app.delete('/api/admin/paiement-managers/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -5092,7 +5283,7 @@ app.delete('/api/admin/paiement-managers/:id', authAdmin, async (req, res) => {
 });
 
 // 6. Activer/Désactiver un gestionnaire (PATCH)
-app.patch('/api/admin/paiement-managers/:id/toggle-active', authAdmin, async (req, res) => {
+app.patch('/api/admin/paiement-managers/:id/toggle-active', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -5137,7 +5328,7 @@ app.patch('/api/admin/paiement-managers/:id/toggle-active', authAdmin, async (re
 
 
 
-app.get('/api/notifications', authAdmin, async (req, res) => {
+app.get('/api/notifications', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const notifications = [];
     const aujourdHui = new Date();
@@ -5458,7 +5649,7 @@ app.get('/notifications-etudiant', authEtudiant, async (req, res) => {
 // Exemple Express
 // backend route
 
-app.put('/update-profil', authAdmin, async (req, res) => {
+app.put('/update-profil', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   const { nom, email, ancienMotDePasse, nouveauMotDePasse } = req.body;
 
   try {
@@ -5592,7 +5783,7 @@ app.get('/api/professeur/me', authProfesseur, async (req, res) => {
 // ===== ROUTES PROFILE ADMIN =====
 console.log('🔧 Ajout des routes profile admin...');
 
-app.get('/api/admin/profile', authAdmin, async (req, res) => {
+app.get('/api/admin/profile', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     console.log('📝 Route profile GET appelée - Admin ID:', req.adminId);
     
@@ -5610,7 +5801,7 @@ app.get('/api/admin/profile', authAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/admin/profile', authAdmin, async (req, res) => {
+app.put('/api/admin/profile', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     console.log('📝 Route profile PUT appelée - Admin ID:', req.adminId);
     console.log('📝 Body reçu:', req.body);

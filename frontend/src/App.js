@@ -70,7 +70,10 @@ import ProfesseurProfil from './pages/ProfesseurProfil';
 import InscripteurPage from './pages/InscripteurPage';
 import InscripteurDashboard from './pages/InscripteurDashboard';
 
+import GestionPaiementManagers from './pages/GestionPaiementManagers';
+import DashboardPaiementManager from './pages/DashboardPaiementManager';
 
+// Dans vos routes
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -309,6 +312,7 @@ function AppContent() {
         <Route path="/lycee" element={<LyceePage />} />
         <Route path="/actualites" element={<ActualitesPage />} />
         <Route path="/Vie-Scolaire" element={<VieScolairePage />} />
+<Route path="/admin/gestionnaire-paiement" element={<GestionPaiementManagers />} />
 
         {/* Auth public */}
         <Route path="/login" element={<Login />} />
@@ -372,6 +376,7 @@ function AppContent() {
         <Route path="/etudiant/live" element={<LiveCoursEtudiant />} />
         <Route path="/etudiant/live/:cours" element={<EtudiantLiveCours />} />
 
+        <Route path="/dashboard/manager" element={<DashboardPaiementManager />} />
 
         <Route path="/admin/inscripteurs" element={<InscripteurDashboard />} />
       </Routes>

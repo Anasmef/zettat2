@@ -1,659 +1,782 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
-  Users, 
-  MessageSquare, 
-  FileText, 
-  Calendar,
-  TrendingUp,
-  Activity,
-  Bell,
-  ChevronRight,
-  BarChart3,
-  PieChart,
-  Globe,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Eye,
-  UserCheck,
-  BookOpen,
-  Award,
-  Target,
-  Zap
+  DollarSign, Users, AlertTriangle, TrendingUp, RefreshCw, Bell,
+  Search, Settings, LogOut, CreditCard, UserCheck,
+  Calculator, Target, Clock, X, Activity
 } from 'lucide-react';
-import Sidebar from '../components/Sidebarmanager';
+import Sidebar from '../components/Sidebar';
+import RappelModal from '../components/RappelModal'; // adapte le chemin si besoin
+import Header from '../components/Header';
 
-// Import des styles CSS
-import './AdminDashboard.css';
+const Dashboardmanager = () => {
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/';
+  };
 
-const handleLogout = () => {
-  localStorage.removeItem('token');
-  window.location.href = '/';
-};
-
-const ManagerDashboard = () => {
   const [stats, setStats] = useState({
-    actualites: {
-      total: 0,
-      pinned: 0,
-      categories: {},
-      types: {},
-      recentActivity: []
-    },
-    vieScolaire: {
-      total: 0,
-      byCategory: {},
-      byCycle: {},
-      upcomingEvents: [],
-      monthlyActivity: {}
-    },
-    messages: {
-      total: 0,
-      bySubject: {},
-      recent: [],
-      unread: 0
-    }
+    totalEtudiants: 0,
+    etudiantsPayes: 0,
+    montantTotal: 0,
+    montantCollecte: 0,
+    paiementsExpires: 0
   });
   
+  // États pour les modals
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showFinanceModal, setShowFinanceModal] = useState(false);
+  const [selectedEtudiant, setSelectedEtudiant] = useState(null);
+  const [nouveauxEtudiants, setNouveauxEtudiants] = useState([]);
+  
+  // États pour les rappels (ajoutés)
+  const [rappelModal, setRappelModal] = useState(null);
+  const [editDate, setEditDate] = useState('');
+  const [editNote, setEditNote] = useState('');
+  
+  // États généraux
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [error, setError] = useState('');
 
-  const token = localStorage.getItem('token');
-
-  // Mise à jour de l'heure
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
+    fetchStatsFinancieres();
+    checkNouveauxEtudiants();
+    
+    // Vérifier périodiquement les nouveaux étudiants (toutes les 5 minutes)
+    const interval = setInterval(checkNouveauxEtudiants, 300000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Chargement des données
+  // Hook pour les rappels (ajouté)
   useEffect(() => {
-    const fetchAllData = async () => {
+    const fetchRappels = async () => {
       try {
-        setLoading(true);
-        
-        // Chargement des actualités
-        const actualitesRes = await fetch('/api/actualites', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const actualitesData = await actualitesRes.json();
-        const actualites = Array.isArray(actualitesData) ? actualitesData : actualitesData.actualites || [];
-
-        // Chargement de la vie scolaire
-        const vieScolaireRes = await fetch('/api/vie-scolaire');
-        const vieScolaireData = await vieScolaireRes.json();
-        const vieScolaire = vieScolaireData.data || [];
-
-        // Chargement des messages
-        const messagesRes = await fetch('/api/admin/contact-messages', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const messages = await messagesRes.json();
-
-        // Traitement des statistiques d'actualités
-        const actualitesStats = {
-          total: actualites.length,
-          pinned: actualites.filter(a => a.isPinned).length,
-          categories: actualites.reduce((acc, a) => {
-            acc[a.category] = (acc[a.category] || 0) + 1;
-            return acc;
-          }, {}),
-          types: actualites.reduce((acc, a) => {
-            acc[a.type] = (acc[a.type] || 0) + 1;
-            return acc;
-          }, {}),
-          recentActivity: actualites
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 5)
+        const token = localStorage.getItem('token');
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         };
 
-        // Traitement des statistiques de vie scolaire
-        const vieScolaireStats = {
-          total: vieScolaire.length,
-          byCategory: vieScolaire.reduce((acc, v) => {
-            acc[v.category] = (acc[v.category] || 0) + 1;
-            return acc;
-          }, {}),
-          byCycle: vieScolaire.reduce((acc, v) => {
-            acc[v.cycle] = (acc[v.cycle] || 0) + 1;
-            return acc;
-          }, {}),
-          upcomingEvents: vieScolaire
-            .filter(v => new Date(v.date) >= new Date())
-            .sort((a, b) => new Date(a.date) - new Date(b.date))
-            .slice(0, 5),
-          monthlyActivity: vieScolaire.reduce((acc, v) => {
-            const month = new Date(v.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-            acc[month] = (acc[month] || 0) + 1;
-            return acc;
-          }, {})
-        };
+        const res = await fetch('/api/rappels', { headers });
+        if (!res.ok) throw new Error('Erreur lors du chargement des rappels');
 
-        // Traitement des statistiques de messages
-        const messagesStats = {
-          total: messages.length,
-          bySubject: messages.reduce((acc, m) => {
-            acc[m.subject] = (acc[m.subject] || 0) + 1;
-            return acc;
-          }, {}),
-          recent: messages
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5),
-          unread: messages.filter(m => !m.read).length
-        };
+        const data = await res.json();
 
-        setStats({
-          actualites: actualitesStats,
-          vieScolaire: vieScolaireStats,
-          messages: messagesStats
-        });
+        // Filtrage des rappels pour la date actuelle
+        const today = new Date();
+        const rappelsAujourdhui = data.filter(r =>
+          r.status === 'actif' &&
+          new Date(r.dateRappel).toDateString() <= today.toDateString()
+        );
 
-      } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
-      } finally {
-        setLoading(false);
+        console.log('📢 Rappels à afficher aujourd\'hui:', rappelsAujourdhui);
+
+        if (rappelsAujourdhui.length > 0) {
+          setRappelModal(rappelsAujourdhui[0]);
+          setEditDate(rappelsAujourdhui[0].dateRappel?.split('T')[0] || '');
+          setEditNote(rappelsAujourdhui[0].note || '');
+        }
+
+      } catch (err) {
+        console.error('❌ Erreur rappels:', err.message);
       }
     };
 
-    fetchAllData();
-  }, [token]);
+    fetchRappels();
+  }, []);
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short'
-    });
+  // Gestionnaires pour les rappels (ajoutés)
+  const handleUpdateRappel = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/rappels/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ dateRappel: editDate, note: editNote })
+      });
+
+      if (res.ok) {
+        setRappelModal(null);
+        alert("Rappel mis à jour avec succès");
+      } else {
+        throw new Error('Erreur lors de la mise à jour');
+      }
+    } catch (err) {
+      console.error('Erreur mise à jour rappel:', err);
+      alert('Erreur lors de la mise à jour: ' + err.message);
+    }
+  };
+
+  const handleDeleteRappel = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/rappels/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setRappelModal(null);
+        alert("Rappel supprimé avec succès");
+      } else {
+        throw new Error('Erreur lors de la suppression');
+      }
+    } catch (err) {
+      console.error('Erreur suppression rappel:', err);
+      alert('Erreur lors de la suppression: ' + err.message);
+    }
+  };
+
+  const fetchStatsFinancieres = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const token = localStorage.getItem('token');
+      console.log('Token:', token ? 'Présent' : 'Absent');
+      console.log('URL appelée:', '/api/paiement-manager/stats');
+      
+      const res = await fetch('/api/paiement-manager/stats', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Erreur ${res.status}: ${res.statusText}`);
+      }
+      
+      const data = await res.json();
+      console.log('Réponse reçue:', data);
+      setStats(data);
+      
+    } catch (err) {
+      console.error('Erreur complète:', err);
+      setError(`Erreur de connexion: ${err.message}`);
+      
+      // Données de démonstration en cas d'erreur
+      setStats({
+        totalEtudiants: 156,
+        etudiantsPayes: 98,
+        montantTotal: 468000,
+        montantCollecte: 294000,
+        paiementsExpires: 12
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkNouveauxEtudiants = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/paiement-manager/etudiants-nouveaux', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        
+        // Filtrer les étudiants sans prix défini
+        const etudiantsSansPrix = data.filter(etudiant => 
+          !etudiant.prixTotal || etudiant.prixTotal === 0
+        );
+        
+        setNouveauxEtudiants(etudiantsSansPrix);
+        
+        // Afficher la modal s'il y a de nouveaux étudiants et qu'elle n'est pas déjà ouverte
+        if (etudiantsSansPrix.length > 0 && !showNotificationModal && !showFinanceModal) {
+          setSelectedEtudiant(etudiantsSansPrix[0]);
+          setShowNotificationModal(true);
+        }
+      }
+    } catch (err) {
+      console.error('Erreur vérification nouveaux étudiants:', err);
+      // Données de démonstration en cas d'erreur
+      setNouveauxEtudiants([
+        { _id: '1', nomComplet: 'Ahmed Bennani', email: 'ahmed.b@email.com' },
+        { _id: '2', nomComplet: 'Fatima Zahra', email: 'fatima.z@email.com' }
+      ]);
+    }
+  };
+
+  const handleSetPrice = (etudiant) => {
+    setSelectedEtudiant(etudiant);
+    setShowNotificationModal(false);
+    setShowFinanceModal(true);
+  };
+
+  const handleFinanceSubmit = async (financeData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(
+        `/api/etudiants/${selectedEtudiant._id}/finance`,
+        {
+          method: 'PATCH',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(financeData)
+        }
+      );
+      
+      if (res.ok) {
+        // Rafraîchir les stats et vérifier les nouveaux étudiants
+        await fetchStatsFinancieres();
+        await checkNouveauxEtudiants();
+        setShowFinanceModal(false);
+        
+        // Message de succès
+        alert('Prix défini avec succès pour ' + selectedEtudiant.nomComplet);
+      } else {
+        throw new Error('Erreur lors de la mise à jour');
+      }
+      
+    } catch (err) {
+      console.error('Erreur mise à jour finance:', err);
+      alert('Erreur lors de la mise à jour: ' + err.message);
+    }
+  };
+
+  const handleShowNextStudent = () => {
+    if (nouveauxEtudiants.length > 1) {
+      const currentIndex = nouveauxEtudiants.findIndex(e => e._id === selectedEtudiant._id);
+      const nextIndex = (currentIndex + 1) % nouveauxEtudiants.length;
+      setSelectedEtudiant(nouveauxEtudiants[nextIndex]);
+    }
+  };
+
+  const StatCard = ({ title, value, icon: Icon, colorClass, subtitle, percentage, formatAsAmount = false }) => (
+    <div className={`stat-card ${colorClass}`}>
+      <div className="stat-card-content">
+        <div className="stat-card-info">
+          <h3 className="stat-card-title">{title}</h3>
+          <p className="stat-card-value">
+            {formatAsAmount ? `${formatMontant(value)} DH` : value?.toLocaleString() || 0}
+          </p>
+          {subtitle && <p className="stat-card-subtitle">{subtitle}</p>}
+          {percentage !== undefined && (
+            <div style={{marginTop: '12px'}}>
+              <div style={{
+                background: '#E5E7EB',
+                borderRadius: '9999px',
+                height: '8px',
+                marginBottom: '4px'
+              }}>
+                <div 
+                  style={{
+                    background: colorClass === 'blue' ? '#3B82F6' : colorClass === 'green' ? '#10B981' : '#8B5CF6',
+                    borderRadius: '9999px',
+                    height: '8px',
+                    width: `${Math.min(percentage, 100)}%`,
+                    transition: 'width 0.7s ease-in-out'
+                  }}
+                ></div>
+              </div>
+              <p style={{fontSize: '0.75rem', color: '#6B7280'}}>{percentage}% collecté</p>
+            </div>
+          )}
+        </div>
+        <div className={`stat-card-icon ${colorClass}`}>
+          <Icon />
+        </div>
+      </div>
+    </div>
+  );
+
+  // Modal de notification pour nouveaux étudiants
+  const ModalNotificationEtudiant = () => {
+    if (!showNotificationModal || !selectedEtudiant) return null;
+    
+    const currentIndex = nouveauxEtudiants.findIndex(e => e._id === selectedEtudiant._id) + 1;
+    
+    return (
+      <div className="modal-backdrop">
+        <div className="modal">
+          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px'}}>
+            <h3 style={{fontSize: '18px', fontWeight: 'bold', color: '#1F2937'}}>Nouvel Étudiant Détecté</h3>
+            <button 
+              onClick={() => setShowNotificationModal(false)}
+              style={{
+                padding: '4px',
+                background: 'none',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+          
+          <div style={{
+            background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+            borderRadius: '8px',
+            padding: '16px',
+            marginBottom: '16px'
+          }}>
+            <p style={{fontWeight: '600', color: '#1F2937'}}>{selectedEtudiant.nomComplet}</p>
+            <p style={{color: '#6B7280', fontSize: '14px'}}>{selectedEtudiant.email}</p>
+            <p style={{color: '#3B82F6', fontSize: '12px', marginTop: '4px'}}>
+              Étudiant {currentIndex} sur {nouveauxEtudiants.length}
+            </p>
+          </div>
+          
+          <p style={{color: '#6B7280', marginBottom: '24px'}}>
+            Cet étudiant n'a pas encore de prix défini. Voulez-vous configurer ses informations financières ?
+          </p>
+          
+          <div style={{display: 'flex', gap: '12px'}}>
+            <button 
+              onClick={() => handleSetPrice(selectedEtudiant)}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%)',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              Définir le Prix
+            </button>
+            {nouveauxEtudiants.length > 1 && (
+              <button 
+                onClick={handleShowNextStudent}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #D1D5DB',
+                  color: '#374151',
+                  borderRadius: '8px',
+                  background: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                Suivant
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Modal de configuration financière utilisant votre composant existant
+  const ModalFinance = () => {
+    if (!showFinanceModal || !selectedEtudiant) return null;
+
+    const handleModalSubmit = (formFinance) => {
+      handleFinanceSubmit(formFinance);
+    };
+
+    const handleModalClose = () => {
+      setShowFinanceModal(false);
+    };
+
+    return (
+      <div className="modal-overlay" onClick={handleModalClose}>
+        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>Gestion Financière - {selectedEtudiant?.nomComplet}</h3>
+            <button className="btn-fermer-modal" onClick={handleModalClose}>×</button>
+          </div>
+          
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const formFinance = {
+              prixTotal: parseFloat(formData.get('prixTotal')) || 0,
+              paye: formData.get('paye') === 'true',
+              pourcentageBourse: parseFloat(formData.get('pourcentageBourse')) || 0,
+              typePaiement: formData.get('typePaiement') || 'Cash'
+            };
+            handleModalSubmit(formFinance);
+          }}>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Prix Total</label>
+                <input
+                  name="prixTotal"
+                  type="number"
+                  defaultValue={selectedEtudiant?.prixTotal || 0}
+                  min="0"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Pourcentage Bourse (%)</label>
+                <input
+                  name="pourcentageBourse"
+                  type="number"
+                  defaultValue={selectedEtudiant?.pourcentageBourse || 0}
+                  min="0"
+                  max="100"
+                />
+              </div>
+            </div>
+            
+            <div className="form-row">
+              <div className="form-group">
+                <label>Type Paiement</label>
+                <select name="typePaiement" defaultValue={selectedEtudiant?.typePaiement || 'Cash'}>
+                  <option value="Cash">Cash</option>
+                  <option value="Virement">Virement</option>
+                  <option value="Chèque">Chèque</option>
+                  <option value="En ligne">En ligne</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Statut Paiement</label>
+                <select name="paye" defaultValue={selectedEtudiant?.paye ? 'true' : 'false'}>
+                  <option value="false">Non payé</option>
+                  <option value="true">Payé</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button type="button" onClick={handleModalClose} className="btn-annuler">
+                Annuler
+              </button>
+              <button type="submit" className="btn-enregistrer">
+                Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const formatMontant = (montant) => {
+    return new Intl.NumberFormat('fr-MA').format(montant || 0);
   };
 
   if (loading) {
     return (
-      <div className="admin-dashboard">
-        <Sidebar onLogout={handleLogout} />
-        <div className="dashboard-container">
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '400px',
-            flexDirection: 'column',
-            gap: '20px'
-          }}>
-            <div style={{
-              width: '50px',
-              height: '50px',
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #3B82F6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite'
-            }}></div>
-            <p style={{ color: '#6B7280', fontSize: '18px' }}>Chargement du tableau de bord...</p>
-          </div>
+      <div className="loading-container">
+        <div className="loading-content">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Chargement des statistiques...</p>
+          <p className="loading-subtext">Récupération des données financières</p>
         </div>
       </div>
     );
   }
 
+  const collectionRate = calculatePercentage(stats.montantCollecte, stats.montantTotal);
+  const paymentRate = calculatePercentage(stats.etudiantsPayes, stats.totalEtudiants);
+
   return (
-    <div className="admin-dashboard">
+    <div className="admin-dashboard" style={{
+      minHeight: '100vh',
+      backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
+      backgroundAttachment: 'fixed'
+    }}>
+      {/* Header ajouté */}
+      <Header />
       <Sidebar onLogout={handleLogout} />
       
-      {/* Header */}
-      <header className="dashboard-header">
-  <div className="container">
-    <div className="header-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '160px' }}>
-      <div className="header-info">
-        <h1 style={{ margin: '0 auto', fontWeight: 'bold', fontSize: '2.2rem' }}>Tableau de Bord Manager</h1>
-        <p style={{ margin: '8px 0 16px 0', fontSize: '1.1rem', color: '#374151' }}>Vue d'ensemble complète de la plateforme</p>
-        <div className="connection-status" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', fontSize: '1rem', color: '#6366f1', gap: '8px' }}>
-          <Clock size={18} style={{ marginRight: '6px' }} />
-          {currentTime.toLocaleString('fr-FR')}
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
-
+      {/* Modal de rappel ajouté */}
+      {rappelModal && (
+        <RappelModal
+          rappel={rappelModal}
+          onClose={() => setRappelModal(null)}
+          onUpdate={() => handleUpdateRappel(rappelModal._id)}
+          onDelete={() => handleDeleteRappel(rappelModal._id)}
+          editDate={editDate}
+          setEditDate={setEditDate}
+          editNote={editNote}
+          setEditNote={setEditNote}
+        />
+      )}
+      
       <div className="dashboard-container">
         <div className="dashboard-content">
-          
-          {/* Alerte section */}
-          {stats.messages.unread > 0 && (
+          {/* Message d'erreur */}
+          {error && (
             <div className="alert-section">
               <div className="alert-content">
-                <Bell />
+                <AlertTriangle />
                 <div className="alert-text">
-                  <h3>Messages non lus</h3>
-                  <p>Vous avez {stats.messages.unread} nouveau(x) message(s) en attente de traitement.</p>
+                  <h3>Erreur de Connexion</h3>
+                  <p>{error} - Affichage des données de démonstration</p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Statistiques principales */}
+          {/* Cartes de statistiques principales */}
           <div className="stats-grid">
-            <div className="stat-card blue">
-              <div className="stat-card-content">
-                <div className="stat-card-info">
-                  <div className="stat-card-title">Actualités Totales</div>
-                  <div className="stat-card-value">{stats.actualites.total}</div>
-                  <div className="stat-card-subtitle">Articles publiés</div>
-                  <div className="stat-card-trend">
-                    <TrendingUp size={14} />
-                    +{stats.actualites.pinned} épinglées
-                  </div>
-                </div>
-                <div className="stat-card-icon">
-                  <FileText />
-                </div>
-              </div>
-            </div>
-
-            <div className="stat-card green">
-              <div className="stat-card-content">
-                <div className="stat-card-info">
-                  <div className="stat-card-title">Activités Scolaires</div>
-                  <div className="stat-card-value">{stats.vieScolaire.total}</div>
-                  <div className="stat-card-subtitle">Événements organisés</div>
-                  <div className="stat-card-trend">
-                    <Activity size={14} />
-                    {stats.vieScolaire.upcomingEvents.length} à venir
-                  </div>
-                </div>
-                <div className="stat-card-icon">
-                  <Calendar />
-                </div>
-              </div>
-            </div>
-
-            <div className="stat-card purple">
-              <div className="stat-card-content">
-                <div className="stat-card-info">
-                  <div className="stat-card-title">Messages Reçus</div>
-                  <div className="stat-card-value">{stats.messages.total}</div>
-                  <div className="stat-card-subtitle">Communications</div>
-                  <div className="stat-card-trend">
-                    <AlertTriangle size={14} />
-                    {stats.messages.unread} non lus
-                  </div>
-                </div>
-                <div className="stat-card-icon">
-                  <MessageSquare />
-                </div>
-              </div>
-            </div>
-
-            <div className="stat-card yellow">
-              <div className="stat-card-content">
-                <div className="stat-card-info">
-                  <div className="stat-card-title">Engagement Global</div>
-                  <div className="stat-card-value">
-                    {((stats.actualites.total + stats.vieScolaire.total + stats.messages.total) / 3).toFixed(0)}
-                  </div>
-                  <div className="stat-card-subtitle">Score d'activité</div>
-                  <div className="stat-card-trend">
-                    <Zap size={14} />
-                    Très actif
-                  </div>
-                </div>
-                <div className="stat-card-icon">
-                  <Target />
-                </div>
-              </div>
-            </div>
+            <StatCard
+              title="Étudiants Inscrits"
+              value={stats.totalEtudiants}
+              icon={Users}
+              colorClass="blue"
+              subtitle={`${stats.etudiantsPayes} payés`}
+              percentage={paymentRate}
+            />
+            
+            <StatCard
+              title="Montant Total Attendu"
+              value={stats.montantTotal}
+              icon={Target}
+              colorClass="purple"
+              subtitle="Revenus prévus"
+              formatAsAmount={true}
+            />
+            
+            <StatCard
+              title="Montant Collecté"
+              value={stats.montantCollecte}
+              icon={DollarSign}
+              colorClass="green"
+              subtitle={`${collectionRate}% collecté`}
+              percentage={collectionRate}
+              formatAsAmount={true}
+            />
+            
+            <StatCard
+              title="Paiements Expirés"
+              value={stats.paiementsExpires}
+              icon={AlertTriangle}
+              colorClass="red"
+              subtitle="Nécessitent action"
+            />
           </div>
 
-          {/* Résumé des sections */}
-          <div className="summary-card">
-            <h2 className="summary-header">Répartition par Sections</h2>
-            <div className="summary-grid">
-              <div className="summary-item blue">
-                <div className="summary-item-label">Actualités par Catégorie</div>
-                <div className="summary-item-value">
-                  {Object.keys(stats.actualites.categories).length}
-                </div>
-                <div className="summary-item-detail">
-                  Catégories actives: {Object.keys(stats.actualites.categories).join(', ')}
+          {/* Section de résumé financier */}
+          <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '32px'}}>
+            {/* Résumé principal */}
+            <div className="chart-card">
+              <div className="chart-header">
+                <Calculator />
+                <div>
+                  <h3>Résumé Financier</h3>
+                  <p style={{fontSize: '14px', color: '#6B7280'}}>Aperçu des performances de collecte</p>
                 </div>
               </div>
               
-              <div className="summary-item green">
-                <div className="summary-item-label">Activités par Cycle</div>
-                <div className="summary-item-value">
-                  {Object.keys(stats.vieScolaire.byCycle).length}
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px'}}>
+                <div style={{
+                  textAlign: 'center',
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+                  borderRadius: '12px'
+                }}>
+                  <h4 style={{color: '#166534', fontWeight: '600', marginBottom: '8px'}}>Montant Collecté</h4>
+                  <p style={{fontSize: '24px', fontWeight: 'bold', color: '#16A34A'}}>{formatMontant(stats.montantCollecte)} DH</p>
+                  <div style={{marginTop: '8px', background: '#BBF7D0', borderRadius: '9999px', height: '8px'}}>
+                    <div 
+                      style={{
+                        background: '#16A34A',
+                        borderRadius: '9999px',
+                        height: '8px',
+                        width: `${collectionRate}%`,
+                        transition: 'width 1s ease-in-out'
+                      }}
+                    ></div>
+                  </div>
+                  <p style={{color: '#15803D', fontSize: '12px', marginTop: '4px'}}>{collectionRate}% de l'objectif</p>
                 </div>
-                <div className="summary-item-detail">
-                  Cycles couverts: {Object.keys(stats.vieScolaire.byCycle).join(', ')}
+                
+                <div style={{
+                  textAlign: 'center',
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+                  borderRadius: '12px'
+                }}>
+                  <h4 style={{color: '#1E40AF', fontWeight: '600', marginBottom: '8px'}}>Montant Restant</h4>
+                  <p style={{fontSize: '24px', fontWeight: 'bold', color: '#2563EB'}}>{formatMontant(stats.montantTotal - stats.montantCollecte)} DH</p>
+                  <div style={{marginTop: '8px', background: '#BFDBFE', borderRadius: '9999px', height: '8px'}}>
+                    <div 
+                      style={{
+                        background: '#2563EB',
+                        borderRadius: '9999px',
+                        height: '8px',
+                        width: `${100 - collectionRate}%`,
+                        transition: 'width 1s ease-in-out'
+                      }}
+                    ></div>
+                  </div>
+                  <p style={{color: '#1D4ED8', fontSize: '12px', marginTop: '4px'}}>{100 - collectionRate}% restant</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Métriques rapides */}
+            <div className="chart-card">
+              <h3 style={{color: '#1F2937', fontWeight: 'bold', fontSize: '18px', marginBottom: '16px'}}>Métriques Clés</h3>
+              
+              <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px',
+                  background: '#F8FAFC',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center'}}>
+                    <UserCheck size={16} style={{color: '#10B981', marginRight: '8px'}} />
+                    <span style={{fontSize: '14px', color: '#374151'}}>Taux de Paiement</span>
+                  </div>
+                  <span style={{fontWeight: 'bold', color: '#16A34A'}}>{paymentRate}%</span>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px',
+                  background: '#F8FAFC',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center'}}>
+                    <DollarSign size={16} style={{color: '#3B82F6', marginRight: '8px'}} />
+                    <span style={{fontSize: '14px', color: '#374151'}}>Taux de Collecte</span>
+                  </div>
+                  <span style={{fontWeight: 'bold', color: '#2563EB'}}>{collectionRate}%</span>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px',
+                  background: '#F8FAFC',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center'}}>
+                    <Clock size={16} style={{color: '#F59E0B', marginRight: '8px'}} />
+                    <span style={{fontSize: '14px', color: '#374151'}}>Paiements Expirés</span>
+                  </div>
+                  <span style={{fontWeight: 'bold', color: '#D97706'}}>{stats.paiementsExpires}</span>
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px',
+                  background: '#F8FAFC',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{display: 'flex', alignItems: 'center'}}>
+                    <Calculator size={16} style={{color: '#8B5CF6', marginRight: '8px'}} />
+                    <span style={{fontSize: '14px', color: '#374151'}}>Revenus Moyens</span>
+                  </div>
+                  <span style={{fontWeight: 'bold', color: '#7C3AED'}}>
+                    {formatMontant(stats.totalEtudiants > 0 ? stats.montantTotal / stats.totalEtudiants : 0)} DH
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tableau de bord détaillé */}
+          <div className="chart-card">
+            <div className="chart-header">
+              <Activity />
+              <div>
+                <h3>Analyse Détaillée</h3>
+                <p style={{fontSize: '14px', color: '#6B7280'}}>Métriques de performance financière</p>
+              </div>
+              <div style={{marginLeft: 'auto', textAlign: 'right'}}>
+                <p style={{fontSize: '12px', color: '#9CA3AF'}}>Dernière mise à jour</p>
+                <p style={{fontSize: '14px', fontWeight: '500', color: '#374151'}}>Il y a quelques instants</p>
+              </div>
+            </div>
+            
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px'}}>
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #EBF8FF 0%, #DBEAFE 100%)',
+                borderRadius: '12px',
+                border: '1px solid #BFDBFE'
+              }}>
+                <div style={{
+                  display: 'inline-flex',
+                  padding: '12px',
+                  borderRadius: '50%',
+                  background: 'rgba(59, 130, 246, 0.2)',
+                  marginBottom: '12px'
+                }}>
+                  <Users style={{color: '#2563EB'}} size={24} />
+                </div>
+                <h4 style={{fontWeight: '600', color: '#1E40AF', marginBottom: '4px'}}>Taux de Participation</h4>
+                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#2563EB'}}>{paymentRate}%</p>
+                <p style={{fontSize: '12px', color: '#1D4ED8'}}>{stats.etudiantsPayes} sur {stats.totalEtudiants}</p>
               </div>
               
-              <div className="summary-item purple">
-                <div className="summary-item-label">Messages par Sujet</div>
-                <div className="summary-item-value">
-                  {Object.keys(stats.messages.bySubject).length}
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+                borderRadius: '12px',
+                border: '1px solid #BBF7D0'
+              }}>
+                <div style={{
+                  display: 'inline-flex',
+                  padding: '12px',
+                  borderRadius: '50%',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  marginBottom: '12px'
+                }}>
+                  <DollarSign style={{color: '#059669'}} size={24} />
                 </div>
-                <div className="summary-item-detail">
-                  Sujets traités: {Object.keys(stats.messages.bySubject).join(', ')}
+                <h4 style={{fontWeight: '600', color: '#166534', marginBottom: '4px'}}>Efficacité Collecte</h4>
+                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#16A34A'}}>{collectionRate}%</p>
+                <p style={{fontSize: '12px', color: '#15803D'}}>de l'objectif atteint</p>
+              </div>
+              
+              <div style={{
+                textAlign: 'center',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                borderRadius: '12px',
+                border: '1px solid #FCD34D'
+              }}>
+                <div style={{
+                  display: 'inline-flex',
+                  padding: '12px',
+                  borderRadius: '50%',
+                  background: 'rgba(245, 158, 11, 0.2)',
+                  marginBottom: '12px'
+                }}>
+                  <AlertTriangle style={{color: '#D97706'}} size={24} />
                 </div>
+                <h4 style={{fontWeight: '600', color: '#92400E', marginBottom: '4px'}}>Retards de Paiement</h4>
+                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#D97706'}}>{stats.paiementsExpires}</p>
+                <p style={{fontSize: '12px', color: '#A16207'}}>étudiants en retard</p>
               </div>
             </div>
           </div>
-
-          {/* Graphiques */}
-          <div className="charts-grid">
-            {/* Graphique des actualités */}
-            <div className="chart-card">
-              <div className="chart-header">
-                <BarChart3 />
-                <h3>Actualités par Catégorie</h3>
-              </div>
-              {Object.keys(stats.actualites.categories).length > 0 ? (
-                <div style={{ height: '300px', padding: '20px' }}>
-                  {Object.entries(stats.actualites.categories).map(([category, count], index) => (
-                    <div key={category} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      marginBottom: '15px',
-                      fontSize: '14px'
-                    }}>
-                      <div style={{ 
-                        width: '120px', 
-                        textTransform: 'capitalize',
-                        color: '#374151',
-                        fontWeight: '600'
-                      }}>
-                        {category}
-                      </div>
-                      <div style={{ 
-                        flex: 1, 
-                        height: '25px', 
-                        backgroundColor: '#f3f4f6', 
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        marginRight: '10px'
-                      }}>
-                        <div style={{ 
-                          width: `${(count / Math.max(...Object.values(stats.actualites.categories))) * 100}%`,
-                          height: '100%',
-                          backgroundColor: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444'][index % 5],
-                          borderRadius: '12px',
-                          transition: 'width 0.3s ease'
-                        }}></div>
-                      </div>
-                      <div style={{ 
-                        minWidth: '30px', 
-                        textAlign: 'right',
-                        fontWeight: '700',
-                        color: '#1F2937'
-                      }}>
-                        {count}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="chart-empty">
-                  <FileText />
-                  <h4>Aucune actualité</h4>
-                  <p>Les données apparaîtront ici une fois les actualités créées</p>
-                </div>
-              )}
-            </div>
-
-            {/* Graphique des activités scolaires */}
-            <div className="chart-card">
-              <div className="chart-header">
-                <PieChart />
-                <h3>Activités par Cycle</h3>
-              </div>
-              {Object.keys(stats.vieScolaire.byCycle).length > 0 ? (
-                <div style={{ height: '300px', padding: '20px' }}>
-                  {Object.entries(stats.vieScolaire.byCycle).map(([cycle, count], index) => (
-                    <div key={cycle} style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      marginBottom: '15px',
-                      fontSize: '14px'
-                    }}>
-                      <div style={{ 
-                        width: '120px', 
-                        textTransform: 'capitalize',
-                        color: '#374151',
-                        fontWeight: '600'
-                      }}>
-                        {cycle}
-                      </div>
-                      <div style={{ 
-                        flex: 1, 
-                        height: '25px', 
-                        backgroundColor: '#f3f4f6', 
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        marginRight: '10px'
-                      }}>
-                        <div style={{ 
-                          width: `${(count / Math.max(...Object.values(stats.vieScolaire.byCycle))) * 100}%`,
-                          height: '100%',
-                          backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'][index % 5],
-                          borderRadius: '12px',
-                          transition: 'width 0.3s ease'
-                        }}></div>
-                      </div>
-                      <div style={{ 
-                        minWidth: '30px', 
-                        textAlign: 'right',
-                        fontWeight: '700',
-                        color: '#1F2937'
-                      }}>
-                        {count}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="chart-empty">
-                  <Calendar />
-                  <h4>Aucune activité</h4>
-                  <p>Les données apparaîtront ici une fois les activités créées</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Activités récentes */}
-          <div className="charts-grid">
-            {/* Actualités récentes */}
-            <div className="chart-card">
-              <div className="chart-header">
-                <FileText />
-                <h3>Actualités Récentes</h3>
-              </div>
-              {stats.actualites.recentActivity.length > 0 ? (
-                <div style={{ padding: '10px 0' }}>
-                  {stats.actualites.recentActivity.map((article, index) => (
-                    <div key={article._id || index} style={{ 
-                      padding: '12px', 
-                      borderBottom: '1px solid #f3f4f6',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      ':last-child': { borderBottom: 'none' }
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          fontWeight: '600', 
-                          color: '#1f2937',
-                          marginBottom: '4px',
-                          fontSize: '14px'
-                        }}>
-                          {article.title}
-                        </div>
-                        <div style={{ 
-                          fontSize: '12px', 
-                          color: '#6b7280',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span style={{ 
-                            padding: '2px 6px',
-                            backgroundColor: '#e5e7eb',
-                            borderRadius: '4px',
-                            textTransform: 'capitalize'
-                          }}>
-                            {article.category}
-                          </span>
-                          <span>{article.author}</span>
-                        </div>
-                      </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#9ca3af',
-                        textAlign: 'right'
-                      }}>
-                        {formatDate(article.createdAt)}
-                        {article.isPinned && (
-                          <div style={{ color: '#ef4444', fontWeight: '600' }}>📌 Épinglé</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="chart-empty">
-                  <FileText />
-                  <h4>Aucune actualité récente</h4>
-                  <p>Les actualités récentes apparaîtront ici</p>
-                </div>
-              )}
-            </div>
-
-            {/* Prochains événements */}
-            <div className="chart-card">
-              <div className="chart-header">
-                <Calendar />
-                <h3>Prochains Événements</h3>
-              </div>
-              {stats.vieScolaire.upcomingEvents.length > 0 ? (
-                <div style={{ padding: '10px 0' }}>
-                  {stats.vieScolaire.upcomingEvents.map((event, index) => (
-                    <div key={event._id || index} style={{ 
-                      padding: '12px', 
-                      borderBottom: '1px solid #f3f4f6',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          fontWeight: '600', 
-                          color: '#1f2937',
-                          marginBottom: '4px',
-                          fontSize: '14px'
-                        }}>
-                          {event.title}
-                        </div>
-                        <div style={{ 
-                          fontSize: '12px', 
-                          color: '#6b7280',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
-                          <span style={{ 
-                            padding: '2px 6px',
-                            backgroundColor: '#dcfce7',
-                            color: '#166534',
-                            borderRadius: '4px',
-                            textTransform: 'capitalize'
-                          }}>
-                            {event.category}
-                          </span>
-                          <span>{event.cycle}</span>
-                        </div>
-                      </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#9ca3af',
-                        textAlign: 'right'
-                      }}>
-                        <div style={{ color: '#059669', fontWeight: '600' }}>
-                          {formatDate(event.date)}
-                        </div>
-                        {event.time && (
-                          <div>{event.time}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="chart-empty">
-                  <Calendar />
-                  <h4>Aucun événement à venir</h4>
-                  <p>Les prochains événements apparaîtront ici</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Messages récents */}
-          {stats.messages.recent.length > 0 && (
-            <div className="chart-card">
-              <div className="chart-header">
-                <MessageSquare />
-                <h3>Messages Récents</h3>
-              </div>
-              <div style={{ padding: '10px 0' }}>
-                {stats.messages.recent.map((message, index) => (
-                  <div key={message._id || index} style={{ 
-                    padding: '12px', 
-                    borderBottom: '1px solid #f3f4f6',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start'
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ 
-                        fontWeight: '600', 
-                        color: '#1f2937',
-                        marginBottom: '4px',
-                        fontSize: '14px'
-                      }}>
-                        {message.firstName} {message.lastName}
-                      </div>
-                      <div style={{ 
-                        fontSize: '13px', 
-                        color: '#6b7280',
-                        marginBottom: '6px'
-                      }}>
-                        {message.subject}
-                      </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#9ca3af',
-                        lineHeight: '1.4'
-                      }}>
-                        {message.message.substring(0, 80)}...
-                      </div>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#9ca3af',
-                      textAlign: 'right'
-                    }}>
-                      {formatDate(message.date)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Modals */}
+      <ModalNotificationEtudiant />
+      <ModalFinance />
+      
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
+
+  // Fonction pour calculer les pourcentages
+  function calculatePercentage(value, total) {
+    return total > 0 ? Math.round((value / total) * 100) : 0;
+  }
 };
 
-export default ManagerDashboard;
+export default Dashboardmanager;

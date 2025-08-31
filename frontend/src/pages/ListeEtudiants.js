@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +34,9 @@ const ListeEtudiants = () => {
   const [etudiantsParPage] = useState(10);
   const [loading, setLoading] = useState(true);
   
+  // Role-based permission state
+  const [userRole, setUserRole] = useState('');
+  
   // États pour le modal d'ajout
   const [showModal, setShowModal] = useState(false);
 const [formAjout, setFormAjout] = useState({
@@ -46,7 +49,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '6ème Collège',
+  niveau: '1AC',
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -86,7 +89,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '6ème Collège',
+  niveau: '1AC',
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -107,6 +110,18 @@ const [formAjout, setFormAjout] = useState({
   const [messageModifier, setMessageModifier] = useState('');
   const [loadingModifier, setLoadingModifier] = useState(false);
   const [etudiantAModifier, setEtudiantAModifier] = useState(null);
+  
+  // Finance modal states
+  const [showFinanceModal, setShowFinanceModal] = useState(false);
+  const [etudiantFinance, setEtudiantFinance] = useState(null);
+  const [formFinance, setFormFinance] = useState({
+    prixTotal: 0,
+    paye: false,
+    pourcentageBourse: 0,
+    typePaiement: 'Cash'
+  });
+  const [messageFinance, setMessageFinance] = useState('');
+  const [loadingFinance, setLoadingFinance] = useState(false);
   
   const navigate = useNavigate();
 
@@ -138,7 +153,25 @@ const [formAjout, setFormAjout] = useState({
   "2BAC Technique"
 ];
 
+  // Helper للحصول على الكورسات حسب المستوى
+  const coursPourNiveau = (liste, niveau) =>
+    liste
+      .filter(c => (c.niveau || '').toLowerCase() === (niveau || '').toLowerCase());
+
+  // حساب الكورسات المتاحة حسب المستوى الحالي
+  const coursDisponiblesAjout = useMemo(
+    () => coursPourNiveau(listeCours, formAjout.niveau),
+    [listeCours, formAjout.niveau]
+  );
+
+  const coursDisponiblesModifier = useMemo(
+    () => coursPourNiveau(listeCours, formModifier.niveau),
+    [listeCours, formModifier.niveau]
+  );
+
   useEffect(() => {
+    const role = localStorage.getItem('role') || '';
+    setUserRole(role);
     fetchEtudiants();
     fetchCours();
   }, []);
@@ -147,16 +180,40 @@ const [formAjout, setFormAjout] = useState({
     filtrerEtudiants();
   }, [etudiants, recherche, filtreGenre, filtreCours, filtreNiveau, filtreActif]);
 
+  // تعبئة الكورسات تلقائيًا حسب المستوى للنموذج الأساسي
+  useEffect(() => {
+    setFormAjout(prev => ({
+      ...prev,
+      cours: coursDisponiblesAjout.map(c => c.nom)
+    }));
+  }, [coursDisponiblesAjout]);
+
+  // تعبئة الكورسات تلقائيًا حسب المستوى لنموذج التعديل
+  useEffect(() => {
+    if (showEditModal) {
+      setFormModifier(prev => ({
+        ...prev,
+        cours: coursDisponiblesModifier.map(c => c.nom)
+      }));
+    }
+  }, [coursDisponiblesModifier, showEditModal]);
+
   const fetchEtudiants = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/etudiants', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setEtudiants(res.data);
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      try {
+        const res = await axios.get('/api/etudiants/filtered', { headers });
+        setEtudiants(res.data);
+      } catch (err) {
+        // fallback to original route
+        const res = await axios.get('/api/etudiants', { headers });
+        setEtudiants(res.data);
+      }
     } catch (err) {
-      console.error('Erreur:', err);
+      console.error('Erreur fetchEtudiants:', err);
     } finally {
       setLoading(false);
     }
@@ -231,7 +288,7 @@ if (recherche) {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '6ème Collège',
+    niveau: '1AC',
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -254,8 +311,12 @@ if (recherche) {
 
   const handleChangeAjout = (e) => {
     const { name, value, type, checked } = e.target;
+    const parseBool = (v) => (v === true || v === 'true');
+    
     if (type === 'checkbox') {
       setFormAjout({ ...formAjout, [name]: checked });
+    } else if (name === 'paye') {
+      setFormAjout({ ...formAjout, [name]: parseBool(value) });
     } else {
       setFormAjout({ ...formAjout, [name]: value });
     }
@@ -324,7 +385,7 @@ const handleSubmitAjout = async (e) => {
       nomCompletMere: '',
       travailPere: '',
       travailMere: '',
-      niveau: '6ème Collège',
+      niveau: '1AC',
       telephoneEtudiant: '',
       telephonePere: '',
       telephoneMere: '',
@@ -371,7 +432,7 @@ const openEditModal = (etudiant) => {
     nomCompletMere: etudiant.nomCompletMere || '',
     travailPere: etudiant.travailPere || '',
     travailMere: etudiant.travailMere || '',
-    niveau: etudiant.niveau || '6ème Collège',
+    niveau: etudiant.niveau || '1AC',
     telephoneEtudiant: etudiant.telephoneEtudiant || '',
     telephonePere: etudiant.telephonePere || '',
     telephoneMere: etudiant.telephoneMere || '',
@@ -409,7 +470,7 @@ const closeEditModal = () => {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '6ème Collège',
+    niveau: '1AC',
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -432,8 +493,12 @@ const closeEditModal = () => {
 
   const handleChangeModifier = (e) => {
     const { name, value, type, checked } = e.target;
+    const parseBool = (v) => (v === true || v === 'true');
+    
     if (type === 'checkbox') {
       setFormModifier({ ...formModifier, [name]: checked });
+    } else if (name === 'paye') {
+      setFormModifier({ ...formModifier, [name]: parseBool(value) });
     } else {
       setFormModifier({ ...formModifier, [name]: value });
     }
@@ -596,8 +661,131 @@ const closeEditModal = () => {
     return <div className="loading">Chargement des étudiants...</div>;
   }
 
+  // Permission helper
+  const canViewFinance = () => {
+    return userRole === 'admin' || userRole === 'paiement_manager';
+  };
+
+  // Finance modal handlers
+  const handleFinanceEdit = (etudiant) => {
+    setEtudiantFinance(etudiant);
+    setFormFinance({
+      prixTotal: etudiant.prixTotal || 0,
+      paye: !!etudiant.paye,
+      pourcentageBourse: etudiant.pourcentageBourse || 0,
+      typePaiement: etudiant.typePaiement || 'Cash'
+    });
+    setShowFinanceModal(true);
+    setMessageFinance('');
+  };
+
+  const onChangeFinance = (e) => {
+    const { name, value } = e.target;
+    const parseBool = (v) => (v === true || v === 'true');
+    setFormFinance(prev => ({
+      ...prev,
+      [name]: name === 'paye' ? parseBool(value) : 
+               (name === 'prixTotal' || name === 'pourcentageBourse') ? Number(value) : value
+    }));
+  };
+
+  const handleSubmitFinance = async (e) => {
+    e.preventDefault();
+    if (!etudiantFinance?._id) return;
+    
+    setLoadingFinance(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/etudiants/${etudiantFinance._id}/finance`, formFinance, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setMessageFinance('✅ Informations financières mises à jour avec succès');
+      await fetchEtudiants();
+      
+      setTimeout(() => {
+        setShowFinanceModal(false);
+        setMessageFinance('');
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Erreur mise à jour finance:', err);
+      setMessageFinance('❌ Erreur lors de la mise à jour financière');
+    } finally {
+      setLoadingFinance(false);
+    }
+  };
+
+  const closeFinanceModal = () => {
+    setShowFinanceModal(false);
+    setEtudiantFinance(null);
+    setFormFinance({
+      prixTotal: 0,
+      paye: false,
+      pourcentageBourse: 0,
+      typePaiement: 'Cash'
+    });
+    setMessageFinance('');
+  };
+
+  // Finance fields component for forms
+  const renderFinanceFields = (form, onChange) => {
+    if (!canViewFinance()) return null;
+    
+    return (
+      <>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Prix Total</label>
+            <input
+              type="number"
+              name="prixTotal"
+              placeholder="Prix total"
+              value={form.prixTotal}
+              onChange={onChange}
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div className="form-group">
+            <label>Payé</label>
+            <select name="paye" value={String(form.paye)} onChange={onChange}>
+              <option value="true">Oui</option>
+              <option value="false">Non</option>
+            </select>
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Pourcentage Bourse (%)</label>
+            <input
+              type="number"
+              name="pourcentageBourse"
+              placeholder="Pourcentage bourse"
+              value={form.pourcentageBourse}
+              onChange={onChange}
+              min="0"
+              max="100"
+              step="1"
+            />
+          </div>
+          <div className="form-group">
+            <label>Type Paiement</label>
+            <select name="typePaiement" value={form.typePaiement} onChange={onChange}>
+              <option value="Cash">Cash</option>
+              <option value="Virement">Virement</option>
+              <option value="Chèque">Chèque</option>
+              <option value="En ligne">En ligne</option>
+            </select>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   return (
-    <div className="liste-etudiants-container"style={{
+    <div className="liste-etudiants-container" style={{
           background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
         }}>
       <Sidebar onLogout={handleLogout} />
@@ -607,6 +795,11 @@ const closeEditModal = () => {
         <div className="header-actions">
           <div className="stats">
             Total: {etudiantsFiltres.length} étudiants
+            {canViewFinance() && (
+              <span style={{ marginLeft: '20px', color: '#666', fontSize: '0.9em' }}>
+                Mode: {userRole === 'admin' ? 'Administrateur' : 'Gestionnaire de paiements'}
+              </span>
+            )}
           </div>
           
           {/* Boutons de basculement vue */}
@@ -706,105 +899,135 @@ const closeEditModal = () => {
       </div>
 
       {/* Vue Tableau ou Cartes */}
-{vueMode === 'tableau' ? (
-  // VUE TABLEAU
-  <div className="tableau-container">
-    <table className="tableau-etudiants">
-      <thead>
-        <tr>
-          <th>Nom Complet</th>
-          <th>Genre</th>
-          <th>Niveau</th>
-          <th>Date de Naissance</th>
-          <th>Âge</th>
-          <th>Tél. Étudiant</th>
-          <th>Code Massar</th>
-          <th>Classe</th>
-          <th>Statut</th>
-          <th>Image</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {etudiantsActuels.length === 0 ? (
-          <tr>
-            <td colSpan="12" className="aucun-resultat">
-              Aucun étudiant trouvé
-            </td>
-          </tr>
-        ) : (
-          etudiantsActuels.map((e) => (
-            <tr key={e._id}>
-              <td className="nom-colonne">{e.nomComplet}</td>
-              <td>{e.genre}</td>
-              <td className="niveau-colonne">
-                <span className="niveau-badge">
-                  <GraduationCap size={16} className="inline mr-1" />
-                  {e.niveau || 'Non défini'}
-                </span>
-              </td>
-              <td>{formatDate(e.dateNaissance)}</td>
-              <td>{calculerAge(e.dateNaissance)} ans</td>
-              <td>{e.telephoneEtudiant}</td>
-              <td>{e.codeMassar}</td>
-              <td className="cours-colonne">
-                {(Array.isArray(e.cours) && e.cours.length > 0) ? e.cours.join(', ') : ''}
-              </td>
-              <td className="statut-colonne">
-                <div className="toggle-switch-container">
-                  <span className={`statut-text ${e.actif ? 'actif' : 'inactif'}`}>
-                    {e.actif ? 'Actif' : 'Inactif'}
-                  </span>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={e.actif}
-                      onChange={() => handleToggleActif(e._id)}
-                    />
-                    <span className="slider"></span>
-                  </label>
-                </div>
-              </td>
-              <td className="image-colonne">
-                {e.image ? (
-                  <img 
-                    src={`${e.image}`} 
-                    alt="etudiant" 
-                    className="image-etudiant"
-                  />
-                ) : (
-                  <div className="pas-image">N/A</div>
-                )}
-              </td>
-              <td className="actions-colonne">
-                <button 
-                  onClick={() => handleView(e)}
-                  className="btn-voir"
-                >
-              <Eye size={16} />
-                </button>
-                <button 
-                  onClick={() => handleEdit(e)}
-                  className="btn-modifier"
-                >
-                            <Edit size={16} />
-
-                </button>
-                <button 
-                  onClick={() => handleDelete(e._id)}
-                  className="btn-supprimer"
-                >
-              <Trash2 size={16} />
-                </button>
-              </td>
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
-  </div>
-) : (
-  // VUE CARTES
+      {vueMode === 'tableau' ? (
+        // VUE TABLEAU with conditional finance columns
+        <div className="tableau-container">
+          <table className="tableau-etudiants">
+            <thead>
+              <tr>
+                <th>Nom Complet</th>
+                <th>Genre</th>
+                <th>Niveau</th>
+                <th>Date de Naissance</th>
+                <th>Âge</th>
+                <th>Tél. Étudiant</th>
+                <th>Code Massar</th>
+                <th>Classe</th>
+                <th>Statut</th>
+                <th>Image</th>
+                {canViewFinance() && <th>Prix Total</th>}
+                {canViewFinance() && <th>Statut Paiement</th>}
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {etudiantsActuels.length === 0 ? (
+                <tr>
+                  <td colSpan={canViewFinance() ? "13" : "11"} className="aucun-resultat">
+                    Aucun étudiant trouvé
+                  </td>
+                </tr>
+              ) : (
+                etudiantsActuels.map((e) => (
+                  <tr key={e._id}>
+                    <td className="nom-colonne">{e.nomComplet}</td>
+                    <td>{e.genre}</td>
+                    <td className="niveau-colonne">
+                      <span className="niveau-badge">
+                        <GraduationCap size={16} className="inline mr-1" />
+                        {e.niveau || 'Non défini'}
+                      </span>
+                    </td>
+                    <td>{formatDate(e.dateNaissance)}</td>
+                    <td>{calculerAge(e.dateNaissance)} ans</td>
+                    <td>{e.telephoneEtudiant}</td>
+                    <td>{e.codeMassar}</td>
+                    <td className="cours-colonne">
+                      {(Array.isArray(e.cours) && e.cours.length > 0) ? e.cours.join(', ') : ''}
+                    </td>
+                    <td className="statut-colonne">
+                      <div className="toggle-switch-container">
+                        <span className={`statut-text ${e.actif ? 'actif' : 'inactif'}`}>
+                          {e.actif ? 'Actif' : 'Inactif'}
+                        </span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={e.actif}
+                            onChange={() => handleToggleActif(e._id)}
+                          />
+                          <span className="slider"></span>
+                        </label>
+                      </div>
+                    </td>
+                    <td className="image-colonne">
+                      {e.image ? (
+                        <img 
+                          src={`${e.image}`} 
+                          alt="etudiant" 
+                          className="image-etudiant"
+                        />
+                      ) : (
+                        <div className="pas-image">N/A</div>
+                      )}
+                    </td>
+                    {canViewFinance() && (
+                      <td>{e.prixTotal || 0} DH</td>
+                    )}
+                    {canViewFinance() && (
+                      <td>
+                        <span className={`paiement-badge ${e.paye ? 'paye' : 'non-paye'}`}>
+                          {e.paye ? '✅ Payé' : '❌ Non payé'}
+                        </span>
+                      </td>
+                    )}
+                    <td className="actions-colonne">
+                      <button 
+                        onClick={() => handleView(e)}
+                        className="btn-voir"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        onClick={() => handleEdit(e)}
+                        className="btn-modifier"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      {canViewFinance() && (
+                        <button 
+                          onClick={() => handleFinanceEdit(e)} 
+                          className="btn-finance"
+                          title="Modifier finances"
+                          style={{
+                            background: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '8px',
+                            margin: '0 2px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                          }}
+                        >
+                          💰
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => handleDelete(e._id)}
+                        className="btn-supprimer"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        // VUE CARTES
 
 <div className="cartes-container">
   {etudiantsActuels.length === 0 ? (
@@ -918,6 +1141,7 @@ const closeEditModal = () => {
           </div>
         </div>
       ))}
+
     </div>
   )}
 </div>
@@ -961,7 +1185,7 @@ const closeEditModal = () => {
         </div>
       )}
 
-      {/* Modal d'ajout d'étudiant */}
+      {/* Modal d'ajout d'étudiant with conditional finance fields */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1183,24 +1407,14 @@ const closeEditModal = () => {
               <div className="form-group">
                 <label>Classe </label>
                 <div className="cours-selection-container">
-                  {listeCours.map((cours) => (
-                    <div
-                      key={cours._id}
-                      className={`cours-chip ${formAjout.cours.includes(cours.nom) ? 'selected' : ''}`}
-                      onClick={() => handleSelectCoursAjout(cours.nom)}
-                    >
+                  {coursDisponiblesAjout.map((cours) => (
+                    <div key={cours._id} className="cours-chip selected">
                       <span className="cours-nom">{cours.nom}</span>
-                      {formAjout.cours.includes(cours.nom) && (
-                        <span className="cours-check">✓</span>
-                      )}
+                      <span className="cours-check">✓</span>
                     </div>
                   ))}
                 </div>
-                {formAjout.cours.length > 0 && (
-                  <div className="cours-selectionnes">
-                    <small>Classe sélectionnés: {formAjout.cours.join(', ')}</small>
-                  </div>
-                )}
+                <small>يتم تعيين الكورسات تلقائيًا حسب المستوى المختار.</small>
               </div>
 
               <div className="form-row">
@@ -1244,54 +1458,10 @@ const closeEditModal = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Prix Total</label>
-                  <input
-                    type="number"
-                    name="prixTotal"
-                    placeholder="Prix total"
-                    value={formAjout.prixTotal}
-                    onChange={handleChangeAjout}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Payé</label>
-                  <select name="paye" value={formAjout.paye} onChange={handleChangeAjout}>
-                    <option value={true}>Oui</option>
-                    <option value={false}>Non</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label>Pourcentage Bourse (%)</label>
-                  <input
-                    type="number"
-                    name="pourcentageBourse"
-                    placeholder="Pourcentage bourse"
-                    value={formAjout.pourcentageBourse}
-                    onChange={handleChangeAjout}
-                    min="0"
-                    max="100"
-                    step="1"
-                  />
-                </div>
-              </div>
+              {/* Conditional finance fields */}
+              {renderFinanceFields(formAjout, handleChangeAjout)}
 
               <div className="form-row">
-                <div className="form-group">
-                  <label>Type Paiement</label>
-                  <select name="typePaiement" value={formAjout.typePaiement} onChange={handleChangeAjout}>
-                    <option value="Cash">Cash</option>
-                    <option value="Virement">Virement</option>
-                    <option value="Chèque">Chèque</option>
-                    <option value="En ligne">En ligne</option>
-                  </select>
-                </div>
-
                 <div className="form-group">
                   <label>Année Scolaire *</label>
                   <input
@@ -1326,7 +1496,7 @@ const closeEditModal = () => {
         </div>
       )}
 
-      {/* Modal de modification d'étudiant */}
+      {/* Modal de modification d'étudiant with conditional finance fields */}
       {showEditModal && etudiantAModifier && (
         <div className="modal-overlay" onClick={closeEditModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1550,48 +1720,38 @@ const closeEditModal = () => {
               <div className="form-group">
                 <label>Classe</label>
                 <div className="cours-selection-container">
-                  {listeCours.map((cours) => (
-                    <div
-                      key={cours._id}
-                      className={`cours-chip ${formModifier.cours.includes(cours.nom) ? 'selected' : ''}`}
-                      onClick={() => handleSelectCoursModifier(cours.nom)}
-                    >
+                  {coursDisponiblesModifier.map((cours) => (
+                    <div key={cours._id} className="cours-chip selected">
                       <span className="cours-nom">{cours.nom}</span>
-                      {formModifier.cours.includes(cours.nom) && (
-                        <span className="cours-check">✓</span>
-                      )}
+                      <span className="cours-check">✓</span>
                     </div>
                   ))}
                 </div>
-                {formModifier.cours.length > 0 && (
-                  <div className="cours-selectionnes">
-                    <small>Classe sélectionnés: {formModifier.cours.join(', ')}</small>
-                  </div>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Image</label>
-                <input
-                  type="file"
-                  name="image"
-                  accept="image/*"
-                  onChange={handleImageChangeModifier}
-                />
-                {etudiantAModifier.image && (
-                  <div className="image-actuelle">
-                    <small>Image actuelle :</small>
-                    <img 
-                      src={`${etudiantAModifier.image}`} 
-                      alt="Image actuelle" 
-                      className="image-preview"
-                      style={{width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px'}}
-                    />
-                  </div>
-                )}
+                <small>الكورسات مرتبطة بالمستوى ولا يمكن تغييرها لمستوى آخر.</small>
               </div>
 
               <div className="form-row">
+                <div className="form-group">
+                  <label>Image</label>
+                  <input
+                    type="file"
+                    name="image"
+                    accept="image/*"
+                    onChange={handleImageChangeModifier}
+                  />
+                  {etudiantAModifier.image && (
+                    <div className="image-actuelle">
+                      <small>Image actuelle :</small>
+                      <img 
+                        src={`${etudiantAModifier.image}`} 
+                        alt="Image actuelle" 
+                        className="image-preview"
+                        style={{width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px'}}
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="form-group checkbox-group">
                   <label className="checkbox-label">
                     <input
@@ -1622,52 +1782,8 @@ const closeEditModal = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Prix Total</label>
-                  <input
-                    type="number"
-                    name="prixTotal"
-                    placeholder="Prix total"
-                    value={formModifier.prixTotal}
-                    onChange={handleChangeModifier}
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Payé</label>
-                  <select name="paye" value={formModifier.paye} onChange={handleChangeModifier}>
-                    <option value={true}>Oui</option>
-                    <option value={false}>Non</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Pourcentage Bourse (%)</label>
-                  <input
-                    type="number"
-                    name="pourcentageBourse"
-                    placeholder="Pourcentage bourse"
-                    value={formModifier.pourcentageBourse}
-                    onChange={handleChangeModifier}
-                    min="0"
-                    max="100"
-                    step="1"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Type Paiement</label>
-                  <select name="typePaiement" value={formModifier.typePaiement} onChange={handleChangeModifier}>
-                    <option value="Cash">Cash</option>
-                    <option value="Virement">Virement</option>
-                    <option value="Chèque">Chèque</option>
-                    <option value="En ligne">En ligne</option>
-                  </select>
-                </div>
-              </div>
+              {/* Conditional finance fields */}
+              {renderFinanceFields(formModifier, handleChangeModifier)}
 
               <div className="form-group">
                 <label>Année Scolaire *</label>
@@ -1695,6 +1811,83 @@ const closeEditModal = () => {
                 </button>
                 <button type="submit" disabled={loadingModifier} className="btn-enregistrer">
                   {loadingModifier ? 'Modification...' : 'Enregistrer les modifications'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Finance Modal */}
+      {showFinanceModal && etudiantFinance && (
+        <div className="modal-overlay" onClick={closeFinanceModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Modifier les informations financières</h3>
+              <p style={{margin: '5px 0', color: '#666', fontSize: '14px'}}>
+                Étudiant: <strong>{etudiantFinance.nomComplet}</strong>
+              </p>
+              <button className="btn-fermer-modal" onClick={closeFinanceModal}>×</button>
+            </div>
+            
+            <form onSubmit={handleSubmitFinance} className="form-ajout-etudiant">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Prix Total *</label>
+                  <input
+                    type="number"
+                    name="prixTotal"
+                    min="0"
+                    step="0.01"
+                    value={formFinance.prixTotal}
+                    onChange={onChangeFinance}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Payé *</label>
+                  <select name="paye" value={String(formFinance.paye)} onChange={onChangeFinance}>
+                    <option value="true">Oui</option>
+                    <option value="false">Non</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Pourcentage Bourse (%)</label>
+                  <input
+                    type="number"
+                    name="pourcentageBourse"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={formFinance.pourcentageBourse}
+                    onChange={onChangeFinance}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Type Paiement</label>
+                  <select name="typePaiement" value={formFinance.typePaiement} onChange={onChangeFinance}>
+                    <option value="Cash">Cash</option>
+                    <option value="Virement">Virement</option>
+                    <option value="Chèque">Chèque</option>
+                    <option value="En ligne">En ligne</option>
+                  </select>
+                </div>
+              </div>
+
+              {messageFinance && (
+                <div className={`message-ajout ${messageFinance.includes('✅') ? 'success' : 'error'}`}>
+                  {messageFinance}
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" onClick={closeFinanceModal} className="btn-annuler">
+                  Annuler
+                </button>
+                <button type="submit" disabled={loadingFinance} className="btn-enregistrer">
+                  {loadingFinance ? 'Mise à jour...' : 'Enregistrer'}
                 </button>
               </div>
             </form>

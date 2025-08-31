@@ -122,8 +122,12 @@ const [filters, setFilters] = useState({
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      setPaiements(data);
-      setFilteredPaiements(data);
+      
+      // Trier les paiements par date de création décroissante (plus récent en premier)
+      const sortedData = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      setPaiements(sortedData);
+      setFilteredPaiements(sortedData);
     } catch (err) {
       console.error('Erreur chargement paiements:', err);
     }
@@ -595,10 +599,11 @@ function convertirMontantEnLettres(montant) {
             </p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={() => generatePDF(paiement)}
             style={styles.cardPdfButton}
+            title="Télécharger PDF"
           >
             <Download size={20} />
           </button>
@@ -659,7 +664,7 @@ function convertirMontantEnLettres(montant) {
   const styles = {
     container: {
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+    backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '24px',
     },
     maxWidth: {
@@ -1450,7 +1455,10 @@ subtitle: {
                 </tr>
               </thead>
               <tbody style={styles.tbody}>
-                {filteredPaiements.map((p, index) => (
+                {filteredPaiements
+                  .slice() // نسخ المصفوفة حتى لا نعدل الأصلية
+                  .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                  .map((p, index) => (
                   <tr 
                     key={p._id} 
                     style={styles.tr}
@@ -1515,8 +1523,11 @@ subtitle: {
           </div>
         ) : (
           <div style={styles.cardsGrid}>
-            {filteredPaiements.map(p => (
-              <CardView key={p._id} paiement={p} />
+            {filteredPaiements
+              .slice()
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .map(p => (
+                <CardView key={p._id} paiement={p} />
             ))}
           </div>
         )}

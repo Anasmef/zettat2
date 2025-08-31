@@ -215,13 +215,13 @@ const EtudiantsProfesseur = () => {
           </div>
 
           <div className="filtre-groupe">
-            <label>Classe:</label>
+            <label>Cours:</label>
             <select
               value={filtreCours}
               onChange={(e) => setFiltreCours(e.target.value)}
               className="select-filtre"
             >
-              <option value="">Tous les classe</option>
+              <option value="">Tous les cours</option>
               {coursUniques.map(cours => (
                 <option key={cours} value={cours}>{cours}</option>
               ))}
@@ -260,7 +260,7 @@ const EtudiantsProfesseur = () => {
                 <th>Âge</th>
                 <th>Téléphone</th>
                 <th>Email</th>
-                <th>Classe</th>
+                <th>Cours</th>
                 <th>Statut</th>
                 <th>Image</th>
                 <th>Actions</th>
@@ -371,14 +371,14 @@ const EtudiantsProfesseur = () => {
                         <span>{e.email || 'N/A'}</span>
                       </div>
                       <div className="carte-detail cours-detail">
-                        <span className="carte-label">Classe:</span>
+                        <span className="carte-label">Cours:</span>
                         <div className="carte-cours">
                           {(e.cours || []).length > 0 ? (
                             e.cours.map((cours, index) => (
                               <span key={index} className="cours-tag">{cours}</span>
                             ))
                           ) : (
-                            <span className="no-cours">Aucun classe</span>
+                            <span className="no-cours">Aucun cours</span>
                           )}
                         </div>
                       </div>
@@ -522,7 +522,7 @@ const EtudiantsProfesseur = () => {
 
               <div className="cours-section">
                 <h4>
-                  <BookOpen size={20} className="inline mr-2" /> Classe Inscrits
+                  <BookOpen size={20} className="inline mr-2" /> Cours Inscrits
                 </h4>
                 <div className="cours-badges">
                   {(etudiantSelectionne.cours || []).length > 0 ? (
@@ -530,7 +530,7 @@ const EtudiantsProfesseur = () => {
                       <span key={index} className="cours-badge">{cours}</span>
                     ))
                   ) : (
-                    <span className="no-cours">Aucun classe inscrit</span>
+                    <span className="no-cours">Aucun cours inscrit</span>
                   )}
                 </div>
               </div>

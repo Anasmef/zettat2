@@ -22,7 +22,9 @@ import {
   Shield,
   QrCode,
   Newspaper,
-  UserPlus
+  UserPlus,
+  DollarSign,
+  Settings
 } from 'lucide-react';
 
 const Sidebar = ({ onLogout }) => {
@@ -162,7 +164,7 @@ const Sidebar = ({ onLogout }) => {
     }
   ];
 
-  // Navigation items for Inscripteur (limited permissions)
+  // Navigation items for Inscripteur (extended permissions)
   const inscripteurNavigationItems = [
     {
       path: '/admin/inscripteurs',
@@ -183,6 +185,50 @@ const Sidebar = ({ onLogout }) => {
       path: '/liste-professeurs',
       label: 'Professeurs',
       icon: User
+    },
+    {
+      path: '/admin/seances',
+      label: 'Séances',
+      icon: Clock
+    },
+    {
+      path: '/calendrier',
+      label: 'Calendrier',
+      icon: Calendar
+    },
+    {
+      path: '/liste-presences',
+      label: 'Liste Présences',
+      icon: ClipboardList
+    }
+  ];
+
+  // Navigation items for Paiement Manager
+  const paiementManagerNavigationItems = [
+    {
+      path: '/manager',
+      label: 'Dashboard',
+      icon: Home
+    },
+    {
+      path: '/admin/Manager',
+      label: 'Gestion Prix',
+      icon: Settings
+    },
+    {
+      path: '/ajouter-paiement',
+      label: 'Nouveau Paiement',
+      icon: Plus
+    },
+    {
+      path: '/liste-paiements',
+      label: 'Liste Paiements',
+      icon: CreditCard
+    },
+    {
+      path: '/paiements-exp',
+      label: 'Paiements Expirés',
+      icon: AlertTriangle
     }
   ];
 
@@ -193,6 +239,8 @@ const Sidebar = ({ onLogout }) => {
         return adminNavigationItems;
       case 'inscripteur':
         return inscripteurNavigationItems;
+      case 'paiement_manager':
+        return paiementManagerNavigationItems;
       default:
         return adminNavigationItems; // Default fallback
     }
@@ -218,21 +266,57 @@ const Sidebar = ({ onLogout }) => {
     }
   };
 
-  // Get header color based on role - maintenant tous en bleu
+  // Get header color based on role
   const getHeaderGradient = () => {
     switch (userRole) {
       case 'admin':
         return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
       case 'inscripteur':
-        return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'; // Changé en bleu
+        return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
       case 'prof':
         return 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
       case 'etudiant':
         return 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
       case 'paiement_manager':
-        return 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)';
+        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'; // Même bleu que admin
       default:
         return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
+    }
+  };
+
+  // Get role display name
+  const getRoleDisplayName = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Administrateur';
+      case 'inscripteur':
+        return 'Inscripteur';
+      case 'prof':
+        return 'Professeur';
+      case 'etudiant':
+        return 'Étudiant';
+      case 'paiement_manager':
+        return 'Gestionnaire';
+      default:
+        return 'Utilisateur';
+    }
+  };
+
+  // Get role icon
+  const getRoleIcon = () => {
+    switch (userRole) {
+      case 'admin':
+        return GraduationCap;
+      case 'inscripteur':
+        return UserPlus;
+      case 'prof':
+        return User;
+      case 'etudiant':
+        return GraduationCap;
+      case 'paiement_manager':
+        return DollarSign;
+      default:
+        return GraduationCap;
     }
   };
 
@@ -244,6 +328,8 @@ const Sidebar = ({ onLogout }) => {
     }
     closeSidebar();
   };
+
+  const RoleIcon = getRoleIcon();
 
   return (
     <div>
@@ -684,12 +770,10 @@ const Sidebar = ({ onLogout }) => {
       <div className={`sidebar ${isOpen ? 'show' : ''}`}>
         <div className="sidebar-header">
           <h3 className="sidebar-title">
-            <div className="header-icon">
-              {userRole === 'inscripteur' ? <UserPlus size={20} /> : <GraduationCap size={20} />}
-            </div>
+          
             Alfred Kastler
             <span className="role-badge">
-              {userRole === 'inscripteur' ? 'Inscripteur' : 'Administrateur'}
+              {getRoleDisplayName()}
             </span>
           </h3>
         </div>

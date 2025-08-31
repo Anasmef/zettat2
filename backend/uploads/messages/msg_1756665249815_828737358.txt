@@ -1,0 +1,4 @@
+motpasse  4tE8.G@4vvrFyGe
+login C:\Users\hp>ssh root@167.99.171.177
+
+pour entre sur le server https://cloud.digitalocean.com/  

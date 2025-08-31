@@ -9,7 +9,8 @@ import {
   Calendar,
   BadgeEuro,
   StickyNote,
-  Info
+  Info,
+  GraduationCap
 } from 'lucide-react';
 
 const handleLogout = () => {
@@ -33,7 +34,8 @@ const AjouterPaiement = () => {
     nombreMois: 1,
     montant: '',
     note: '',
-    typePaiement: 'mensuel'
+    typePaiement: 'mensuel',
+    incluePrixInscription: false
   });
 
   const [message, setMessage] = useState('');
@@ -56,36 +58,26 @@ const AjouterPaiement = () => {
 
         const etudiantsOptions = etudiantsActifs.map(e => ({
           value: e._id,
-          label: e.nomComplet // ✅ Utiliser nomComplet
+          label: e.nomComplet
         }));
 
         setEtudiants(etudiantsOptions);
         setCours(resCours.data.map(c => ({ value: c.nom, label: c.nom })));
 
-        // ✅ Traitement des données pré-remplies APRÈS avoir chargé les étudiants
         const savedData = JSON.parse(localStorage.getItem('paiementPreRempli'));
         if (savedData) {
           const etuId = savedData.etudiant;
           const coursSaved = savedData.cours || [];
 
-          // ✅ Trouver l'étudiant complet avec l'ID
           const etudiantComplet = etudiantsActifs.find(e => e._id === etuId);
           
           if (etudiantComplet) {
-            // ✅ Créer l'option pour le Select avec le nom complet
-            const etudiantOption = {
-              value: etuId,
-              label: etudiantComplet.nomComplet // ✅ Utiliser nomComplet
-            };
-
-            // ✅ Mettre à jour le formulaire
             setForm(prev => ({
               ...prev,
               etudiant: etuId,
               cours: coursSaved
             }));
 
-            // ✅ Déclencher le calcul des paiements
             await handleEtudiantChangeInternal(etudiantComplet, etuId, coursSaved);
           }
 
@@ -100,16 +92,13 @@ const AjouterPaiement = () => {
     fetchData();
   }, []);
 
-  // ✅ Fonction interne pour éviter les dépendances circulaires
   const handleEtudiantChangeInternal = async (etudiantComplet, etudiantId, coursEtudiant = null) => {
     try {
-      // ✅ Récupérer les cours de l'étudiant
       let coursFinaux = coursEtudiant;
       if (!coursFinaux) {
         coursFinaux = etudiantComplet?.cours || etudiantComplet?.coursInscrits || [];
       }
 
-      // ✅ Calculer les paiements
       const token = localStorage.getItem('token');
       const resPaiements = await axios.get(`/api/paiements/etudiant/${etudiantId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -135,6 +124,31 @@ const AjouterPaiement = () => {
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  // ✅ Fonction pour gérer la case à cocher
+  const handleCheckboxChange = (e) => {
+    const isChecked = e.target.checked;
+    
+    if (isChecked) {
+      // ✅ Ajouter "Prix inscription: " à la note existante
+      const noteActuelle = form.note;
+      const nouveauTexte = noteActuelle + (noteActuelle ? ' + Prix inscription: ' : 'Prix inscription: ');
+      setForm({ 
+        ...form, 
+        incluePrixInscription: true,
+        note: nouveauTexte
+      });
+    } else {
+      // ✅ Enlever le texte "Prix inscription: " de la note
+      const noteActuelle = form.note;
+      const noteSansPrix = noteActuelle.replace(/ \+ Prix inscription: [0-9]*/, '').replace(/Prix inscription: [0-9]*/, '').trim();
+      setForm({ 
+        ...form, 
+        incluePrixInscription: false,
+        note: noteSansPrix
+      });
+    }
   };
 
   const handleEtudiantChange = async (selectedEtudiant) => {
@@ -187,8 +201,19 @@ const AjouterPaiement = () => {
     }
 
     const token = localStorage.getItem('token');
+    
+    const paiementData = {
+      etudiant: form.etudiant,
+      cours: form.cours,
+      moisDebut: form.moisDebut,
+      nombreMois: form.nombreMois,
+      montant: form.montant,
+      note: form.note, // ✅ La note contient tout (note + prix inscription si inclus)
+      typePaiement: form.typePaiement
+    };
+
     try {
-      await axios.post('/api/paiements', form, {
+      await axios.post('/api/paiements', paiementData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage('✅ Paiement ajouté avec succès');
@@ -200,7 +225,8 @@ const AjouterPaiement = () => {
         nombreMois: 1,
         montant: '',
         note: '',
-        typePaiement: 'mensuel'
+        typePaiement: 'mensuel',
+        incluePrixInscription: false
       });
       
       setPrixTotalEtudiant(0);
@@ -272,7 +298,7 @@ const AjouterPaiement = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+      backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '20px'
     },
     formContainer: {
@@ -406,6 +432,26 @@ const AjouterPaiement = () => {
       backgroundColor: '#fef2f2',
       borderColor: '#fecaca',
       color: '#dc2626'
+    },
+    checkboxContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      marginBottom: '15px'
+    },
+    checkbox: {
+      width: '18px',
+      height: '18px',
+      cursor: 'pointer'
+    },
+    checkboxLabel: {
+      fontSize: '14px',
+      fontWeight: '500',
+      color: '#374151',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
     }
   };
 
@@ -473,10 +519,6 @@ const AjouterPaiement = () => {
           )}
 
           <div style={styles.formGrid}>
-            <div style={styles.formGroup}>
-             
-            </div>
-
             <div style={styles.formRow}>
               <div style={styles.formGroup}>
                 <label style={styles.label}>
@@ -586,13 +628,35 @@ const AjouterPaiement = () => {
                   <StickyNote size={16} style={{color: '#eab308'}} />
                   Note (optionnel)
                 </label>
+                
+                {/* ✅ Case à cocher pour inclure prix d'inscription dans la note */}
+                <div style={styles.checkboxContainer}>
+                  <input
+                    type="checkbox"
+                    id="incluePrixInscription"
+                    checked={form.incluePrixInscription}
+                    onChange={handleCheckboxChange}
+                    style={styles.checkbox}
+                  />
+                  <label htmlFor="incluePrixInscription" style={styles.checkboxLabel}>
+                    <GraduationCap size={16} style={{color: '#8b5cf6'}} />
+                    Inclure prix d'inscription
+                  </label>
+                </div>
+                
                 <textarea
                   name="note"
                   value={form.note}
                   onChange={handleChange}
-                  placeholder="Ajouter une note..."
+                  placeholder={form.incluePrixInscription ? "Écrivez votre note + le montant après 'Prix inscription: '" : "Ajouter une note..."}
                   style={styles.textarea}
                 />
+                
+                {form.incluePrixInscription && (
+                  <small style={{color: '#8b5cf6', marginTop: '5px', fontSize: '12px'}}>
+                    💡 Ajoutez le montant après "Prix inscription: " dans le champ ci-dessus
+                  </small>
+                )}
               </div>
             </div>
 

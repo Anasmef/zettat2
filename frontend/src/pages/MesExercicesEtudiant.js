@@ -533,13 +533,13 @@ const MesExercicesEtudiant = () => {
           </div>
 
           <div>
-            <label style={styles.label}>classe</label>
+            <label style={styles.label}>Cours</label>
             <select
               value={filterCours}
               onChange={(e) => setFilterCours(e.target.value)}
               style={styles.select}
             >
-              <option value="all">Tous les classes</option>
+              <option value="all">Tous les cours</option>
               {uniqueCours.map(cours => (
                 <option key={cours} value={cours}>{cours}</option>
               ))}
@@ -570,7 +570,7 @@ const MesExercicesEtudiant = () => {
             >
               <option value="dateEnvoi">Date d'envoi</option>
               <option value="titre">Titre</option>
-              <option value="cours">classe</option>
+              <option value="cours">Cours</option>
               <option value="type">Type</option>
               <option value="numero">Numéro</option>
             </select>
@@ -654,7 +654,7 @@ const MesExercicesEtudiant = () => {
                 <div style={styles.infoItem}>
                   <BookOpen size={16} style={styles.infoIcon} />
                   <p style={styles.infoText}>
-                    Classe: <span style={styles.infoValue}>{ex.cours}</span>
+                    Cours: <span style={styles.infoValue}>{ex.cours}</span>
                   </p>
                 </div>
                 <div style={styles.infoItem}>

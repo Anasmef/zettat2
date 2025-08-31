@@ -781,7 +781,7 @@ const DocumentsProfesseur = () => {
               <Search style={styles.searchIcon} />
               <input
                 type="text"
-                placeholder="Rechercher un document ou un classe..."
+                placeholder="Rechercher un document ou un cours..."
                 style={styles.searchInput}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -800,7 +800,7 @@ const DocumentsProfesseur = () => {
                 onFocus={(e) => e.target.style.borderColor = '#2563eb'}
                 onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
               >
-                <option value="">Tous les classes</option>
+                <option value="">Tous les cours</option>
                 {uniqueCourses.map(course => (
                   <option key={course} value={course}>{course}</option>
                 ))}
@@ -1001,7 +1001,7 @@ const DocumentsProfesseur = () => {
               </div>
 
               <div style={styles.formGroup}>
-                <label style={styles.label}>Classe</label>
+                <label style={styles.label}>Cours</label>
                 <select
                   value={cours}
                   onChange={(e) => setCours(e.target.value)}
@@ -1010,7 +1010,7 @@ const DocumentsProfesseur = () => {
                   onBlur={(e) => e.target.style.borderColor = '#d1d5db'}
                   required
                 >
-                  <option value="">Sélectionnez un classe</option>
+                  <option value="">Sélectionnez un cours</option>
                   {mesCours.map(c => (
                     <option key={c._id} value={c.nom}>{c.nom}</option>
                   ))}
@@ -1073,7 +1073,7 @@ const DocumentsProfesseur = () => {
                   {uploadLoading ? (
                     <>
                       <Loader2 style={{width: '16px', height: '16px'}} className="animate-spin" />
-                      Envoi en classe...
+                      Envoi en cours...
                     </>
                   ) : (
                     <>

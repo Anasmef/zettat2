@@ -1,0 +1,9 @@
+netstat -aon | findstr ":3306"
+taskkill /PID 4140 /F
+chapitre 2 : étude de l existant et étude théorique
+chapitre 3 : conception et spécification de la soultion
+chapitre 4 : Réalisation et implémentation
+chapitre 5 : Tests,déploiement et validation
+conclusion générale
+association zettat
+Année Universitaire : 2024/2025
