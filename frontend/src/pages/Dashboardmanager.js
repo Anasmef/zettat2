@@ -193,10 +193,7 @@ const Dashboardmanager = () => {
     } catch (err) {
       console.error('Erreur vérification nouveaux étudiants:', err);
       // Données de démonstration en cas d'erreur
-      setNouveauxEtudiants([
-        { _id: '1', nomComplet: 'Ahmed Bennani', email: 'ahmed.b@email.com' },
-        { _id: '2', nomComplet: 'Fatima Zahra', email: 'fatima.z@email.com' }
-      ]);
+     
     }
   };
 

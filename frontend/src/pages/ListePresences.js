@@ -61,7 +61,7 @@ const key = `${new Date(p.dateSession).toDateString()}_${p.cours}_${p.matiere ||
             totalCount,
             attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
           };
-        });
+        }).sort((a, b) => new Date(b.date) - new Date(a.date)); // ✅ ترتيب تنازلي حسب التاريخ
 
         // Extraire les cours, matières, périodes et professeurs uniques pour les filtres
         const uniqueCours = [...new Set(sessions.map(s => s.cours))];
@@ -165,7 +165,7 @@ if (dateTo) {
       );
     }
 
-    setFilteredSessions(filtered);
+    setFilteredSessions(filtered.sort((a, b) => new Date(b.date) - new Date(a.date))); // ✅ ترتيب النتائج المفلترة أيضًا
   }, [
   searchTerm,
   dateFilter,
@@ -225,7 +225,7 @@ const getMoisOptions = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
           padding: '20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     },

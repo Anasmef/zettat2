@@ -199,7 +199,7 @@ useEffect(() => {
           maxWidth: '500px',
           width: '90%',
           position: 'relative',
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
+          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
         }}>
           <button
             onClick={closeWelcomeModal}
@@ -326,7 +326,7 @@ useEffect(() => {
 
   return (
     <div className="admin-dashboard"  style={{
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
+          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
         }}> {/* ✅ Utilisation de la même classe principale */}
     <HeaderProf />
 
@@ -354,7 +354,7 @@ useEffect(() => {
       <div 
         className="dashboard-container"
         style={{
-          background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
+          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
         }}
       >
         <div className="dashboard-content">

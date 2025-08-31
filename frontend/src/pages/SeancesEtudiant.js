@@ -163,7 +163,7 @@ const SeancesEtudiant = () => {
     container: {
       display: 'flex',
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
     },
     content: {
       flexGrow: 1,

@@ -1,1204 +1,814 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  Search, 
-  UserCheck, 
-  UserX, 
-  Phone, 
-  Mail, 
-  Calendar,
-  RotateCcw,
-  X,
-  Save,
-  User
+  Trash2, Edit, Plus, X, Phone, Mail, AlertCircle, Eye, 
+  CheckCircle, XCircle, UserPlus, EyeOff, Save, Users
 } from 'lucide-react';
-import axios from 'axios';
+import './CommercialPage.css';
+import Sidebar from '../components/Sidebar';
 
-const GestionPaiementManagers = () => {
+const handleLogout = () => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.removeItem('token');
+  }
+  window.location.href = '/';
+};
+
+const PaiementManagersPage = () => {
   const [managers, setManagers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [recherche, setRecherche] = useState('');
-  const [filtreActif, setFiltreActif] = useState('');
-  
-  // États pour les modals
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  
-  // États pour les formulaires
-  const [formAdd, setFormAdd] = useState({
-    nom: '',
+  const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [managerToDelete, setManagerToDelete] = useState(null);
+  const [editingManager, setEditingManager] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [newManager, setNewManager] = useState({ 
+    nom: '', 
+    telephone: '', 
     email: '',
-    telephone: '',
     motDePasse: '',
+    confirmPassword: '',
     actif: true
   });
-  
-  const [formEdit, setFormEdit] = useState({
-    nom: '',
-    email: '',
-    telephone: '',
-    motDePasse: '',
-    actif: true
-  });
-  
-  const [managerSelectionne, setManagerSelectionne] = useState(null);
-  const [managerAModifier, setManagerAModifier] = useState(null);
-  
-  const [messageAdd, setMessageAdd] = useState('');
-  const [messageEdit, setMessageEdit] = useState('');
-  const [loadingAdd, setLoadingAdd] = useState(false);
-  const [loadingEdit, setLoadingEdit] = useState(false);
 
-  useEffect(() => {
-    fetchManagers();
-  }, []);
+  // Get token from localStorage
+  const token = typeof window !== 'undefined' ? window.localStorage?.getItem('token') : null;
+  const headers = { 
+    'Authorization': `Bearer ${token}`, 
+    'Content-Type': 'application/json' 
+  };
 
   const fetchManagers = async () => {
     try {
+      console.log('Fetching managers...');
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/admin/paiement-managers', {
-        headers: { Authorization: `Bearer ${token}` }
+      
+      const res = await fetch('/api/admin/paiement-managers', { 
+        headers,
+        method: 'GET'
       });
-      setManagers(res.data);
-    } catch (err) {
-      console.error('Erreur chargement managers:', err);
+      
+      console.log('Response status:', res.status);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Error response:', errorText);
+        throw new Error(`Erreur ${res.status}: ${errorText || 'Erreur serveur'}`);
+      }
+      
+      const data = await res.json();
+      console.log('Received data:', data);
+      
+      // Handle both array response and object with managers property
+      const managersArray = Array.isArray(data) ? data : (data.managers || []);
+      setManagers(managersArray);
+      setError('');
+      
+    } catch (error) {
+      console.error('Erreur fetchManagers:', error);
+      setError('Impossible de charger les gestionnaires: ' + error.message);
+      setManagers([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filtrage des managers
-  const managersFiltres = managers.filter(manager => {
-    const matchRecherche = !recherche || 
-      manager.nom.toLowerCase().includes(recherche.toLowerCase()) ||
-      manager.email.toLowerCase().includes(recherche.toLowerCase()) ||
-      manager.telephone.includes(recherche);
+  const validateForm = () => {
+    // Reset errors
+    setError('');
     
-    const matchActif = filtreActif === '' || 
-      manager.actif.toString() === filtreActif;
+    if (!newManager.nom || !newManager.nom.trim()) {
+      setError('Le nom est requis');
+      return false;
+    }
     
-    return matchRecherche && matchActif;
-  });
-
-  // Fonctions pour les modals
-  const openAddModal = () => {
-    setShowAddModal(true);
-    setMessageAdd('');
-    setFormAdd({
-      nom: '',
-      email: '',
-      telephone: '',
-      motDePasse: '',
-      actif: true
-    });
+    if (!newManager.email || !newManager.email.trim()) {
+      setError('L\'email est requis');
+      return false;
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newManager.email.trim())) {
+      setError('Format d\'email invalide');
+      return false;
+    }
+    
+    // Validation du mot de passe pour les nouveaux managers
+    if (!editingManager && (!newManager.motDePasse || !newManager.motDePasse.trim())) {
+      setError('Le mot de passe est requis');
+      return false;
+    }
+    
+    // Si un mot de passe est fourni, valider
+    if (newManager.motDePasse && newManager.motDePasse.trim()) {
+      if (newManager.motDePasse.length < 6) {
+        setError('Le mot de passe doit contenir au moins 6 caractères');
+        return false;
+      }
+      
+      // Vérification de la confirmation du mot de passe
+      if (newManager.motDePasse !== newManager.confirmPassword) {
+        setError('Les mots de passe ne correspondent pas');
+        return false;
+      }
+    }
+    
+    return true;
   };
 
-  const closeAddModal = () => {
-    setShowAddModal(false);
-    setFormAdd({
-      nom: '',
+  const handleCreateOrUpdateManager = async (e) => {
+    if (e && e.preventDefault) {
+      e.preventDefault();
+    }
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const url = editingManager 
+        ? `/api/admin/paiement-managers/${editingManager._id}`
+        : '/api/admin/paiement-managers';
+      
+      const method = editingManager ? 'PUT' : 'POST';
+      
+      // Préparer les données à envoyer
+      const dataToSend = {
+        nom: newManager.nom.trim(),
+        telephone: newManager.telephone?.trim() || '',
+        email: newManager.email.trim().toLowerCase(),
+        actif: Boolean(newManager.actif)
+      };
+      
+      // Inclure le mot de passe seulement s'il est fourni et non vide
+      if (newManager.motDePasse && newManager.motDePasse.trim() !== '') {
+        dataToSend.motDePasse = newManager.motDePasse.trim();
+      }
+      
+      console.log('Sending request:', { 
+        method, 
+        url, 
+        data: { ...dataToSend, motDePasse: dataToSend.motDePasse ? '[PROVIDED]' : '[NOT PROVIDED]' } 
+      });
+      
+      const res = await fetch(url, {
+        method,
+        headers,
+        body: JSON.stringify(dataToSend)
+      });
+      
+      console.log('Response status:', res.status);
+      
+      if (res.ok) {
+        const responseData = await res.json();
+        console.log('Success response:', responseData);
+        
+        setSuccess(editingManager ? 'Gestionnaire modifié avec succès!' : 'Gestionnaire créé avec succès!');
+        resetForm();
+        await fetchManagers();
+        setShowModal(false);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+        
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Erreur serveur' }));
+        console.error('Error response:', errorData);
+        throw new Error(errorData.message || `Erreur HTTP ${res.status}`);
+      }
+    } catch (error) {
+      console.error('Erreur création/modification gestionnaire:', error);
+      setError(error.message || 'Impossible de sauvegarder le gestionnaire');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteManager = async () => {
+    if (!managerToDelete) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const res = await fetch(`/api/admin/paiement-managers/${managerToDelete._id}`, {
+        method: 'DELETE',
+        headers
+      });
+      
+      if (res.ok) {
+        setSuccess('Gestionnaire supprimé avec succès!');
+        await fetchManagers();
+        setShowDeleteModal(false);
+        setManagerToDelete(null);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+        
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Erreur serveur' }));
+        throw new Error(errorData.message || 'Erreur lors de la suppression');
+      }
+    } catch (error) {
+      console.error('Erreur suppression gestionnaire:', error);
+      setError('Impossible de supprimer le gestionnaire: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (manager) => {
+    if (loading) return; // Prevent multiple clicks
+    
+    try {
+      setLoading(true);
+      setError('');
+      setSuccess('');
+      
+      const res = await fetch(`/api/admin/paiement-managers/${manager._id}/toggle`, {
+        method: 'PATCH',
+        headers
+      });
+      
+      if (res.ok) {
+        const newStatus = !manager.actif;
+        setSuccess(`Gestionnaire ${newStatus ? 'activé' : 'désactivé'} avec succès!`);
+        await fetchManagers();
+        
+        // Clear success message after 2 seconds
+        setTimeout(() => setSuccess(''), 2000);
+        
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Erreur serveur' }));
+        throw new Error(errorData.message || 'Erreur lors de la modification du statut');
+      }
+    } catch (error) {
+      console.error('Erreur toggle actif:', error);
+      setError('Impossible de modifier le statut: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setNewManager({ 
+      nom: '', 
+      telephone: '', 
       email: '',
-      telephone: '',
       motDePasse: '',
+      confirmPassword: '',
       actif: true
     });
-    setMessageAdd('');
+    setEditingManager(null);
+    setShowPassword(false);
+    setError('');
+    setSuccess('');
   };
 
   const openEditModal = (manager) => {
-    setManagerAModifier(manager);
-    setFormEdit({
-      nom: manager.nom,
-      email: manager.email,
-      telephone: manager.telephone,
+    setEditingManager(manager);
+    setNewManager({
+      nom: manager.nom || '',
+      telephone: manager.telephone || '',
+      email: manager.email || '',
       motDePasse: '',
-      actif: manager.actif
+      confirmPassword: '',
+      actif: manager.actif !== false
     });
-    setShowEditModal(true);
-    setMessageEdit('');
+    setError('');
+    setSuccess('');
+    setShowModal(true);
   };
 
-  const closeEditModal = () => {
-    setShowEditModal(false);
-    setManagerAModifier(null);
-    setFormEdit({
-      nom: '',
-      email: '',
-      telephone: '',
-      motDePasse: '',
-      actif: true
-    });
-    setMessageEdit('');
+  const openAddModal = () => {
+    resetForm();
+    setShowModal(true);
   };
 
-  const openViewModal = (manager) => {
-    setManagerSelectionne(manager);
-    setShowViewModal(true);
+  const closeModal = () => {
+    setShowModal(false);
+    resetForm();
   };
 
-  const closeViewModal = () => {
-    setShowViewModal(false);
-    setManagerSelectionne(null);
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setManagerToDelete(null);
   };
 
-  // Gestion des changements de formulaire
-  const handleChangeAdd = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormAdd(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleChangeEdit = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormEdit(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  // Soumission du formulaire d'ajout
-  const handleSubmitAdd = async (e) => {
-    e.preventDefault();
-    setLoadingAdd(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.post('/api/admin/paiement-managers', formAdd, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setMessageAdd('Gestionnaire créé avec succès');
-      await fetchManagers();
-      
-      setTimeout(() => {
-        closeAddModal();
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Erreur création:', err);
-      setMessageAdd(err.response?.data?.message || 'Erreur lors de la création');
-    } finally {
-      setLoadingAdd(false);
-    }
-  };
-
-  // Soumission du formulaire de modification
-  const handleSubmitEdit = async (e) => {
-    e.preventDefault();
-    setLoadingEdit(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.put(`/api/admin/paiement-managers/${managerAModifier._id}`, formEdit, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setMessageEdit('Gestionnaire modifié avec succès');
-      await fetchManagers();
-      
-      setTimeout(() => {
-        closeEditModal();
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Erreur modification:', err);
-      setMessageEdit(err.response?.data?.message || 'Erreur lors de la modification');
-    } finally {
-      setLoadingEdit(false);
-    }
-  };
-
-  // Toggle statut actif
-  const handleToggleActif = async (managerId) => {
-    try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`/api/admin/paiement-managers/${managerId}/toggle-active`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      await fetchManagers();
-    } catch (err) {
-      console.error('Erreur toggle:', err);
-    }
-  };
-
-  // Suppression
-  const handleDelete = async (managerId, managerNom) => {
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer le gestionnaire "${managerNom}" ?`)) {
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/api/admin/paiement-managers/${managerId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      await fetchManagers();
-    } catch (err) {
-      console.error('Erreur suppression:', err);
-      alert('Erreur lors de la suppression');
-    }
-  };
-
+  // Format date helper
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('fr-FR');
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return '';
+    }
   };
 
-  if (loading) {
-    return (
-      <div style={styles.loading}>
-        <div style={styles.spinner}></div>
-        <p>Chargement des gestionnaires...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetchManagers();
+  }, []);
+
+  // Clear messages after some time
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(''), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>Gestion des Gestionnaires de Paiement</h1>
-        <button onClick={openAddModal} style={styles.btnAdd}>
-          <Plus size={20} />
-          Ajouter un gestionnaire
-        </button>
-      </div>
-
-      {/* Filtres */}
-      <div style={styles.filtres}>
-        <div style={styles.searchContainer}>
-          <Search size={20} style={styles.searchIcon} />
-          <input
-            type="text"
-            placeholder="Rechercher par nom, email ou téléphone..."
-            value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
-            style={styles.searchInput}
-          />
+    <div className="commercial-page">
+      <Sidebar onLogout={handleLogout} />
+      
+      <div className="container">
+        {/* Header */}
+        <div className="header-card">
+          <div className="header-content">
+            <div className="header-info">
+              <h1 className="page-title">
+                <Users size={28} />
+                Gestion des Gestionnaires de Paiement
+              </h1>
+              <p className="page-subtitle">
+                Gérez les comptes des gestionnaires qui peuvent gérer les paiements
+              </p>
+            </div>
+            <button 
+              className="btn btn-primary" 
+              onClick={openAddModal}
+              disabled={loading}
+            >
+              <UserPlus size={20} />
+              Nouveau Gestionnaire
+            </button>
+          </div>
         </div>
-        
-        <select
-          value={filtreActif}
-          onChange={(e) => setFiltreActif(e.target.value)}
-          style={styles.filterSelect}
-        >
-          <option value="">Tous les statuts</option>
-          <option value="true">Actifs uniquement</option>
-          <option value="false">Inactifs uniquement</option>
-        </select>
 
-        <div style={styles.statsInfo}>
-          Total: {managersFiltres.length} gestionnaire(s)
-        </div>
-      </div>
+        {/* Success Message */}
+        {success && (
+          <div className="success-message" style={{ 
+            backgroundColor: '#d4edda', 
+            color: '#155724', 
+            border: '1px solid #c3e6cb',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            margin: '16px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <CheckCircle size={20} />
+            {success}
+            <button 
+              onClick={() => setSuccess('')}
+              className="btn-close"
+              style={{ 
+                marginLeft: 'auto',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#155724'
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
-      {/* Tableau des gestionnaires */}
-      <div style={styles.tableContainer}>
-        <table style={styles.table}>
-          <thead>
-            <tr style={styles.tableHeader}>
-              <th style={styles.th}>Nom</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Téléphone</th>
-              <th style={styles.th}>Statut</th>
-              <th style={styles.th}>Date de création</th>
-              <th style={styles.th}>Dernière connexion</th>
-              <th style={styles.th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {managersFiltres.length === 0 ? (
-              <tr>
-                <td colSpan="7" style={styles.noResults}>
-                  Aucun gestionnaire trouvé
-                </td>
-              </tr>
-            ) : (
-              managersFiltres.map((manager) => (
-                <tr key={manager._id} style={styles.tableRow}>
-                  <td style={styles.td}>
-                    <div style={styles.managerInfo}>
-                      <div style={styles.avatar}>
-                        {manager.nom.charAt(0).toUpperCase()}
-                      </div>
-                      <span style={styles.managerName}>{manager.nom}</span>
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.emailContainer}>
-                      <Mail size={16} style={styles.icon} />
-                      {manager.email}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.phoneContainer}>
-                      <Phone size={16} style={styles.icon} />
-                      {manager.telephone}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.statusContainer}>
-                      <span style={{
-                        ...styles.statusBadge,
-                        backgroundColor: manager.actif ? '#dcfce7' : '#fee2e2',
-                        color: manager.actif ? '#166534' : '#991b1b'
-                      }}>
-                        {manager.actif ? (
-                          <><UserCheck size={14} /> Actif</>
-                        ) : (
-                          <><UserX size={14} /> Inactif</>
-                        )}
-                      </span>
-                      <button
-                        onClick={() => handleToggleActif(manager._id)}
-                        style={styles.toggleBtn}
-                        title={manager.actif ? 'Désactiver' : 'Activer'}
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.dateContainer}>
-                      <Calendar size={14} style={styles.icon} />
-                      {formatDate(manager.createdAt)}
-                    </div>
-                  </td>
-                  <td style={styles.td}>
-                    {manager.lastSeen ? formatDate(manager.lastSeen) : 'Jamais'}
-                  </td>
-                  <td style={styles.td}>
-                    <div style={styles.actions}>
-                      <button
-                        onClick={() => openViewModal(manager)}
-                        style={styles.btnAction}
-                        title="Voir détails"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => openEditModal(manager)}
-                        style={{...styles.btnAction, backgroundColor: '#fbbf24'}}
-                        title="Modifier"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(manager._id, manager.nom)}
-                        style={{...styles.btnAction, backgroundColor: '#ef4444'}}
-                        title="Supprimer"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+        {/* Error Message */}
+        {error && (
+          <div className="error-message">
+            <AlertCircle size={20} />
+            {error}
+            <button 
+              onClick={() => setError('')}
+              className="btn-close"
+              style={{ marginLeft: 'auto' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Managers List */}
+        <div className="commercials-card">
+          <div className="section-header">
+            <h2 className="section-title">
+              <Users size={24} className="icon-green" />
+              Gestionnaires de Paiement ({managers.length})
+            </h2>
+            
+            {managers.length > 0 && (
+              <button 
+                className="btn btn-outline" 
+                onClick={fetchManagers}
+                disabled={loading}
+                title="Actualiser la liste"
+              >
+                🔄 Actualiser
+              </button>
             )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal d'ajout */}
-      {showAddModal && (
-        <div style={styles.modalOverlay} onClick={closeAddModal}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h3>Ajouter un Gestionnaire de Paiement</h3>
-              <button onClick={closeAddModal} style={styles.btnClose}>
-                <X size={20} />
-              </button>
+          </div>
+          
+          {loading && managers.length === 0 ? (
+            <div className="loading-container">
+              <div className="spinner"></div>
+              <p>Chargement des gestionnaires...</p>
             </div>
-            
-            <form onSubmit={handleSubmitAdd} style={styles.form}>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <User size={16} />
-                    Nom complet *
-                  </label>
-                  <input
-                    type="text"
-                    name="nom"
-                    value={formAdd.nom}
-                    onChange={handleChangeAdd}
-                    required
-                    style={styles.input}
-                    placeholder="Nom complet du gestionnaire"
-                  />
+          ) : (
+            <>
+              {managers.length > 0 ? (
+                <div className="commercials-grid">
+                  {managers.map(manager => (
+                    <div key={manager._id} className="commercial-item">
+                      <div className="commercial-header">
+                        <div className="commercial-name-section">
+                          <h3 className="commercial-name">{manager.nom}</h3>
+                          <div className="commercial-status">
+                            <button
+                              onClick={() => handleToggleActive(manager)}
+                              className={`badge ${manager.actif ? 'green-badge' : 'red-badge'}`}
+                              title={`Cliquer pour ${manager.actif ? 'désactiver' : 'activer'}`}
+                              disabled={loading}
+                              style={{ 
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                opacity: loading ? 0.6 : 1
+                              }}
+                            >
+                              {manager.actif ? (
+                                <>
+                                  <CheckCircle size={12} />
+                                  Actif
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle size={12} />
+                                  Inactif
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="commercial-actions">
+                          <button
+                            onClick={() => openEditModal(manager)}
+                            className="btn-icon yellow"
+                            title="Modifier"
+                            disabled={loading}
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setManagerToDelete(manager);
+                              setShowDeleteModal(true);
+                            }}
+                            className="btn-icon red"
+                            title="Supprimer"
+                            disabled={loading}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="commercial-details">
+                        {manager.telephone && (
+                          <div className="detail-item">
+                            <Phone size={14} />
+                            <span>{manager.telephone}</span>
+                          </div>
+                        )}
+                        {manager.email && (
+                          <div className="detail-item">
+                            <Mail size={14} />
+                            <span>{manager.email}</span>
+                          </div>
+                        )}
+                        {manager.createdAt && (
+                          <div className="detail-small">
+                            Créé le {formatDate(manager.createdAt)}
+                          </div>
+                        )}
+                        {manager.creeParAdmin && (
+                          <div className="detail-small">
+                            Par: {manager.creeParAdmin.nom || manager.creeParAdmin.email}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Mail size={16} />
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formAdd.email}
-                    onChange={handleChangeAdd}
-                    required
-                    style={styles.input}
-                    placeholder="email@exemple.com"
-                  />
-                </div>
-              </div>
-              
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Phone size={16} />
-                    Téléphone *
-                  </label>
-                  <input
-                    type="text"
-                    name="telephone"
-                    value={formAdd.telephone}
-                    onChange={handleChangeAdd}
-                    required
-                    style={styles.input}
-                    placeholder="Numéro de téléphone"
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Mot de passe *
-                  </label>
-                  <input
-                    type="password"
-                    name="motDePasse"
-                    value={formAdd.motDePasse}
-                    onChange={handleChangeAdd}
-                    required
-                    minLength="6"
-                    style={styles.input}
-                    placeholder="Minimum 6 caractères"
-                  />
-                </div>
-              </div>
-              
-              <div style={styles.formGroup}>
-                <label style={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="actif"
-                    checked={formAdd.actif}
-                    onChange={handleChangeAdd}
-                    style={styles.checkbox}
-                  />
-                  Compte actif
-                </label>
-              </div>
-
-              {messageAdd && (
-                <div style={{
-                  ...styles.message,
-                  backgroundColor: messageAdd.includes('succès') ? '#dcfce7' : '#fee2e2',
-                  color: messageAdd.includes('succès') ? '#166534' : '#991b1b'
-                }}>
-                  {messageAdd}
+              ) : (
+                <div className="no-students">
+                  <Users size={48} />
+                  <h3>Aucun gestionnaire de paiement</h3>
+                  <p>Commencez par créer votre premier gestionnaire</p>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={openAddModal}
+                    disabled={loading}
+                  >
+                    <UserPlus size={20} />
+                    Créer le premier gestionnaire
+                  </button>
                 </div>
               )}
+            </>
+          )}
+        </div>
 
-              <div style={styles.modalActions}>
-                <button 
-                  type="button" 
-                  onClick={closeAddModal} 
-                  style={styles.btnCancel}
+        {/* Modal for Add/Edit Manager */}
+        {showModal && (
+          <div className="modal-overlay" onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}>
+            <div className="modal">
+              <div className="modal-header">
+                <h3 className="modal-title">
+                  {editingManager ? (
+                    <>
+                      <Edit size={24} />
+                      Modifier le Gestionnaire
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={24} />
+                      Nouveau Gestionnaire
+                    </>
+                  )}
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="btn-close"
+                  disabled={loading}
                 >
-                  Annuler
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={loadingAdd}
-                  style={styles.btnSubmit}
-                >
-                  <Save size={16} />
-                  {loadingAdd ? 'Création...' : 'Créer le gestionnaire'}
+                  <X size={24} />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Modal de modification */}
-      {showEditModal && managerAModifier && (
-        <div style={styles.modalOverlay} onClick={closeEditModal}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h3>Modifier le Gestionnaire</h3>
-              <button onClick={closeEditModal} style={styles.btnClose}>
-                <X size={20} />
-              </button>
+              <div className="modal-body">
+                <form onSubmit={handleCreateOrUpdateManager}>
+                  <div className="form-group">
+                    <label htmlFor="nom">Nom complet *</label>
+                    <input
+                      id="nom"
+                      type="text"
+                      value={newManager.nom}
+                      onChange={e => setNewManager({ ...newManager, nom: e.target.value })}
+                      placeholder="Nom et prénom du gestionnaire"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="telephone">Téléphone</label>
+                    <input
+                      id="telephone"
+                      type="tel"
+                      value={newManager.telephone}
+                      onChange={e => setNewManager({ ...newManager, telephone: e.target.value })}
+                      placeholder="Numéro de téléphone (optionnel)"
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="email">Email *</label>
+                    <input
+                      id="email"
+                      type="email"
+                      value={newManager.email}
+                      onChange={e => setNewManager({ ...newManager, email: e.target.value })}
+                      placeholder="Adresse email"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="password">
+                      {editingManager ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe *'}
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={newManager.motDePasse}
+                        onChange={e => setNewManager({ ...newManager, motDePasse: e.target.value })}
+                        required={!editingManager}
+                        placeholder={editingManager ? "Laisser vide pour ne pas changer" : "Minimum 6 caractères"}
+                        style={{ paddingRight: '45px' }}
+                        disabled={loading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        disabled={loading}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: loading ? 'not-allowed' : 'pointer',
+                          color: '#6b7280',
+                          padding: '4px'
+                        }}
+                        title={showPassword ? "Masquer" : "Afficher"}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {newManager.motDePasse && (
+                    <div className="form-group">
+                      <label htmlFor="confirmPassword">Confirmer le mot de passe *</label>
+                      <input
+                        id="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        value={newManager.confirmPassword}
+                        onChange={e => setNewManager({ ...newManager, confirmPassword: e.target.value })}
+                        placeholder="Retaper le mot de passe"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+
+                  <div className="form-group">
+                    <label style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem',
+                      cursor: loading ? 'not-allowed' : 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={newManager.actif}
+                        onChange={e => setNewManager({ ...newManager, actif: e.target.checked })}
+                        disabled={loading}
+                      />
+                      <CheckCircle size={16} />
+                      Compte actif
+                    </label>
+                    <small style={{ color: '#6b7280', marginLeft: '24px' }}>
+                      Les comptes inactifs ne peuvent pas se connecter
+                    </small>
+                  </div>
+
+                  <div className="modal-actions">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="btn btn-primary"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {loading ? (
+                        <>
+                          <div className="spinner" style={{ width: '16px', height: '16px' }}></div>
+                          {editingManager ? 'Modification...' : 'Création...'}
+                        </>
+                      ) : (
+                        <>
+                          <Save size={16} />
+                          {editingManager ? 'Modifier' : 'Créer'}
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="btn btn-secondary"
+                      disabled={loading}
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-            
-            <form onSubmit={handleSubmitEdit} style={styles.form}>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <User size={16} />
-                    Nom complet *
-                  </label>
-                  <input
-                    type="text"
-                    name="nom"
-                    value={formEdit.nom}
-                    onChange={handleChangeEdit}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Mail size={16} />
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formEdit.email}
-                    onChange={handleChangeEdit}
-                    required
-                    style={styles.input}
-                  />
-                </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && managerToDelete && (
+          <div className="modal-overlay" onClick={(e) => {
+            if (e.target === e.currentTarget) closeDeleteModal();
+          }}>
+            <div className="modal small">
+              <div className="modal-header">
+                <h3 className="modal-title" style={{ color: '#dc3545' }}>
+                  <Trash2 size={24} />
+                  Confirmer la suppression
+                </h3>
+                <button
+                  onClick={closeDeleteModal}
+                  className="btn-close"
+                  disabled={loading}
+                >
+                  <X size={20} />
+                </button>
               </div>
               
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Phone size={16} />
-                    Téléphone *
-                  </label>
-                  <input
-                    type="text"
-                    name="telephone"
-                    value={formEdit.telephone}
-                    onChange={handleChangeEdit}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Nouveau mot de passe
-                  </label>
-                  <input
-                    type="password"
-                    name="motDePasse"
-                    value={formEdit.motDePasse}
-                    onChange={handleChangeEdit}
-                    minLength="6"
-                    style={styles.input}
-                    placeholder="Laisser vide pour garder l'ancien"
-                  />
-                  <small style={styles.smallText}>
-                    Laisser vide pour conserver le mot de passe actuel
-                  </small>
-                </div>
-              </div>
-              
-              <div style={styles.formGroup}>
-                <label style={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="actif"
-                    checked={formEdit.actif}
-                    onChange={handleChangeEdit}
-                    style={styles.checkbox}
-                  />
-                  Compte actif
-                </label>
-              </div>
-
-              {messageEdit && (
-                <div style={{
-                  ...styles.message,
-                  backgroundColor: messageEdit.includes('succès') ? '#dcfce7' : '#fee2e2',
-                  color: messageEdit.includes('succès') ? '#166534' : '#991b1b'
-                }}>
-                  {messageEdit}
-                </div>
-              )}
-
-              <div style={styles.modalActions}>
-                <button 
-                  type="button" 
-                  onClick={closeEditModal} 
-                  style={styles.btnCancel}
-                >
-                  Annuler
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={loadingEdit}
-                  style={styles.btnSubmit}
-                >
-                  <Save size={16} />
-                  {loadingEdit ? 'Modification...' : 'Enregistrer les modifications'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de visualisation */}
-      {showViewModal && managerSelectionne && (
-        <div style={styles.modalOverlay} onClick={closeViewModal}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h3>Détails du Gestionnaire</h3>
-              <button onClick={closeViewModal} style={styles.btnClose}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div style={styles.viewContent}>
-              <div style={styles.managerHeader}>
-                <div style={styles.avatarLarge}>
-                  {managerSelectionne.nom.charAt(0).toUpperCase()}
-                </div>
-                <div style={styles.managerMainInfo}>
-                  <h2 style={styles.managerNameLarge}>{managerSelectionne.nom}</h2>
-                  <span style={{
-                    ...styles.statusBadgeLarge,
-                    backgroundColor: managerSelectionne.actif ? '#dcfce7' : '#fee2e2',
-                    color: managerSelectionne.actif ? '#166534' : '#991b1b'
+              <div className="modal-body">
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div style={{ 
+                    backgroundColor: '#ffeaea', 
+                    borderRadius: '50%', 
+                    width: '60px', 
+                    height: '60px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    margin: '0 auto 16px' 
                   }}>
-                    {managerSelectionne.actif ? (
-                      <><UserCheck size={16} /> Compte Actif</>
+                    <Trash2 size={24} color="#dc3545" />
+                  </div>
+                  
+                  <h4 style={{ margin: '0 0 8px', color: '#333' }}>
+                    Supprimer le gestionnaire ?
+                  </h4>
+                  
+                  <p className="modal-text" style={{ margin: '0 0 16px' }}>
+                    Êtes-vous sûr de vouloir supprimer <strong>{managerToDelete.nom}</strong> ?
+                  </p>
+                  
+                  <div style={{ 
+                    backgroundColor: '#fff3cd', 
+                    border: '1px solid #ffeaa7',
+                    borderRadius: '6px',
+                    padding: '12px',
+                    marginBottom: '20px'
+                  }}>
+                    <small style={{ color: '#856404' }}>
+                      ⚠️ Cette action est irréversible et supprimera définitivement ce gestionnaire.
+                    </small>
+                  </div>
+                </div>
+                
+                <div className="modal-actions">
+                  <button
+                    onClick={handleDeleteManager}
+                    disabled={loading}
+                    className="btn btn-danger"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <div className="spinner" style={{ width: '16px', height: '16px' }}></div>
+                        Suppression...
+                      </>
                     ) : (
-                      <><UserX size={16} /> Compte Inactif</>
+                      <>
+                        <Trash2 size={16} />
+                        Supprimer définitivement
+                      </>
                     )}
-                  </span>
+                  </button>
+                  <button
+                    onClick={closeDeleteModal}
+                    className="btn btn-secondary"
+                    disabled={loading}
+                  >
+                    Annuler
+                  </button>
                 </div>
-              </div>
-
-              <div style={styles.infoGrid}>
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>Email</div>
-                  <div style={styles.infoValue}>
-                    <Mail size={16} style={styles.infoIcon} />
-                    {managerSelectionne.email}
-                  </div>
-                </div>
-
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>Téléphone</div>
-                  <div style={styles.infoValue}>
-                    <Phone size={16} style={styles.infoIcon} />
-                    {managerSelectionne.telephone}
-                  </div>
-                </div>
-
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>Date de création</div>
-                  <div style={styles.infoValue}>
-                    <Calendar size={16} style={styles.infoIcon} />
-                    {formatDate(managerSelectionne.createdAt)}
-                  </div>
-                </div>
-
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>Dernière mise à jour</div>
-                  <div style={styles.infoValue}>
-                    <Calendar size={16} style={styles.infoIcon} />
-                    {formatDate(managerSelectionne.updatedAt)}
-                  </div>
-                </div>
-
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>Dernière connexion</div>
-                  <div style={styles.infoValue}>
-                    {managerSelectionne.lastSeen ? formatDate(managerSelectionne.lastSeen) : 'Jamais connecté'}
-                  </div>
-                </div>
-
-                <div style={styles.infoCard}>
-                  <div style={styles.infoLabel}>ID</div>
-                  <div style={styles.infoValue}>
-                    {managerSelectionne._id}
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.modalActions}>
-                <button 
-                  onClick={() => {
-                    closeViewModal();
-                    openEditModal(managerSelectionne);
-                  }}
-                  style={styles.btnEdit}
-                >
-                  <Edit size={16} />
-                  Modifier
-                </button>
-                <button onClick={closeViewModal} style={styles.btnCancel}>
-                  Fermer
-                </button>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
 
-const styles = {
-  container: {
-    padding: '24px',
-    maxWidth: '1200px',
-    margin: '0 auto',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-  },
-  loading: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '400px',
-    color: '#6b7280'
-  },
-  spinner: {
-    width: '40px',
-    height: '40px',
-    border: '4px solid #f3f4f6',
-    borderTop: '4px solid #3b82f6',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-    marginBottom: '16px'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '24px',
-    padding: '0 8px'
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: 0
-  },
-  btnAdd: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)'
-  },
-  filtres: {
-    display: 'flex',
-    gap: '16px',
-    alignItems: 'center',
-    marginBottom: '24px',
-    padding: '20px',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb'
-  },
-  searchContainer: {
-    position: 'relative',
-    flex: 1
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: '12px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: '#9ca3af'
-  },
-  searchInput: {
-    width: '100%',
-    padding: '12px 12px 12px 40px',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.2s ease'
-  },
-  filterSelect: {
-    padding: '12px 16px',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    backgroundColor: 'white',
-    fontSize: '14px',
-    cursor: 'pointer',
-    outline: 'none'
-  },
-  statsInfo: {
-    fontSize: '14px',
-    color: '#6b7280',
-    fontWeight: '500'
-  },
-  tableContainer: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    border: '1px solid #e5e7eb'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse'
-  },
-  tableHeader: {
-    backgroundColor: '#f9fafb'
-  },
-  th: {
-    padding: '16px',
-    textAlign: 'left',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#374151',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    borderBottom: '1px solid #e5e7eb'
-  },
-  tableRow: {
-    borderBottom: '1px solid #f3f4f6',
-    transition: 'background-color 0.2s ease',
-    cursor: 'pointer'
-  },
-  td: {
-    padding: '16px',
-    verticalAlign: 'middle'
-  },
-  managerInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px'
-  },
-  avatar: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '16px',
-    fontWeight: '600'
-  },
-  managerName: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#1f2937'
-  },
-  emailContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#6b7280'
-  },
-  phoneContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#6b7280'
-  },
-  dateContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#6b7280'
-  },
-  icon: {
-    color: '#9ca3af'
-  },
-  statusContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  statusBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '4px 8px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '500'
-  },
-  toggleBtn: {
-    padding: '4px',
-    backgroundColor: '#f3f4f6',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    color: '#6b7280',
-    transition: 'all 0.2s ease'
-  },
-  actions: {
-    display: 'flex',
-    gap: '8px'
-  },
-  btnAction: {
-    padding: '8px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease'
-  },
-  noResults: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#6b7280',
-    fontSize: '16px'
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '0',
-    width: '90%',
-    maxWidth: '600px',
-    maxHeight: '90vh',
-    overflow: 'auto',
-    boxShadow: '0 20px 25px rgba(0, 0, 0, 0.1)'
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '24px',
-    borderBottom: '1px solid #e5e7eb'
-  },
-  btnClose: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#6b7280',
-    cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px'
-  },
-  form: {
-    padding: '24px'
-  },
-  formRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-    marginBottom: '20px'
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  label: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#374151'
-  },
-  input: {
-    padding: '12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.2s ease'
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#374151',
-    cursor: 'pointer'
-  },
-  checkbox: {
-    width: '16px',
-    height: '16px',
-    cursor: 'pointer'
-  },
-  smallText: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginTop: '4px'
-  },
-  message: {
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    marginTop: '24px'
-  },
-  btnCancel: {
-    padding: '10px 20px',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  btnSubmit: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#10b981',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'background-color 0.2s ease'
-  },
-  btnEdit: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#f59e0b',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  viewContent: {
-    padding: '24px'
-  },
-  managerHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-    marginBottom: '24px',
-    padding: '20px',
-    backgroundColor: '#f8fafc',
-    borderRadius: '12px'
-  },
-  avatarLarge: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
-    backgroundColor: '#3b82f6',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '32px',
-    fontWeight: '600'
-  },
-  managerMainInfo: {
-    flex: 1
-  },
-  managerNameLarge: {
-    fontSize: '24px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 8px 0'
-  },
-  statusBadgeLarge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    borderRadius: '20px',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  infoGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '16px',
-    marginBottom: '24px'
-  },
-  infoCard: {
-    padding: '16px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb'
-  },
-  infoLabel: {
-    fontSize: '12px',
-    fontWeight: '500',
-    color: '#6b7280',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '8px'
-  },
-  infoValue: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#1f2937',
-    fontWeight: '500'
-  },
-  infoIcon: {
-    color: '#9ca3af'
-  }
-};
-
-// CSS pour l'animation du spinner
-const spinKeyframes = `
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-`;
-
-// Ajouter les keyframes au document
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.textContent = spinKeyframes;
-  document.head.appendChild(styleSheet);
-}
-
-export default GestionPaiementManagers;
+export default PaiementManagersPage;

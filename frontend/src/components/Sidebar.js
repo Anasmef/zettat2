@@ -153,7 +153,7 @@ const Sidebar = ({ onLogout }) => {
       icon: FileText
     },
     {
-      path: '/admin/Manager',
+      path: '/admin/gestionnaire-paiement',
       label: 'Manager',
       icon: Wallet
     },

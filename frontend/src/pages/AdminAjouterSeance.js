@@ -326,7 +326,7 @@ const EmploiDuTemps = () => {
 
   const styles = {
     container: {
-            background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+            background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
 
       maxWidth: '1400px',
       margin: '20px auto',

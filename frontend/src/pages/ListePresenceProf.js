@@ -82,7 +82,7 @@ const ListePresences = () => {
             totalCount,
             attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
           };
-        });
+        }).sort((a, b) => new Date(b.date) - new Date(a.date)); // ✅ ترتيب تنازلي حسب التاريخ
 
         const uniqueCours = [...new Set(sessions.map(s => s.cours))];
         setAvailableCours(uniqueCours);
@@ -168,7 +168,7 @@ const ListePresences = () => {
       filtered = filtered.filter(session => session.periode === periodeFilter);
     }
 
-    setFilteredSessions(filtered);
+    setFilteredSessions(filtered.sort((a, b) => new Date(b.date) - new Date(a.date))); // ✅ ترتيب النتائج المفلترة أيضًا
   }, [searchTerm, dateFilter, coursFilter, presenceRateFilter, heureFilter, periodeFilter, matiereFilter, professeurFilter, groupedSessions]);
 
   const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
@@ -189,7 +189,7 @@ const ListePresences = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
       padding: '20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     },
