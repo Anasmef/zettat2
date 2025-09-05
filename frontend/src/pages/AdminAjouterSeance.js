@@ -24,6 +24,34 @@ const EmploiDuTemps = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
 
+  // ✅ NOUVELLE FONCTION: Obtenir les professeurs assignés à un cours spécifique
+  const getProfesseursForCours = (coursId) => {
+    const cours = coursList.find(c => c._id === coursId);
+    if (!cours || !cours.professeur || cours.professeur.length === 0) {
+      return []; // Aucun professeur assigné
+    }
+    
+    // Filtrer les professeurs qui sont dans la liste des professeurs du cours
+    return profList.filter(prof => cours.professeur.includes(prof.nom));
+  };
+
+  // ✅ NOUVELLE FONCTION: Auto-remplir la matière quand on sélectionne un professeur
+  const handleProfesseurChange = (coursId, jour, creneau, professeurId) => {
+    // Mettre à jour le professeur
+    updateCase(coursId, jour, creneau, 'professeur', professeurId);
+    
+    // Auto-remplir la matière si un professeur est sélectionné
+    if (professeurId) {
+      const professeur = profList.find(p => p._id === professeurId);
+      if (professeur && professeur.matiere) {
+        updateCase(coursId, jour, creneau, 'matiere', professeur.matiere);
+      }
+    } else {
+      // Vider la matière si aucun professeur n'est sélectionné
+      updateCase(coursId, jour, creneau, 'matiere', '');
+    }
+  };
+
   // Fonction pour obtenir les dates de la semaine
   const getWeekDates = (date) => {
     const start = new Date(date);
@@ -58,15 +86,16 @@ const EmploiDuTemps = () => {
       try {
         setLoading(true);
         
-        let coursData = []; // ✅ Declare coursData at the beginning
+        let coursData = [];
         
         // Récupérer les cours depuis votre API
         const resCours = await fetch('/api/cours', {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (resCours.ok) {
-          coursData = await resCours.json(); // ✅ Assign to coursData
+          coursData = await resCours.json();
           setCoursList(coursData);
+          console.log('Cours chargés:', coursData); // ✅ Debug
         }
 
         // Récupérer les professeurs depuis votre API
@@ -76,6 +105,7 @@ const EmploiDuTemps = () => {
         if (resProfs.ok) {
           const profsData = await resProfs.json();
           setProfList(profsData);
+          console.log('Professeurs chargés:', profsData); // ✅ Debug
         }
 
         // Récupérer les séances existantes depuis votre API
@@ -85,12 +115,12 @@ const EmploiDuTemps = () => {
         if (resSeances.ok) {
           const seancesData = await resSeances.json();
           
-          // ✅ CORRECTION: Organiser les séances par cours ID avec la matière et salle
+          // Organiser les séances par cours ID avec la matière et salle
           const emploi = {};
           seancesData.forEach(seance => {
-            // ✅ Find course ID from course name
+            // Find course ID from course name
             const cours = coursData.find(c => c.nom === seance.cours);
-            if (!cours) return; // Skip if course not found
+            if (!cours) return;
             
             const coursId = cours._id;
             if (!emploi[coursId]) emploi[coursId] = {};
@@ -98,16 +128,15 @@ const EmploiDuTemps = () => {
             const key = `${seance.jour}-${seance.heureDebut}-${seance.heureFin}`;
             emploi[coursId][key] = {
               professeur: seance.professeur?._id || '',
-              matiere: seance.matiere || '', // ✅ IMPORTANT: Récupérer la matière depuis la BD
-              salle: seance.salle || '', // ✅ NOUVEAU: Récupérer la salle depuis la BD
+              matiere: seance.matiere || '',
+              salle: seance.salle || '',
               seanceId: seance._id
             };
             
-            // ✅ DEBUG: Log pour vérifier que la matière et salle sont bien récupérées
             console.log(`Séance récupérée - Cours: ${seance.cours}, Matière: "${seance.matiere}", Salle: "${seance.salle}", Prof: ${seance.professeur?.nom}`);
           });
           
-          console.log('Emploi du temps chargé:', emploi); // ✅ Debug log
+          console.log('Emploi du temps chargé:', emploi);
           setEmploiDuTemps(emploi);
         }
 
@@ -137,7 +166,6 @@ const EmploiDuTemps = () => {
   const updateCase = (coursId, jour, creneau, field, value) => {
     const key = `${jour}-${creneau.debut}-${creneau.fin}`;
     
-    // ✅ DEBUG: Log pour voir les changements
     console.log(`Mise à jour - Cours: ${coursId}, Jour: ${jour}, Champ: ${field}, Valeur: "${value}"`);
     
     setEmploiDuTemps(prev => ({
@@ -157,7 +185,6 @@ const EmploiDuTemps = () => {
     const coursData = emploiDuTemps[coursId];
     if (!coursData) return;
 
-    // ✅ Trouver le cours pour obtenir son nom
     const cours = coursList.find(c => c._id === coursId);
     if (!cours) {
       setMessage({ type: 'error', text: 'Cours non trouvé' });
@@ -172,7 +199,7 @@ const EmploiDuTemps = () => {
 
     try {
       const promises = Object.entries(coursData).map(async ([key, seanceData]) => {
-        if (!seanceData.professeur) return; // Ignorer les cases vides
+        if (!seanceData.professeur) return;
 
         const [jour, heureDebut, heureFin] = key.split('-');
         
@@ -180,19 +207,17 @@ const EmploiDuTemps = () => {
           jour,
           heureDebut,
           heureFin,
-          cours: coursId, // ✅ Send course ID to backend (backend will convert to name)
+          cours: coursId,
           professeur: seanceData.professeur,
-          matiere: seanceData.matiere || '', // ✅ IMPORTANT: Inclure la matière
-          salle: seanceData.salle || '' // ✅ NOUVEAU: Inclure la salle
+          matiere: seanceData.matiere || '',
+          salle: seanceData.salle || ''
         };
 
-        // ✅ DEBUG: Log du payload envoyé
         console.log('Payload envoyé:', payload);
 
         try {
           let res;
           if (seanceData.seanceId) {
-            // Modifier séance existante
             res = await fetch(`/api/seances/${seanceData.seanceId}`, {
               method: 'PUT',
               headers: {
@@ -202,7 +227,6 @@ const EmploiDuTemps = () => {
               body: JSON.stringify(payload)
             });
           } else {
-            // Créer nouvelle séance
             res = await fetch('/api/seances', {
               method: 'POST',
               headers: {
@@ -217,7 +241,6 @@ const EmploiDuTemps = () => {
             const result = await res.json();
             successCount++;
             
-            // Mettre à jour l'ID si c'est une nouvelle séance
             if (!seanceData.seanceId) {
               setEmploiDuTemps(prev => ({
                 ...prev,
@@ -270,18 +293,15 @@ const EmploiDuTemps = () => {
       const cours = coursList.find(c => c._id === coursId);
       if (!cours) return;
 
-      // En-tête du cours
       csvContent += `\nCOURS: ${cours.nom}\n`;
       csvContent += `Semaine du ${formatDate(weekDates[0])} au ${formatDate(weekDates[5])}\n\n`;
       
-      // En-tête du tableau
       csvContent += 'Horaires;';
       jours.forEach((jour, index) => {
         csvContent += `${jour} (${formatDate(weekDates[index])});`;
       });
       csvContent += '\n';
 
-      // Données du tableau
       creneaux.forEach(creneau => {
         csvContent += `${creneau.label};`;
         
@@ -293,7 +313,6 @@ const EmploiDuTemps = () => {
           const matiere = seanceData.matiere || '';
           const salle = seanceData.salle || '';
           
-          // ✅ NOUVEAU: Inclure la salle dans le CSV
           csvContent += `"${profNom}${matiere ? ' - ' + matiere : ''}${salle ? ' (Salle: ' + salle + ')' : ''}";`;
         });
         csvContent += '\n';
@@ -302,7 +321,6 @@ const EmploiDuTemps = () => {
       csvContent += '\n';
     });
 
-    // Créer et télécharger le fichier
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -326,8 +344,7 @@ const EmploiDuTemps = () => {
 
   const styles = {
     container: {
-            background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
       maxWidth: '1400px',
       margin: '20px auto',
       padding: '0 20px',
@@ -429,6 +446,17 @@ const EmploiDuTemps = () => {
       color: '#374151',
       margin: 0
     },
+    // ✅ NOUVEAU: Style pour afficher les professeurs assignés
+    courseInfo: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '5px'
+    },
+    professeursAssignes: {
+      fontSize: '12px',
+      color: '#6b7280',
+      fontStyle: 'italic'
+    },
     saveAllButton: {
       padding: '8px 16px',
       backgroundColor: '#10b981',
@@ -470,7 +498,7 @@ const EmploiDuTemps = () => {
       border: '1px solid #e5e7eb',
       padding: '8px',
       verticalAlign: 'top',
-      height: '120px', // ✅ Augmenté pour accueillir le champ salle
+      height: '120px',
       width: 'calc(100% / 7)',
       position: 'relative'
     },
@@ -487,6 +515,16 @@ const EmploiDuTemps = () => {
       borderRadius: '4px',
       fontSize: '11px',
       backgroundColor: '#fff'
+    },
+    // ✅ NOUVEAU: Style pour champ matière en lecture seule
+    selectDisabled: {
+      width: '100%',
+      padding: '4px',
+      border: '1px solid #d1d5db',
+      borderRadius: '4px',
+      fontSize: '11px',
+      backgroundColor: '#f9fafb',
+      color: '#6b7280'
     },
     input: {
       width: '100%',
@@ -539,7 +577,6 @@ const EmploiDuTemps = () => {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
       <Sidebar onLogout={handleLogout} />
 
       <div style={styles.header}>
@@ -549,31 +586,42 @@ const EmploiDuTemps = () => {
         </h1>
       </div>
 
-      {/* Contrôles */}
       <div style={styles.controls}>
-        {/* Sélection des cours */}
         <div style={styles.coursSelection}>
           <h3 style={{ margin: '0 0 10px 0', color: '#374151' }}>
             <Book size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
-            Sélectionnez les classe à afficher:
+            Sélectionnez les classes à afficher:
           </h3>
           <div style={styles.coursGrid}>
-            {coursList.map(cours => (
-              <div
-                key={cours._id}
-                style={{
-                  ...styles.coursCard,
-                  ...(selectedCours.includes(cours._id) ? styles.coursCardSelected : {})
-                }}
-                onClick={() => toggleCours(cours._id)}
-              >
-                {cours.nom}
-              </div>
-            ))}
+            {coursList.map(cours => {
+              // ✅ Obtenir les professeurs assignés pour ce cours
+              const professeursAssignes = getProfesseursForCours(cours._id);
+              
+              return (
+                <div
+                  key={cours._id}
+                  style={{
+                    ...styles.coursCard,
+                    ...(selectedCours.includes(cours._id) ? styles.coursCardSelected : {})
+                  }}
+                  onClick={() => toggleCours(cours._id)}
+                  title={`Professeurs: ${professeursAssignes.map(p => `${p.nom} (${p.matiere})`).join(', ') || 'Aucun'}`}
+                >
+                  <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                    {cours.nom}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#6b7280' }}>
+                    {professeursAssignes.length > 0 
+                      ? `${professeursAssignes.length} prof${professeursAssignes.length > 1 ? 's' : ''} assigné${professeursAssignes.length > 1 ? 's' : ''}`
+                      : 'Aucun professeur assigné'
+                    }
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Navigation des semaines */}
         <div style={styles.weekNavigation}>
           <button style={styles.weekButton} onClick={() => changeWeek(-1)}>
             <ChevronLeft size={16} />
@@ -588,7 +636,6 @@ const EmploiDuTemps = () => {
           </button>
         </div>
 
-        {/* Bouton de téléchargement */}
         {selectedCours.length > 0 && (
           <div style={{ textAlign: 'center', marginTop: '25px' }}>
             <button 
@@ -612,7 +659,6 @@ const EmploiDuTemps = () => {
         )}
       </div>
 
-      {/* Message */}
       {message.text && (
         <div style={{
           ...styles.message,
@@ -629,11 +675,23 @@ const EmploiDuTemps = () => {
         const cours = coursList.find(c => c._id === coursId);
         if (!cours) return null;
 
+        // ✅ Obtenir les professeurs assignés pour ce cours
+        const professeursAssignes = getProfesseursForCours(coursId);
+
         return (
           <div key={coursId} style={styles.tableContainer}>
             <div style={styles.tableActions}>
-              <div style={styles.courseTitle}>
-                📚 {cours.nom}
+              <div style={styles.courseInfo}>
+                <div style={styles.courseTitle}>
+                  📚 {cours.nom}
+                </div>
+                {/* ✅ NOUVEAU: Afficher la liste des professeurs assignés */}
+                <div style={styles.professeursAssignes}>
+                  {professeursAssignes.length > 0 
+                    ? `Professeurs: ${professeursAssignes.map(p => `${p.nom} (${p.matiere})`).join(', ')}`
+                    : '⚠️ Aucun professeur assigné à ce cours'
+                  }
+                </div>
               </div>
               <button 
                 style={styles.saveAllButton}
@@ -676,33 +734,38 @@ const EmploiDuTemps = () => {
                         const key = `${jour}-${creneau.debut}-${creneau.fin}`;
                         const seanceData = emploiDuTemps[coursId]?.[key] || {};
                         
-                        // ✅ DEBUG: Log pour voir les données de la séance
-                        console.log(`Rendu cellule - Cours: ${cours.nom}, Jour: ${jour}, Matière: "${seanceData.matiere}", Salle: "${seanceData.salle}"`);
-                        
                         return (
                           <td key={jour} style={styles.cell}>
                             <div style={styles.cellContent}>
-                              {/* Sélection du professeur */}
+                              {/* ✅ MODIFIÉ: Sélection du professeur - filtré par cours */}
                               <select
                                 style={styles.select}
                                 value={seanceData.professeur || ''}
-                                onChange={(e) => updateCase(coursId, jour, creneau, 'professeur', e.target.value)}
+                                onChange={(e) => handleProfesseurChange(coursId, jour, creneau, e.target.value)}
                               >
-                                <option value="">-- Professeur --</option>
-                                {profList.map(prof => (
-                                  <option key={prof._id} value={prof._id}>
-                                    {prof.nom}
-                                  </option>
-                                ))}
+                                <option value="">-- Choisir Professeur --</option>
+                                {professeursAssignes.length === 0 ? (
+                                  <option value="" disabled>Aucun prof assigné</option>
+                                ) : (
+                                  professeursAssignes.map(prof => (
+                                    <option key={prof._id} value={prof._id}>
+                                      {prof.nom} ({prof.matiere})
+                                    </option>
+                                  ))
+                                )}
                               </select>
 
-                              {/* ✅ Champ matière */}
+                              {/* ✅ MODIFIÉ: Champ matière - rempli automatiquement */}
                               <input
-                                style={styles.input}
-                                placeholder="Matière..."
+                                style={seanceData.professeur ? styles.selectDisabled : styles.input}
+                                placeholder="Matière (auto-rempli)"
                                 value={seanceData.matiere || ''}
+                                readOnly={!!seanceData.professeur}
                                 onChange={(e) => updateCase(coursId, jour, creneau, 'matiere', e.target.value)}
-                                title={`Valeur actuelle: "${seanceData.matiere || 'vide'}"`}
+                                title={seanceData.professeur 
+                                  ? `Matière auto-remplie depuis le professeur` 
+                                  : `Tapez manuellement si nécessaire`
+                                }
                               />
 
                               {/* ✅ NOUVEAU: Champ salle */}
@@ -728,7 +791,7 @@ const EmploiDuTemps = () => {
 
       {selectedCours.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
-          Sélectionnez au moins un classe pour afficher son emploi du temps
+          Sélectionnez au moins une classe pour afficher son emploi du temps
         </div>
       )}
     </div>

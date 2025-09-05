@@ -19,7 +19,7 @@ const ModalNotificationEtudiant = ({ show, etudiant, onClose, onSetPrice }) => {
           <div className="student-info-card">
             {etudiant.image && (
               <img 
-                src={`http://localhost:5000${etudiant.image}`} 
+                src={`/api${etudiant.image}`} 
                 alt={etudiant.nomComplet}
                 className="student-avatar"
                 onError={(e) => {e.target.style.display = 'none'}}

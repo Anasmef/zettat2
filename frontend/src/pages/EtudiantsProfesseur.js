@@ -293,7 +293,7 @@ const EtudiantsProfesseur = () => {
                     <td className="image-colonne">
                       {e.image ? (
                         <img 
-                          src={`http://localhost:5000${e.image}`} 
+                          src={`/api${e.image}`} 
                           alt="etudiant" 
                           className="image-etudiant"
                         />
@@ -330,7 +330,7 @@ const EtudiantsProfesseur = () => {
                     <div className="carte-image">
                       {e.image ? (
                         <img 
-                          src={`http://localhost:5000${e.image}`} 
+                          src={`/api${e.image}`} 
                           alt="etudiant" 
                           className="carte-photo"
                         />
@@ -455,7 +455,7 @@ const EtudiantsProfesseur = () => {
                 <div className="etudiant-image-section">
                   {etudiantSelectionne.image ? (
                     <img 
-                      src={`http://localhost:5000${etudiantSelectionne.image}`} 
+                      src={`/api${etudiantSelectionne.image}`} 
                       alt="Photo de l'étudiant" 
                       className="etudiant-image-large"
                     />

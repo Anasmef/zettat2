@@ -158,7 +158,7 @@ const ExercicesCoursProf = () => {
     container: {
       minHeight: '100vh',
       padding: '24px',
-    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     },
     header: {
@@ -560,7 +560,7 @@ const ExercicesCoursProf = () => {
                     </div>
                     <div>
                       <a 
-                        href={`http://localhost:5000${ex.fichier}`}
+                        href={`${ex.fichier}`}
                         target="_blank" 
                         rel="noreferrer"
                         style={styles.downloadLink}

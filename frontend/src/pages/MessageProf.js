@@ -32,10 +32,10 @@ const UserAvatar = ({ user, size = 48 }) => {
     }
     
     if (imagePath.startsWith('/')) {
-      return `http://localhost:5000${imagePath}`;
+      return `${imagePath}`;
     }
     
-    return `http://localhost:5000/${imagePath}`;
+    return `/${imagePath}`;
   };
 
   const imageUrl = getImageUrl(user?.image);
@@ -604,7 +604,7 @@ const stopRecording = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex',           background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
+    <div style={{ minHeight: '100vh', display: 'flex',           background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
  }}> <Sidebar onLogout={handleLogout} />
       <div style={{ flexGrow: 1, padding: '20px' }}>
     <div style={{
@@ -916,7 +916,7 @@ const stopRecording = () => {
                               </div>
                             )}
                             {message.fichier && getFileExtension(message.fichier) === 'webm' && (
-  <audio controls src={`http://localhost:5000${message.fichier}`} style={{ marginTop: '8px', width: '100%' }} />
+  <audio controls src={`${message.fichier}`} style={{ marginTop: '8px', width: '100%' }} />
 )}
 
                             {/* Fichier attaché */}
@@ -949,7 +949,7 @@ const stopRecording = () => {
                                   </div>
                                 </div>
                                 <a
-                                  href={`http://localhost:5000${message.fichier}`}
+                                  href={`${message.fichier}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   style={{

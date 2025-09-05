@@ -202,7 +202,7 @@ const MesExercicesEtudiant = () => {
       margin: '0 auto',
       padding: '20px',
       fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
- background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
        minHeight: '100vh',
     },
     header: {
@@ -683,7 +683,7 @@ const MesExercicesEtudiant = () => {
 
               <div style={styles.actionsContainer}>
                 <a
-                  href={`http://localhost:5000${ex.fichier}`}
+                  href={`${ex.fichier}`}
                   target="_blank"
                   rel="noreferrer"
                   style={styles.downloadButton}

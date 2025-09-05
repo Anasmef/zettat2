@@ -856,7 +856,7 @@ const DocumentsProfesseur = () => {
 
                     <div style={styles.buttonContainer}>
                       <a
-                        href={`http://localhost:5000${doc.fichier}`}
+                        href={`${doc.fichier}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{...styles.button, ...styles.buttonOutline}}
@@ -917,7 +917,7 @@ const DocumentsProfesseur = () => {
                     </div>
                     <div style={styles.listButtons}>
                       <a
-                        href={`http://localhost:5000${doc.fichier}`}
+                        href={`${doc.fichier}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{...styles.listButton, ...styles.buttonOutline}}

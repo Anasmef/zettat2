@@ -179,7 +179,7 @@ const AbsencesParCours = () => {
                 <div style={styles.avatar}>
                   {etudiant.image ? (
                     <img 
-                      src={`http://localhost:5000${etudiant.image}`} 
+                      src={`/api${etudiant.image}`} 
                       alt={etudiant.nomComplet}
                       style={styles.avatarImage}
                     />
@@ -303,7 +303,7 @@ const AbsencesParCours = () => {
                     <div style={styles.avatarSmall}>
                       {etudiant.image ? (
                         <img 
-                          src={`http://localhost:5000${etudiant.image}`} 
+                          src={`/api${etudiant.image}`} 
                           alt={etudiant.nomComplet}
                           style={styles.avatarImageSmall}
                         />
