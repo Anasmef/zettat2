@@ -5602,7 +5602,96 @@ app.get('/api/notifications', authAdminOrInscripteurOrPaiementManager, async (re
     res.status(500).json({ error: err.message });
   }
 });
+// Route pour voir les étudiants par cours avec leurs absences
+app.get('/api/professeur/etudiants-absences/:coursNom', authProfesseur, async (req, res) => {
+  try {
+    const { coursNom } = req.params;
+    const professeurId = req.professeurId;
 
+    // Vérifier que le professeur enseigne ce cours
+    const professeur = await Professeur.findById(professeurId);
+    if (!professeur || !professeur.cours.includes(coursNom)) {
+      return res.status(403).json({ 
+        message: 'Vous n\'êtes pas autorisé à voir les étudiants de ce cours' 
+      });
+    }
+
+    // Récupérer tous les étudiants de ce cours
+    const etudiants = await Etudiant.find({
+      cours: coursNom,
+      actif: true
+    }).select('nomComplet email telephoneEtudiant image genre');
+
+    // Pour chaque étudiant, récupérer ses absences
+    const etudiantsAvecAbsences = await Promise.all(
+      etudiants.map(async (etudiant) => {
+        // Toutes les absences pour ce cours
+        const absences = await Presence.find({
+          etudiant: etudiant._id,
+          cours: coursNom,
+          present: false
+        }).sort({ dateSession: -1 });
+
+        // Total des sessions pour ce cours
+        const totalSessions = await Presence.countDocuments({
+          etudiant: etudiant._id,
+          cours: coursNom
+        });
+
+        // Absences récentes (7 derniers jours)
+        const absencesRecentes = await Presence.countDocuments({
+          etudiant: etudiant._id,
+          cours: coursNom,
+          present: false,
+          dateSession: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        });
+
+        // Absences ce mois
+        const debutMois = new Date();
+        debutMois.setDate(1);
+        const absencesCeMois = await Presence.countDocuments({
+          etudiant: etudiant._id,
+          cours: coursNom,
+          present: false,
+          dateSession: { $gte: debutMois }
+        });
+
+        return {
+          ...etudiant.toObject(),
+          absences: {
+            total: absences.length,
+            recentes: absencesRecentes,
+            ceMois: absencesCeMois,
+            details: absences.slice(0, 10) // 10 dernières absences
+          },
+          sessions: {
+            total: totalSessions,
+            tauxPresence: totalSessions > 0 ? 
+              (((totalSessions - absences.length) / totalSessions) * 100).toFixed(1) : 0
+          }
+        };
+      })
+    );
+
+    // Trier par nombre d'absences (les plus absents en premier)
+    etudiantsAvecAbsences.sort((a, b) => b.absences.total - a.absences.total);
+
+    res.json({
+      cours: coursNom,
+      professeur: professeur.nom,
+      etudiants: etudiantsAvecAbsences,
+      statistiques: {
+        totalEtudiants: etudiantsAvecAbsences.length,
+        etudiantsProblematiques: etudiantsAvecAbsences.filter(e => e.absences.total >= 3).length,
+        etudiantsCritiques: etudiantsAvecAbsences.filter(e => e.absences.total >= 5).length
+      }
+    });
+
+  } catch (err) {
+    console.error('Erreur récupération absences:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
 
 // 7. Route supplémentaire : Statistiques des gestionnaires
 

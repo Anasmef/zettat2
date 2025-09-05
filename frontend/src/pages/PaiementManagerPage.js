@@ -573,7 +573,7 @@ const PaiementManagerPage = () => {
                       <div className="student-info">
                         {etudiant.image ? (
                           <img
-                            src={`${etudiant.image}`}
+                            src={`http://localhost:5000${etudiant.image}`}
                             alt={etudiant.nomComplet}
                             className="student-avatar"
                             onError={(e) => {e.target.style.display = 'none'}}
@@ -776,7 +776,7 @@ const PaiementManagerPage = () => {
                       <div className="carte-image">
                         {e.image ? (
                           <img 
-                            src={`${e.image}`} 
+                            src={`http://localhost:5000${e.image}`} 
                             alt="etudiant" 
                             className="carte-photo"
                             onError={(e) => {e.target.style.display = 'none'}}
@@ -872,7 +872,7 @@ const PaiementManagerPage = () => {
                 <div className="etudiant-image-section">
                   {etudiantSelectionne.image ? (
                     <img 
-                      src={`${etudiantSelectionne.image}`} 
+                      src={`http://localhost:5000${etudiantSelectionne.image}`} 
                       alt="Photo de l'étudiant" 
                       className="etudiant-image-large"
                       onError={(e) => {e.target.style.display = 'none'}}

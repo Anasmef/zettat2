@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Users,
   Clock,
+  UserX,
   UserCheck,
   ClipboardList,
   LogOut,
@@ -126,7 +127,13 @@ const SidebarProf = ({ onLogout }) => {
   {   path: '/professeur/profil',
       label: 'Mot de passe',
       icon: Lock
-    }
+    },
+    // Dans la liste des liens de navigation
+{
+  path: '/professeur/absences',
+  icon: UserX,
+  label: 'Suivi des Absences',
+}
     
   ];
 

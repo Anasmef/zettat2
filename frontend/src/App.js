@@ -69,6 +69,7 @@ import EtudiantProfil from './pages/EtudiantProfil';
 import ProfesseurProfil from './pages/ProfesseurProfil';
 import InscripteurPage from './pages/InscripteurPage';
 import InscripteurDashboard from './pages/InscripteurDashboard';
+import AbsencesParCours from './pages/AbsencesParCours';
 
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
@@ -349,6 +350,7 @@ function AppContent() {
         <Route path="/manager/actualites" element={<AdminActualitesmanager />} />
         <Route path="/admin/inscripteur" element={<InscripteurPage />} />
 
+<Route path="/professeur/absences" element={<AbsencesParCours />} />
         {/* Routes Professeur */}
         <Route path="/professeur" element={<ProfesseurDashboard />} />
         <Route path="/professeur/profile" element={<ProfileProfesseur />} />

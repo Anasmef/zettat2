@@ -567,7 +567,7 @@ const DocumentsEtudiant = () => {
 
                     <div style={styles.buttonContainer}>
                       <a
-                        href={`${doc.fichier}`}
+                        href={`http://localhost:5000${doc.fichier}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{...styles.button, ...styles.buttonOutline}}
@@ -578,7 +578,7 @@ const DocumentsEtudiant = () => {
                         Voir
                       </a>
                       <a
-                        href={`${doc.fichier}`}
+                        href={`http://localhost:5000${doc.fichier}`}
                         download
                         style={{...styles.button, ...styles.buttonPrimary}}
                         onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
@@ -612,7 +612,7 @@ const DocumentsEtudiant = () => {
                     </div>
                     <div style={styles.listButtons}>
                       <a
-                        href={`${doc.fichier}`}
+                        href={`http://localhost:5000${doc.fichier}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{...styles.listButton, ...styles.buttonOutline}}
@@ -623,7 +623,7 @@ const DocumentsEtudiant = () => {
                         Voir
                       </a>
                       <a
-                        href={`${doc.fichier}`}
+                        href={`http://localhost:5000${doc.fichier}`}
                         download
                         style={{...styles.listButton, ...styles.buttonPrimary}}
                         onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}

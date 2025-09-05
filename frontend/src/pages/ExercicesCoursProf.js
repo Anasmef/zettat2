@@ -560,7 +560,7 @@ const ExercicesCoursProf = () => {
                     </div>
                     <div>
                       <a 
-                        href={`${ex.fichier}`}
+                        href={`http://localhost:5000${ex.fichier}`}
                         target="_blank" 
                         rel="noreferrer"
                         style={styles.downloadLink}

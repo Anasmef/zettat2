@@ -32,10 +32,10 @@ const UserAvatar = ({ user, size = 48 }) => {
     }
     
     if (imagePath.startsWith('/')) {
-      return `${imagePath}`;
+      return `http://localhost:5000${imagePath}`;
     }
     
-    return `/${imagePath}`;
+    return `http://localhost:5000/${imagePath}`;
   };
 
   const imageUrl = getImageUrl(user?.image);
@@ -916,7 +916,7 @@ const stopRecording = () => {
                               </div>
                             )}
                             {message.fichier && getFileExtension(message.fichier) === 'webm' && (
-  <audio controls src={`${message.fichier}`} style={{ marginTop: '8px', width: '100%' }} />
+  <audio controls src={`http://localhost:5000${message.fichier}`} style={{ marginTop: '8px', width: '100%' }} />
 )}
 
                             {/* Fichier attaché */}
@@ -949,7 +949,7 @@ const stopRecording = () => {
                                   </div>
                                 </div>
                                 <a
-                                  href={`${message.fichier}`}
+                                  href={`http://localhost:5000${message.fichier}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   style={{
