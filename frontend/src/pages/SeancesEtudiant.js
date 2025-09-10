@@ -9,11 +9,12 @@ const SeancesEtudiant = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  
+  // Nouveaux créneaux horaires mis à jour
   const creneaux = [
-    { debut: '08:00', fin: '10:00', label: '8h - 10h' },
-    { debut: '10:00', fin: '12:00', label: '10h - 12h' },
-    { debut: '14:00', fin: '16:00', label: '14h - 16h' },
-    { debut: '16:00', fin: '18:00', label: '16h - 18h' }
+    { debut: '08:45', fin: '10:45', label: '8h45 - 10h45' },
+    { debut: '11:00', fin: '13:00', label: '11h00 - 13h00' },
+    { debut: '14:00', fin: '16:00', label: '14h00 - 16h00' }
   ];
 
   // Fonction pour obtenir les dates de la semaine
@@ -113,7 +114,6 @@ const SeancesEtudiant = () => {
         const seance = emploiOrganise[key];
         
         if (seance) {
-          // ✅ Inclure la matière et salle dans le CSV
           const coursInfo = seance.cours || 'Cours';
           const matiereInfo = seance.matiere ? ` (${seance.matiere})` : '';
           const salleInfo = seance.salle ? ` - Salle: ${seance.salle}` : '';
@@ -137,7 +137,7 @@ const SeancesEtudiant = () => {
     link.click();
     document.body.removeChild(link);
 
-    setMessage({ type: 'success', text: '📁 Emploi du temps téléchargé avec succès !' });
+    setMessage({ type: 'success', text: 'Emploi du temps téléchargé avec succès !' });
     setTimeout(() => setMessage({ type: '', text: '' }), 3000);
   };
 
@@ -146,14 +146,14 @@ const SeancesEtudiant = () => {
     const coursUniques = [...new Set(seances.map(s => s.cours).filter(Boolean))];
     const profsUniques = [...new Set(seances.map(s => s.professeur?.nom).filter(Boolean))];
     const matieresUniques = [...new Set(seances.map(s => s.matiere).filter(Boolean))];
-    const sallesUniques = [...new Set(seances.map(s => s.salle).filter(Boolean))]; // ✅ NOUVEAU: Salles uniques
+    const sallesUniques = [...new Set(seances.map(s => s.salle).filter(Boolean))];
     
     return {
       totalSeances: seances.length,
       totalCours: coursUniques.length,
       totalProfs: profsUniques.length,
       totalMatieres: matieresUniques.length,
-      totalSalles: sallesUniques.length // ✅ NOUVEAU: Nombre de salles
+      totalSalles: sallesUniques.length
     };
   };
 
@@ -163,7 +163,7 @@ const SeancesEtudiant = () => {
     container: {
       display: 'flex',
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
     },
     content: {
       flexGrow: 1,
@@ -181,7 +181,7 @@ const SeancesEtudiant = () => {
     },
     statsContainer: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', // ✅ Réduit pour accommoder 5 stats
+      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
       gap: '15px',
       marginBottom: '20px'
     },
@@ -282,20 +282,20 @@ const SeancesEtudiant = () => {
       fontWeight: '600',
       color: '#374151',
       border: '1px solid #e5e7eb',
-      minWidth: '100px'
+      minWidth: '120px'
     },
     cell: {
       border: '1px solid #e5e7eb',
       padding: '8px',
       verticalAlign: 'top',
-      height: '110px', // ✅ Augmenté pour accommoder la salle
+      height: '120px',
       width: 'calc(100% / 7)',
       position: 'relative'
     },
     seanceCard: {
       backgroundColor: '#dbeafe',
       borderRadius: '4px',
-      padding: '6px',
+      padding: '8px',
       fontSize: '11px',
       height: '100%',
       display: 'flex',
@@ -305,19 +305,19 @@ const SeancesEtudiant = () => {
     coursName: {
       fontWeight: '600',
       color: '#1e40af',
-      marginBottom: '2px',
+      marginBottom: '3px',
       fontSize: '12px'
     },
     matiereName: {
       fontWeight: '500',
       color: '#7c3aed',
-      marginBottom: '2px',
+      marginBottom: '3px',
       fontSize: '10px'
     },
-    salleName: { // ✅ NOUVEAU: Style pour la salle
+    salleName: {
       fontWeight: '500',
       color: '#059669',
-      marginBottom: '2px',
+      marginBottom: '3px',
       fontSize: '10px'
     },
     profName: {
@@ -385,6 +385,9 @@ const SeancesEtudiant = () => {
             <Calendar size={24} style={{ verticalAlign: 'middle', marginRight: '10px' }} />
             Mon Emploi du Temps
           </h1>
+          <div style={{ marginTop: '10px', fontSize: '14px', color: '#6b7280' }}>
+            Nouveaux créneaux: 8h45-10h45 | 11h00-13h00 | 14h00-16h00
+          </div>
         </div>
 
         {/* Statistiques */}
@@ -417,7 +420,6 @@ const SeancesEtudiant = () => {
               Matières
             </div>
           </div>
-          {/* ✅ NOUVEAU: Statistique pour les salles */}
           <div style={styles.statCard}>
             <div style={styles.statNumber}>{stats.totalSalles}</div>
             <div style={styles.statLabel}>
@@ -486,7 +488,7 @@ const SeancesEtudiant = () => {
         {seances.length > 0 ? (
           <div style={styles.tableContainer}>
             <div style={styles.tableTitle}>
-              📅 Emploi du Temps - Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[5])}
+              Emploi du Temps - Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[5])}
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={styles.table}>
@@ -519,21 +521,19 @@ const SeancesEtudiant = () => {
                                   <div style={styles.coursName}>
                                     {seance.cours || 'Cours'}
                                   </div>
-                                  {/* ✅ Affichage de la matière */}
                                   {seance.matiere && (
                                     <div style={styles.matiereName}>
-                                      📚 {seance.matiere}
+                                      {seance.matiere}
                                     </div>
                                   )}
-                                  {/* ✅ NOUVEAU: Affichage de la salle */}
                                   {seance.salle && (
                                     <div style={styles.salleName}>
-                                      📍 {seance.salle}
+                                      Salle: {seance.salle}
                                     </div>
                                   )}
                                 </div>
                                 <div style={styles.profName}>
-                                  👨‍🏫 {seance.professeur?.nom || 'Professeur'}
+                                  Prof: {seance.professeur?.nom || 'Professeur'}
                                 </div>
                               </div>
                             ) : null}
@@ -548,7 +548,6 @@ const SeancesEtudiant = () => {
           </div>
         ) : (
           <div style={styles.emptyState}>
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>📚</div>
             <div style={{ fontSize: '18px', marginBottom: '10px' }}>Aucune séance programmée</div>
             <div>Votre emploi du temps sera affiché ici une fois que vos cours seront programmés.</div>
           </div>

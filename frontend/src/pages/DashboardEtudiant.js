@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import Sidebaretudiant from '../components/sidebaretudiant';
 import Headeretudiant from '../components/Headeretudiant';
 import ModalPaiementExpire from '../components/ModalPaiementExpire';
+import ModalEmploiSemaine from '../components/ModalEmploiSemaine';
 
 import './AdminDashboard.css';
 
@@ -357,6 +358,7 @@ const DashboardEtudiant = () => {
       <WelcomeModal />
       
       <ModalPaiementExpire />
+      <ModalEmploiSemaine />
 
       <Sidebaretudiant onLogout={handleLogout} />
 

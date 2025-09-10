@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Send, User, Search, X, Bell, Trash2, MoreVertical, Check, CheckCheck, Paperclip , Mic } from 'lucide-react';
+import { Send, User, Search, X, Bell, Trash2, MoreVertical, Check, CheckCheck, Paperclip, Mic, Menu, ArrowLeft } from 'lucide-react';
 import './message.css';
 import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeu
 const handleLogout = () => {
@@ -8,6 +8,22 @@ const handleLogout = () => {
 };
 
 const MicIcon = Mic;
+
+// Hook pour détecter la taille d'écran
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isMobile;
+};
 
 const formatTimeAgo = (dateString) => {
   const date = new Date(dateString);
@@ -191,6 +207,11 @@ const MessageProf = () => {
 const [isRecording, setIsRecording] = useState(false);
 const [mediaRecorder, setMediaRecorder] = useState(null);
 const [audioBlob, setAudioBlob] = useState(null);
+
+// États pour la navigation mobile
+const [showSidebar, setShowSidebar] = useState(false);
+const [showStudentList, setShowStudentList] = useState(true);
+const isMobile = useIsMobile();
 
   // ✅ Fonction pour faire défiler vers le bas
   const scrollToBottom = () => {
@@ -604,28 +625,54 @@ const stopRecording = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex',           background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)'
- }}> <Sidebar onLogout={handleLogout} />
-      <div style={{ flexGrow: 1, padding: '20px' }}>
-    <div style={{
-  display: 'flex',
-  justifyContent: 'center',
-  backgroundColor: 'white',
-  padding: '12px 20px',
-  borderRadius: '12px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  marginBottom: '20px'
-}}>
-  <h2 style={{
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1c1e21',
-    textAlign: 'center',
-    margin: 0
-  }}>
-     Messagerie Étudiants
-  </h2>
-</div>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex',
+      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
+      position: 'relative'
+    }}> 
+      {!isMobile && <Sidebar onLogout={handleLogout} />}
+      
+      <div style={{ flexGrow: 1, padding: isMobile ? '10px' : '20px' }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: isMobile ? 'space-between' : 'center',
+          alignItems: 'center',
+          backgroundColor: 'white',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          marginBottom: '20px'
+        }}>
+          {isMobile && (
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '6px',
+                color: '#1c1e21'
+              }}
+            >
+              <Menu size={24} />
+            </button>
+          )}
+          
+          <h2 style={{
+            fontSize: isMobile ? '20px' : '24px',
+            fontWeight: 'bold',
+            color: '#1c1e21',
+            textAlign: 'center',
+            margin: 0,
+            flex: isMobile ? 1 : 'none'
+          }}>
+            Messagerie Étudiants
+          </h2>
+          
+          {isMobile && <div style={{ width: '40px' }} />}
+        </div>
 
 
         
@@ -658,14 +705,27 @@ const stopRecording = () => {
           </div>
         )}
         
-        <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 100px)' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: isMobile ? '0' : '16px', 
+          height: 'calc(100vh - 100px)',
+          position: 'relative'
+        }}>
           {/* ✅ Sidebar des étudiants */}
           <div style={{ 
-            width: '360px', 
+            width: isMobile ? '100%' : '360px',
             backgroundColor: 'white', 
-            borderRadius: '8px', 
+            borderRadius: isMobile ? '0' : '8px', 
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', 
-            overflow: 'hidden' 
+            overflow: 'hidden',
+            position: isMobile ? 'absolute' : 'relative',
+            top: isMobile ? '0' : 'auto',
+            left: isMobile ? '0' : 'auto',
+            height: isMobile ? '100%' : 'auto',
+            zIndex: isMobile ? 1000 : 'auto',
+            display: isMobile ? (showStudentList ? 'block' : 'none') : 'block',
+            transform: isMobile ? 'translateX(0)' : 'none',
+            transition: 'transform 0.3s ease'
           }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #e4e6ea' }}>
               <h3 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '12px', color: '#1c1e21' }}>
@@ -689,6 +749,25 @@ const stopRecording = () => {
                   }}
                 />
               </div>
+              {isMobile && selectedEtudiant && (
+                <button
+                  onClick={() => setShowStudentList(false)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: 'none',
+                    backgroundColor: '#0084ff',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    marginTop: '8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Voir la conversation
+                </button>
+              )}
             </div>
             
             <div style={{ height: 'calc(100% - 90px)', overflowY: 'auto' }}>
@@ -837,6 +916,25 @@ const stopRecording = () => {
                   alignItems: 'center', 
                   gap: '12px' 
                 }}>
+                  {isMobile && (
+                    <button
+                      onClick={() => setShowStudentList(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '8px',
+                        borderRadius: '50%',
+                        color: '#0084ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                  
                   <UserAvatar user={selectedEtudiant} size={40} />
                   <div style={{ flex: 1 }}>
                     <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: '#1c1e21' }}>
@@ -897,7 +995,7 @@ const stopRecording = () => {
                           )}
                           
                           <div style={{
-                            maxWidth: '70%',
+                            maxWidth: isMobile ? '85%' : '70%',
                             backgroundColor: isOwnMessage ? '#0084ff' : '#e4e6ea',
                             borderRadius: '18px',
                             padding: '8px 12px',
@@ -1280,6 +1378,42 @@ const stopRecording = () => {
         </div>
       </div>
       
+      {/* Sidebar mobile overlay */}
+      {isMobile && (
+        <>
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: showSidebar ? 0 : '-280px',
+              width: '280px',
+              height: '100vh',
+              backgroundColor: 'white',
+              zIndex: 9999,
+              transition: 'left 0.3s ease',
+              boxShadow: showSidebar ? '2px 0 10px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            <Sidebar onLogout={handleLogout} />
+          </div>
+          
+          {showSidebar && (
+            <div
+              onClick={() => setShowSidebar(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 9998
+              }}
+            />
+          )}
+        </>
+      )}
+      
       {/* Modal de confirmation de suppression */}
       <ConfirmModal
         show={showConfirmModal}
@@ -1339,6 +1473,26 @@ const stopRecording = () => {
         .hover-effect:hover {
           transform: translateY(-1px);
           box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Media queries pour mobile */
+        @media (max-width: 768px) {
+          .message-container {
+            padding: 8px !important;
+          }
+          
+          .student-item {
+            padding: 12px 16px !important;
+          }
+          
+          .message-bubble {
+            font-size: 14px !important;
+            padding: 8px 12px !important;
+          }
+          
+          .file-preview {
+            padding: 6px 8px !important;
+          }
         }
       `}</style>
     </div>

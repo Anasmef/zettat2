@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock } from 'lucide-react';
+import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download } from 'lucide-react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 
 const ListePresences = () => {
@@ -26,6 +27,7 @@ const [dateTo, setDateTo] = useState('');
   const [availablePeriodes, setAvailablePeriodes] = useState([]); // 🆕
   const [professeurFilter, setProfesseurFilter] = useState(''); // 🆕 Nouveau filtre
   const [availableProfesseurs, setAvailableProfesseurs] = useState([]); // 🆕
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     const fetchPresences = async () => {
@@ -220,6 +222,163 @@ const getMoisOptions = () => {
   }
 
   return options;
+};
+
+// Fonction générale d'export Excel
+const exportToExcel = (data, filename, sheetName = 'Présences') => {
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+};
+
+// Export présences par jour
+const exportDailyPresences = (date, professorName = null) => {
+  const sessionsOfDay = filteredSessions.filter(session => {
+    const sessionDate = new Date(session.date).toDateString();
+    const filterDate = new Date(date).toDateString();
+    return sessionDate === filterDate && 
+           (!professorName || session.nomProfesseur === professorName);
+  });
+
+  const data = [];
+  sessionsOfDay.forEach(session => {
+    session.presences.forEach(p => {
+      data.push({
+        'Date': formatDate(session.date),
+        'Classe': session.cours,
+        'Matière': session.matiere || 'N/A',
+        'Professeur': session.nomProfesseur || 'N/A',
+        'Période': session.presences[0]?.periode || 'N/A',
+        'Heure': session.presences[0]?.heure || 'N/A',
+        'Étudiant': p.etudiant?.nomComplet || 'N/A',
+        'Présent': p.present ? 'Oui' : 'Non',
+        'Remarque': p.remarque || ''
+      });
+    });
+  });
+
+  const filename = professorName 
+    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName}`
+    : `presences_${formatDate(date).replace(/\//g, '-')}`;
+  
+  exportToExcel(data, filename);
+};
+
+// Export présences par mois avec détails des étudiants
+const exportMonthlyPresences = (month, year) => {
+  const monthSessions = filteredSessions.filter(session => {
+    const sessionDate = new Date(session.date);
+    return sessionDate.getMonth() + 1 === parseInt(month) && 
+           sessionDate.getFullYear() === parseInt(year);
+  });
+
+  const data = [];
+  
+  monthSessions.forEach(session => {
+    session.presences.forEach(p => {
+      data.push({
+        'Date': formatDate(session.date),
+        'Classe': session.cours,
+        'Matière': session.matiere || 'N/A',
+        'Professeur': session.nomProfesseur || 'N/A',
+        'Période': session.presences[0]?.periode || 'N/A',
+        'Heure': session.presences[0]?.heure || 'N/A',
+        'Étudiant': p.etudiant?.nomComplet || 'N/A',
+        'Statut': p.present ? 'Présent' : 'Absent',
+        'Remarque': p.remarque || '',
+        'Total Étudiants Session': session.totalCount,
+        'Présents Session': session.presentCount,
+        'Taux Présence Session': `${session.attendanceRate}%`
+      });
+    });
+  });
+
+  // Tri par date puis par classe
+  data.sort((a, b) => {
+    const dateA = new Date(a.Date.split('/').reverse().join('-'));
+    const dateB = new Date(b.Date.split('/').reverse().join('-'));
+    if (dateA.getTime() !== dateB.getTime()) {
+      return dateA - dateB;
+    }
+    return a.Classe.localeCompare(b.Classe);
+  });
+
+  const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
+  exportToExcel(data, `presences_${monthName}_${year}_detaillees`);
+};
+
+// Export présences par mois avec feuilles séparées (résumé + détails)
+const exportMonthlyPresencesWithSummary = (month, year) => {
+  const monthSessions = filteredSessions.filter(session => {
+    const sessionDate = new Date(session.date);
+    return sessionDate.getMonth() + 1 === parseInt(month) && 
+           sessionDate.getFullYear() === parseInt(year);
+  });
+
+  // Feuille 1: Résumé par session
+  const summaryData = monthSessions.map(session => ({
+    'Date': formatDate(session.date),
+    'Classe': session.cours,
+    'Matière': session.matiere || 'N/A',
+    'Professeur': session.nomProfesseur || 'N/A',
+    'Période': session.presences[0]?.periode || 'N/A',
+    'Total Étudiants': session.totalCount,
+    'Présents': session.presentCount,
+    'Absents': session.totalCount - session.presentCount,
+    'Taux de Présence': `${session.attendanceRate}%`
+  }));
+
+  // Feuille 2: Détails par étudiant
+  const detailsData = [];
+  monthSessions.forEach(session => {
+    session.presences.forEach(p => {
+      detailsData.push({
+        'Date': formatDate(session.date),
+        'Classe': session.cours,
+        'Matière': session.matiere || 'N/A',
+        'Professeur': session.nomProfesseur || 'N/A',
+        'Étudiant': p.etudiant?.nomComplet || 'N/A',
+        'Statut': p.present ? 'Présent' : 'Absent',
+        'Remarque': p.remarque || ''
+      });
+    });
+  });
+
+  // Création du fichier Excel avec plusieurs feuilles
+  const wb = XLSX.utils.book_new();
+  
+  const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Résumé');
+  
+  const wsDetails = XLSX.utils.json_to_sheet(detailsData);
+  XLSX.utils.book_append_sheet(wb, wsDetails, 'Détails');
+
+  const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
+  XLSX.writeFile(wb, `presences_${monthName}_${year}_complet.xlsx`);
+};
+
+// Export par professeur
+const exportByProfessor = (professorName) => {
+  const professorSessions = filteredSessions.filter(session => 
+    session.nomProfesseur === professorName
+  );
+
+  const data = [];
+  professorSessions.forEach(session => {
+    session.presences.forEach(p => {
+      data.push({
+        'Date': formatDate(session.date),
+        'Classe': session.cours,
+        'Matière': session.matiere || 'N/A',
+        'Étudiant': p.etudiant?.nomComplet || 'N/A',
+        'Présent': p.present ? 'Oui' : 'Non',
+        'Remarque': p.remarque || ''
+      });
+    });
+  });
+
+  exportToExcel(data, `presences_${professorName.replace(/\s+/g, '_')}`);
 };
 
   const styles = {
@@ -651,15 +810,30 @@ const getMoisOptions = () => {
                 />
               </button>
               
-              {(searchTerm || dateFilter || coursFilter || presenceRateFilter || moisScolaireFilter || dateFrom || dateTo || matiereFilter || periodeFilter || professeurFilter) && (
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {(searchTerm || dateFilter || coursFilter || presenceRateFilter || moisScolaireFilter || dateFrom || dateTo || matiereFilter || periodeFilter || professeurFilter) && (
+                  <button
+                    onClick={clearFilters}
+                    style={styles.clearButton}
+                    className="clear-button"
+                  >
+                    Effacer les filtres
+                  </button>
+                )}
+                
                 <button
-                  onClick={clearFilters}
-                  style={styles.clearButton}
-                  className="clear-button"
+                  onClick={() => setShowExportModal(true)}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#059669',
+                    color: 'white',
+                    gap: '8px'
+                  }}
                 >
-                  Effacer les filtres
+                  <Download size={16} />
+                  Exporter Excel
                 </button>
-              )}
+              </div>
             </div>
 
             {/* Filtres avancés */}
@@ -1124,6 +1298,190 @@ const getMoisOptions = () => {
                 >
                   Fermer
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Export Excel */}
+        {showExportModal && (
+          <div style={styles.modal}>
+            <div style={styles.modalContent}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+                  Exporter vers Excel
+                </h3>
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  style={styles.closeButton}
+                  className="close-button"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div style={styles.modalBody}>
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  {/* Export journalier */}
+                  <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
+                      Export par jour
+                    </h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'end' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Date</label>
+                        <input
+                          type="date"
+                          id="exportDate"
+                          style={styles.filterInput}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Professeur (optionnel)</label>
+                        <select id="exportProfessor" style={styles.filterSelect}>
+                          <option value="">Tous les professeurs</option>
+                          {availableProfesseurs.map(prof => (
+                            <option key={prof} value={prof}>{prof}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const date = document.getElementById('exportDate').value;
+                          const prof = document.getElementById('exportProfessor').value;
+                          if (date) {
+                            exportDailyPresences(date, prof || null);
+                            setShowExportModal(false);
+                          }
+                        }}
+                        style={styles.button}
+                      >
+                        Exporter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Export mensuel */}
+                  <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
+                      Export par mois
+                    </h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'end', marginBottom: '12px' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Mois</label>
+                        <select id="exportMonth" style={styles.filterSelect}>
+                          {Array.from({length: 12}, (_, i) => (
+                            <option key={i+1} value={i+1}>
+                              {new Date(0, i).toLocaleString('fr-FR', { month: 'long' })}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Année</label>
+                        <select id="exportYear" style={styles.filterSelect}>
+                          {Array.from({length: 3}, (_, i) => {
+                            const year = new Date().getFullYear() - 1 + i;
+                            return <option key={year} value={year}>{year}</option>;
+                          })}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          const month = document.getElementById('exportMonth').value;
+                          const year = document.getElementById('exportYear').value;
+                          exportMonthlyPresences(month, year);
+                          setShowExportModal(false);
+                        }}
+                        style={styles.button}
+                      >
+                        Export détaillé
+                      </button>
+                      <button
+                        onClick={() => {
+                          const month = document.getElementById('exportMonth').value;
+                          const year = document.getElementById('exportYear').value;
+                          exportMonthlyPresencesWithSummary(month, year);
+                          setShowExportModal(false);
+                        }}
+                        style={{
+                          ...styles.button,
+                          backgroundColor: '#7c3aed',
+                          color: 'white'
+                        }}
+                      >
+                        Export avec résumé
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Export par professeur */}
+                  <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
+                      Export par professeur
+                    </h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'end' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Professeur</label>
+                        <select id="exportProfOnly" style={styles.filterSelect}>
+                          <option value="">Sélectionner un professeur</option>
+                          {availableProfesseurs.map(prof => (
+                            <option key={prof} value={prof}>{prof}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const prof = document.getElementById('exportProfOnly').value;
+                          if (prof) {
+                            exportByProfessor(prof);
+                            setShowExportModal(false);
+                          }
+                        }}
+                        style={styles.button}
+                      >
+                        Exporter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Export complet */}
+                  <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
+                    <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
+                      Export complet (données actuellement filtrées)
+                    </h4>
+                    <button
+                      onClick={() => {
+                        const data = [];
+                        filteredSessions.forEach(session => {
+                          session.presences.forEach(p => {
+                            data.push({
+                              'Date': formatDate(session.date),
+                              'Classe': session.cours,
+                              'Matière': session.matiere || 'N/A',
+                              'Professeur': session.nomProfesseur || 'N/A',
+                              'Étudiant': p.etudiant?.nomComplet || 'N/A',
+                              'Présent': p.present ? 'Oui' : 'Non',
+                              'Remarque': p.remarque || ''
+                            });
+                          });
+                        });
+                        exportToExcel(data, 'presences_complet');
+                        setShowExportModal(false);
+                      }}
+                      style={{
+                        ...styles.button,
+                        backgroundColor: '#dc2626',
+                        color: 'white'
+                      }}
+                    >
+                      Exporter toutes les données filtrées
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

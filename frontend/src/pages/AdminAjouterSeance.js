@@ -9,11 +9,12 @@ const handleLogout = () => {
 
 const EmploiDuTemps = () => {
   const [jours] = useState(['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']);
+  
+  // ✅ MODIFIÉ: Nouveaux créneaux horaires
   const [creneaux] = useState([
-    { debut: '08:00', fin: '10:00', label: '8h - 10h' },
-    { debut: '10:00', fin: '12:00', label: '10h - 12h' },
-    { debut: '14:00', fin: '16:00', label: '14h - 16h' },
-    { debut: '16:00', fin: '18:00', label: '16h - 18h' }
+    { debut: '08:45', fin: '10:45', label: '8h45 - 10h45' },
+    { debut: '11:00', fin: '13:00', label: '11h00 - 13h00' },
+    { debut: '14:00', fin: '16:00', label: '14h00 - 16h00' }
   ]);
   
   const [coursList, setCoursList] = useState([]);
@@ -446,7 +447,6 @@ const EmploiDuTemps = () => {
       color: '#374151',
       margin: 0
     },
-    // ✅ NOUVEAU: Style pour afficher les professeurs assignés
     courseInfo: {
       display: 'flex',
       flexDirection: 'column',
@@ -492,13 +492,13 @@ const EmploiDuTemps = () => {
       fontWeight: '600',
       color: '#374151',
       border: '1px solid #e5e7eb',
-      minWidth: '100px'
+      minWidth: '120px' // ✅ AUGMENTÉ pour les nouveaux horaires
     },
     cell: {
       border: '1px solid #e5e7eb',
       padding: '8px',
       verticalAlign: 'top',
-      height: '120px',
+      height: '140px', // ✅ AUGMENTÉ légèrement pour plus d'espace
       width: 'calc(100% / 7)',
       position: 'relative'
     },
@@ -516,7 +516,6 @@ const EmploiDuTemps = () => {
       fontSize: '11px',
       backgroundColor: '#fff'
     },
-    // ✅ NOUVEAU: Style pour champ matière en lecture seule
     selectDisabled: {
       width: '100%',
       padding: '4px',
@@ -554,6 +553,11 @@ const EmploiDuTemps = () => {
       color: '#92400e',
       border: '1px solid #fbbf24'
     },
+    infoMessage: {
+      backgroundColor: '#dbeafe',
+      color: '#1e40af',
+      border: '1px solid #93c5fd'
+    },
     loading: {
       textAlign: 'center',
       padding: '50px',
@@ -584,6 +588,9 @@ const EmploiDuTemps = () => {
           <Calendar size={24} style={{ verticalAlign: 'middle', marginRight: '10px' }} />
           Emploi du Temps - Gestion des Séances
         </h1>
+        <div style={{ marginTop: '10px', fontSize: '14px', color: '#6b7280' }}>
+          ⏰ Nouveaux créneaux: 8h45-10h45 | 11h00-13h00 | 14h00-16h00
+        </div>
       </div>
 
       <div style={styles.controls}>
@@ -594,7 +601,6 @@ const EmploiDuTemps = () => {
           </h3>
           <div style={styles.coursGrid}>
             {coursList.map(cours => {
-              // ✅ Obtenir les professeurs assignés pour ce cours
               const professeursAssignes = getProfesseursForCours(cours._id);
               
               return (
@@ -663,7 +669,8 @@ const EmploiDuTemps = () => {
         <div style={{
           ...styles.message,
           ...(message.type === 'error' ? styles.errorMessage : 
-              message.type === 'warning' ? styles.warningMessage : 
+              message.type === 'warning' ? styles.warningMessage :
+              message.type === 'info' ? styles.infoMessage :
               styles.successMessage)
         }}>
           {message.text}
@@ -675,7 +682,6 @@ const EmploiDuTemps = () => {
         const cours = coursList.find(c => c._id === coursId);
         if (!cours) return null;
 
-        // ✅ Obtenir les professeurs assignés pour ce cours
         const professeursAssignes = getProfesseursForCours(coursId);
 
         return (
@@ -685,7 +691,6 @@ const EmploiDuTemps = () => {
                 <div style={styles.courseTitle}>
                   📚 {cours.nom}
                 </div>
-                {/* ✅ NOUVEAU: Afficher la liste des professeurs assignés */}
                 <div style={styles.professeursAssignes}>
                   {professeursAssignes.length > 0 
                     ? `Professeurs: ${professeursAssignes.map(p => `${p.nom} (${p.matiere})`).join(', ')}`
@@ -737,7 +742,6 @@ const EmploiDuTemps = () => {
                         return (
                           <td key={jour} style={styles.cell}>
                             <div style={styles.cellContent}>
-                              {/* ✅ MODIFIÉ: Sélection du professeur - filtré par cours */}
                               <select
                                 style={styles.select}
                                 value={seanceData.professeur || ''}
@@ -755,7 +759,6 @@ const EmploiDuTemps = () => {
                                 )}
                               </select>
 
-                              {/* ✅ MODIFIÉ: Champ matière - rempli automatiquement */}
                               <input
                                 style={seanceData.professeur ? styles.selectDisabled : styles.input}
                                 placeholder="Matière (auto-rempli)"
@@ -768,7 +771,6 @@ const EmploiDuTemps = () => {
                                 }
                               />
 
-                              {/* ✅ NOUVEAU: Champ salle */}
                               <input
                                 style={styles.input}
                                 placeholder="Salle..."

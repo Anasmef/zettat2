@@ -2,11 +2,28 @@ import React, { useEffect, useState, useRef } from 'react';
 import './message.css';
 import Sidebar from '../components/sidebaretudiant'; // ✅ ا
 
-import { Send, User, Search, X, Bell, Trash2, MoreVertical, Check, CheckCheck, Paperclip ,Mic} from 'lucide-react';
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
+import { Send, User, Search, X, Bell, Trash2, MoreVertical, Check, CheckCheck, Paperclip, Mic, ArrowLeft, Menu } from 'lucide-react';
+
+// Hook pour détecter la taille d'écran
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return isMobile;
+};
+
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/';
+};
 
 const formatTimeAgo = (dateString) => {
   const date = new Date(dateString);
@@ -185,10 +202,15 @@ const MessageEtudiant = () => {
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-const [isRecording, setIsRecording] = useState(false);
-const [mediaRecorder, setMediaRecorder] = useState(null);
-const [audioBlob, setAudioBlob] = useState(null);
-const audioChunksRef = useRef([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const audioChunksRef = useRef([]);
+  
+  // États pour la navigation mobile
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showProfList, setShowProfList] = useState(true);
+  const isMobile = useIsMobile();
 
   // ✅ Fonction pour faire défiler vers le bas
   const scrollToBottom = () => {
@@ -593,29 +615,55 @@ const stopRecording = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex',background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)' }}>
-           {/* Header */}           <Sidebar onLogout={handleLogout} />
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+      position: 'relative'
+    }}>
+      {/* Header */}           
+      <Sidebar onLogout={handleLogout} />
 
       <div style={{ flexGrow: 1, padding: '20px' }}>
-       <div style={{
-  display: 'flex',
-  justifyContent: 'center',
-  backgroundColor: 'white',
-  padding: '12px 20px',
-  borderRadius: '12px',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  marginBottom: '20px'
-}}>
-  <h2 style={{
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#1c1e21',
-    textAlign: 'center',
-    margin: 0
-  }}>
-     Messagerie Professeurs
-  </h2>
-</div>
+        <div style={{
+          display: 'flex',
+          justifyContent: isMobile ? 'space-between' : 'center',
+          alignItems: 'center',
+          backgroundColor: 'white',
+          padding: '12px 20px',
+          borderRadius: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          marginBottom: '20px'
+        }}>
+          {isMobile && (
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '6px',
+                color: '#1c1e21'
+              }}
+            >
+              <Menu size={24} />
+            </button>
+          )}
+          
+          <h2 style={{
+            fontSize: isMobile ? '20px' : '24px',
+            fontWeight: 'bold',
+            color: '#1c1e21',
+            textAlign: 'center',
+            margin: 0,
+            flex: isMobile ? 1 : 'none'
+          }}>
+            Messagerie Professeurs
+          </h2>
+          
+          {isMobile && <div style={{ width: '40px' }} />}
+        </div>
 
         {/* Affichage des erreurs */}
         {error && (
@@ -646,14 +694,27 @@ const stopRecording = () => {
           </div>
         )}
         
-        <div style={{ display: 'flex', gap: '16px', height: 'calc(100vh - 100px)' }}>
+        <div style={{ 
+          display: 'flex', 
+          gap: isMobile ? '0' : '16px', 
+          height: 'calc(100vh - 100px)',
+          position: 'relative'
+        }}>
           {/* ✅ Sidebar des professeurs */}
           <div style={{ 
-            width: '360px', 
+            width: isMobile ? '100%' : '360px',
             backgroundColor: 'white', 
-            borderRadius: '8px', 
+            borderRadius: isMobile ? '0' : '8px', 
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', 
-            overflow: 'hidden' 
+            overflow: 'hidden',
+            position: isMobile ? 'absolute' : 'relative',
+            top: isMobile ? '0' : 'auto',
+            left: isMobile ? '0' : 'auto',
+            height: isMobile ? '100%' : 'auto',
+            zIndex: isMobile ? 1000 : 'auto',
+            display: isMobile ? (showProfList ? 'block' : 'none') : 'block',
+            transform: isMobile ? 'translateX(0)' : 'none',
+            transition: 'transform 0.3s ease'
           }}>
             <div style={{ padding: '16px', borderBottom: '1px solid #e4e6ea' }}>
               <h3 style={{ fontSize: '17px', fontWeight: '600', marginBottom: '12px', color: '#1c1e21' }}>
@@ -677,6 +738,25 @@ const stopRecording = () => {
                   }}
                 />
               </div>
+              {isMobile && selectedProf && (
+                <button
+                  onClick={() => setShowProfList(false)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: 'none',
+                    backgroundColor: '#0084ff',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    marginTop: '8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Voir la conversation
+                </button>
+              )}
             </div>
             
             <div style={{ height: 'calc(100% - 90px)', overflowY: 'auto' }}>
@@ -810,10 +890,16 @@ const stopRecording = () => {
           <div style={{ 
             flex: 1, 
             backgroundColor: 'white', 
-            borderRadius: '8px', 
+            borderRadius: isMobile ? '0' : '8px', 
             boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)', 
-            display: 'flex', 
-            flexDirection: 'column' 
+            display: isMobile ? (showProfList ? 'none' : 'flex') : 'flex',
+            flexDirection: 'column',
+            position: isMobile ? 'absolute' : 'relative',
+            top: isMobile ? '0' : 'auto',
+            left: isMobile ? '0' : 'auto',
+            width: isMobile ? '100%' : 'auto',
+            height: isMobile ? '100%' : 'auto',
+            zIndex: isMobile ? 999 : 'auto'
           }}>
             {selectedProf ? (
               <>
@@ -824,6 +910,25 @@ const stopRecording = () => {
                   alignItems: 'center', 
                   gap: '12px' 
                 }}>
+                  {isMobile && (
+                    <button
+                      onClick={() => setShowProfList(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '8px',
+                        borderRadius: '50%',
+                        color: '#0084ff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                  )}
+                  
                   <UserAvatar user={selectedProf} size={40} />
                   <div style={{ flex: 1 }}>
                     <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: '#1c1e21' }}>
@@ -887,7 +992,7 @@ const stopRecording = () => {
                           )}
                           
                           <div style={{
-                            maxWidth: '70%',
+                            maxWidth: isMobile ? '85%' : '70%',
                             position: 'relative'
                           }}>
                             <div
@@ -1264,6 +1369,42 @@ const stopRecording = () => {
         </div>
       </div>
       
+      {/* Sidebar mobile overlay */}
+      {isMobile && (
+        <>
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: showSidebar ? 0 : '-280px',
+              width: '280px',
+              height: '100vh',
+              backgroundColor: 'white',
+              zIndex: 9999,
+              transition: 'left 0.3s ease',
+              boxShadow: showSidebar ? '2px 0 10px rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            <Sidebar onLogout={handleLogout} />
+          </div>
+          
+          {showSidebar && (
+            <div
+              onClick={() => setShowSidebar(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100vw',
+                height: '100vh',
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                zIndex: 9998
+              }}
+            />
+          )}
+        </>
+      )}
+      
       {/* Modal de confirmation pour supprimer un message */}
       <ConfirmModal
         show={showConfirmModal}
@@ -1304,6 +1445,30 @@ const stopRecording = () => {
         
         ::-webkit-scrollbar-thumb:hover {
           background: #a8a8a8;
+        }
+
+        @media (max-width: 768px) {
+          .message-container {
+            padding: 8px !important;
+          }
+          
+          .prof-item {
+            padding: 12px 16px !important;
+          }
+          
+          .message-bubble {
+            font-size: 14px !important;
+            padding: 8px 12px !important;
+          }
+          
+          .input-container {
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          
+          textarea {
+            min-height: 40px !important;
+          }
         }
       `}</style>
     </div>

@@ -9,11 +9,12 @@ const SeancesProfesseur = () => {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  
+  // Nouveaux créneaux horaires mis à jour
   const creneaux = [
-    { debut: '08:00', fin: '10:00', label: '8h - 10h' },
-    { debut: '10:00', fin: '12:00', label: '10h - 12h' },
-    { debut: '14:00', fin: '16:00', label: '14h - 16h' },
-    { debut: '16:00', fin: '18:00', label: '16h - 18h' }
+    { debut: '08:45', fin: '10:45', label: '8h45 - 10h45' },
+    { debut: '11:00', fin: '13:00', label: '11h00 - 13h00' },
+    { debut: '14:00', fin: '16:00', label: '14h00 - 16h00' }
   ];
 
   // Fonction pour obtenir les dates de la semaine
@@ -135,7 +136,7 @@ const SeancesProfesseur = () => {
     link.click();
     document.body.removeChild(link);
 
-    setMessage({ type: 'success', text: '📁 Emploi du temps téléchargé avec succès !' });
+    setMessage({ type: 'success', text: 'Emploi du temps téléchargé avec succès !' });
     setTimeout(() => setMessage({ type: '', text: '' }), 3000);
   };
 
@@ -205,7 +206,7 @@ const SeancesProfesseur = () => {
     container: {
       display: 'flex',
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
     },
     content: {
       flexGrow: 1,
@@ -345,20 +346,20 @@ const SeancesProfesseur = () => {
       fontWeight: '600',
       color: '#374151',
       border: '1px solid #e5e7eb',
-      minWidth: '100px'
+      minWidth: '120px'
     },
     cell: {
       border: '1px solid #e5e7eb',
       padding: '8px',
       verticalAlign: 'top',
-      height: '110px',
+      height: '120px',
       width: 'calc(100% / 7)',
       position: 'relative'
     },
     seanceCard: {
       backgroundColor: '#d1fae5',
       borderRadius: '4px',
-      padding: '6px',
+      padding: '8px',
       fontSize: '11px',
       height: '100%',
       display: 'flex',
@@ -369,26 +370,20 @@ const SeancesProfesseur = () => {
     coursName: {
       fontWeight: '600',
       color: '#065f46',
-      marginBottom: '2px',
+      marginBottom: '3px',
       fontSize: '12px'
     },
     matiereName: {
       fontWeight: '500',
       color: '#7c3aed',
-      marginBottom: '2px',
-      fontSize: '10px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '2px'
+      marginBottom: '3px',
+      fontSize: '10px'
     },
     salleName: {
       fontWeight: '500',
       color: '#dc2626',
-      marginBottom: '2px',
-      fontSize: '10px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '2px'
+      marginBottom: '3px',
+      fontSize: '10px'
     },
     message: {
       padding: '12px 16px',
@@ -432,7 +427,7 @@ const SeancesProfesseur = () => {
           <div style={styles.loading}>
             <div>Chargement de votre emploi du temps...</div>
             <div style={{ marginTop: '10px', fontSize: '14px' }}>
-              Récupération de vos classe depuis la base de données
+              Récupération de vos classes depuis la base de données
             </div>
           </div>
         </div>
@@ -451,6 +446,9 @@ const SeancesProfesseur = () => {
             <GraduationCap size={24} style={{ verticalAlign: 'middle', marginRight: '10px' }} />
             Mes Classes - Emploi du Temps
           </h1>
+          <div style={{ marginTop: '10px', fontSize: '14px', color: '#6b7280' }}>
+            Nouveaux créneaux: 8h45-10h45 | 11h00-13h00 | 14h00-16h00
+          </div>
         </div>
 
         {/* Prochaine séance */}
@@ -481,7 +479,7 @@ const SeancesProfesseur = () => {
             <div style={styles.statNumber}>{stats.totalCours}</div>
             <div style={styles.statLabel}>
               <Book size={16} style={{ verticalAlign: 'middle', marginRight: '5px' }} />
-              Classes différents
+              Classes différentes
             </div>
           </div>
           <div style={styles.statCard}>
@@ -566,7 +564,7 @@ const SeancesProfesseur = () => {
         {seances.length > 0 ? (
           <div style={styles.tableContainer}>
             <div style={styles.tableTitle}>
-               Mes Cours - Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[5])}
+              Mes Cours - Semaine du {formatDate(weekDates[0])} au {formatDate(weekDates[5])}
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={styles.table}>
@@ -599,18 +597,14 @@ const SeancesProfesseur = () => {
                                   <div style={styles.coursName}>
                                     {seance.cours || 'Cours'}
                                   </div>
-                                  {/* Affichage de la matière avec icône */}
                                   {seance.matiere && (
                                     <div style={styles.matiereName}>
-                                      <BookOpen size={10} />
                                       {seance.matiere}
                                     </div>
                                   )}
-                                  {/* Affichage de la salle avec icône */}
                                   {seance.salle && (
                                     <div style={styles.salleName}>
-                                      <MapPin size={10} />
-                                      {seance.salle}
+                                      Salle: {seance.salle}
                                     </div>
                                   )}
                                 </div>
@@ -627,7 +621,6 @@ const SeancesProfesseur = () => {
           </div>
         ) : (
           <div style={styles.emptyState}>
-            <div style={{ fontSize: '48px', marginBottom: '10px' }}>👨‍🏫</div>
             <div style={{ fontSize: '18px', marginBottom: '10px' }}>Aucun cours programmé</div>
             <div>Vos cours apparaîtront ici une fois qu'ils seront assignés par l'administration.</div>
           </div>

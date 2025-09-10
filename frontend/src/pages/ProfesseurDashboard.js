@@ -5,6 +5,7 @@ import './AdminDashboard.css'; // ✅ Utilisation du même fichier CSS
 import SidebarProf from '../components/SidebarProf';
 import { useNavigate } from 'react-router-dom';
 import HeaderProf from '../components/Headerprof';
+import ModalEmploiSemaine from '../components/ModalEmploiSemaine';
 
 const ProfesseurDashboard = () => {
   const [etudiants, setEtudiants] = useState([]);
@@ -332,6 +333,9 @@ useEffect(() => {
 
       {/* Modal de bienvenue */}
       <WelcomeModal />
+      
+      {/* Modal Emploi du Temps */}
+      <ModalEmploiSemaine />
 
       {/* Header */} <SidebarProf onLogout={handleLogout} /> {/* ✅ Utilisation du composant SidebarProfesseur */}
       <div className="dashboard-header">
