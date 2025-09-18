@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, BookOpen, User, Eye, X, Users, GraduationCap, Trash2, Filter, Search, Download } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import * as XLSX from 'xlsx';
 
 const ListeCours = () => {
   const [cours, setCours] = useState([]);
@@ -225,48 +226,42 @@ const ListeCours = () => {
 
   // Fonction pour exporter les cours en Excel
   const exportCoursToExcel = () => {
-    const getEtudiantsForCourse = (courseName) =>
-      etudiants.filter(e => {
-        const c = e.cours;
-        if (Array.isArray(c)) return c.includes(courseName);
-        if (typeof c === 'string') {
-          return c.split(',').map(s => s.trim()).includes(courseName);
-        }
-        return false;
+    try {
+      const getEtudiantsForCourse = (courseName) =>
+        etudiants.filter(e => {
+          const c = e.cours;
+          if (Array.isArray(c)) return c.includes(courseName);
+          if (typeof c === 'string') {
+            return c.split(',').map(s => s.trim()).includes(courseName);
+          }
+          return false;
+        });
+
+      // Préparer les données pour Excel
+      const worksheetData = [
+        ["Nom de la Classe", "Professeurs", "Nombre d'Étudiants", "Liste des Étudiants"]
+      ];
+
+      coursFiltres.forEach(c => {
+        const profs = Array.isArray(c.professeur)
+          ? c.professeur.join(', ')
+          : (c.professeur || 'Non assigné');
+        const etuds = getEtudiantsForCourse(c.nom);
+        const etudsNames = etuds.map(e => e.nomComplet || e.nom || '').join(', ');
+        
+        worksheetData.push([
+          c.nom,
+          profs,
+          etuds.length,
+          etudsNames
+        ]);
       });
 
-    // Préparer les données pour Excel
-    const worksheetData = [
-      ["Nom de la Classe", "Professeurs", "Nombre d'Étudiants", "Liste des Étudiants"]
-    ];
-
-    coursFiltres.forEach(c => {
-      const profs = Array.isArray(c.professeur)
-        ? c.professeur.join(', ')
-        : (c.professeur || 'Non assigné');
-      const etuds = getEtudiantsForCourse(c.nom);
-      const etudsNames = etuds.map(e => e.nomComplet || e.nom || '').join(', ');
-      
-      worksheetData.push([
-        c.nom,
-        profs,
-        etuds.length,
-        etudsNames
-      ]);
-    });
-
-    try {
-      // Vérifier si XLSX est disponible
-      if (typeof window.XLSX === 'undefined') {
-        alert('La bibliothèque Excel n\'est pas chargée. Veuillez rafraîchir la page.');
-        return;
-      }
-
       // Créer un nouveau workbook
-      const wb = window.XLSX.utils.book_new();
+      const wb = XLSX.utils.book_new();
       
       // Convertir les données en worksheet
-      const ws = window.XLSX.utils.aoa_to_sheet(worksheetData);
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
 
       // Définir les largeurs de colonnes
       ws['!cols'] = [
@@ -277,7 +272,7 @@ const ListeCours = () => {
       ];
 
       // Ajouter le worksheet au workbook
-      window.XLSX.utils.book_append_sheet(wb, ws, 'Classes');
+      XLSX.utils.book_append_sheet(wb, ws, 'Classes');
 
       // Générer le nom du fichier avec la date
       const date = new Date();
@@ -285,14 +280,78 @@ const ListeCours = () => {
       const fileName = `classes_${dateStr}.xlsx`;
 
       // Écrire le fichier
-      window.XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, fileName);
 
       // Message de succès
-      console.log('Fichier Excel exporté avec succès:', fileName);
+      alert('✅ Fichier Excel exporté avec succès: ' + fileName);
 
     } catch (error) {
       console.error('Erreur lors de l\'exportation Excel:', error);
-      alert('Erreur lors de l\'exportation du fichier Excel. Veuillez réessayer.');
+      exportAsCSV();
+    }
+  };
+
+  // Fonction de fallback pour exporter en CSV
+  const exportAsCSV = () => {
+    try {
+      const getEtudiantsForCourse = (courseName) =>
+        etudiants.filter(e => {
+          const c = e.cours;
+          if (Array.isArray(c)) return c.includes(courseName);
+          if (typeof c === 'string') {
+            return c.split(',').map(s => s.trim()).includes(courseName);
+          }
+          return false;
+        });
+
+      // Préparer les données CSV
+      let csvContent = "Nom de la Classe,Professeurs,Nombre d'Étudiants,Liste des Étudiants\n";
+
+      coursFiltres.forEach(c => {
+        const profs = Array.isArray(c.professeur)
+          ? c.professeur.join('; ')
+          : (c.professeur || 'Non assigné');
+        const etuds = getEtudiantsForCourse(c.nom);
+        const etudsNames = etuds.map(e => e.nomComplet || e.nom || '').join('; ');
+        
+        // Échapper les guillemets et ajouter des guillemets si nécessaire
+        const escapeCsv = (field) => {
+          if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+            return '"' + field.replace(/"/g, '""') + '"';
+          }
+          return field;
+        };
+
+        csvContent += [
+          escapeCsv(c.nom),
+          escapeCsv(profs),
+          etuds.length,
+          escapeCsv(etudsNames)
+        ].join(',') + '\n';
+      });
+
+      // Créer le blob et télécharger
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        
+        const date = new Date();
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        link.setAttribute('download', `classes_${dateStr}.csv`);
+        
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert('✅ Fichier CSV exporté avec succès');
+      }
+    } catch (error) {
+      console.error('Erreur lors de l\'exportation CSV:', error);
+      alert('❌ Erreur lors de l\'exportation. Veuillez réessayer.');
     }
   };
 
@@ -535,7 +594,7 @@ const ListeCours = () => {
     coursTitleHovered: {
       color: '#2563eb'
     },
-    professeurInfo: {
+    professeurSection: {
       display: 'flex',
       alignItems: 'center',
       gap: '0.5rem',
@@ -1161,7 +1220,7 @@ const ListeCours = () => {
                       {c.nom}
                     </h3>
                     
-                    <div style={styles.professeurInfo}>
+                    <div style={styles.professeurSection}>
                       <User size={16} />
                       <span>
                         {Array.isArray(c.professeur)
@@ -1313,16 +1372,8 @@ const ListeCours = () => {
                         setProfesseurSearch(e.target.value);
                         setShowProfesseurDropdown(e.target.value.length > 0);
                       }}
-                      onFocus={() => {
-                        if (professeurSearch.length > 0) {
-                          setShowProfesseurDropdown(true);
-                        }
-                      }}
                       style={styles.searchInput}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#3b82f6';
-                        e.target.style.backgroundColor = 'white';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                      onFocus={() => {
                         if (professeurSearch.length > 0) {
                           setShowProfesseurDropdown(true);
                         }
