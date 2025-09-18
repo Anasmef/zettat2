@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, BookOpen, User, Eye, X, Users, GraduationCap, Trash2, Filter, Search } from 'lucide-react';
+import { Plus, BookOpen, User, Eye, X, Users, GraduationCap, Trash2, Filter, Search, Download } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 const ListeCours = () => {
@@ -223,10 +223,83 @@ const ListeCours = () => {
     ? etudiants.filter(e => e.cours.includes(coursActuel.nom))
     : [];
 
+  // Fonction pour exporter les cours en Excel
+  const exportCoursToExcel = () => {
+    const getEtudiantsForCourse = (courseName) =>
+      etudiants.filter(e => {
+        const c = e.cours;
+        if (Array.isArray(c)) return c.includes(courseName);
+        if (typeof c === 'string') {
+          return c.split(',').map(s => s.trim()).includes(courseName);
+        }
+        return false;
+      });
+
+    // Préparer les données pour Excel
+    const worksheetData = [
+      ["Nom de la Classe", "Professeurs", "Nombre d'Étudiants", "Liste des Étudiants"]
+    ];
+
+    coursFiltres.forEach(c => {
+      const profs = Array.isArray(c.professeur)
+        ? c.professeur.join(', ')
+        : (c.professeur || 'Non assigné');
+      const etuds = getEtudiantsForCourse(c.nom);
+      const etudsNames = etuds.map(e => e.nomComplet || e.nom || '').join(', ');
+      
+      worksheetData.push([
+        c.nom,
+        profs,
+        etuds.length,
+        etudsNames
+      ]);
+    });
+
+    try {
+      // Vérifier si XLSX est disponible
+      if (typeof window.XLSX === 'undefined') {
+        alert('La bibliothèque Excel n\'est pas chargée. Veuillez rafraîchir la page.');
+        return;
+      }
+
+      // Créer un nouveau workbook
+      const wb = window.XLSX.utils.book_new();
+      
+      // Convertir les données en worksheet
+      const ws = window.XLSX.utils.aoa_to_sheet(worksheetData);
+
+      // Définir les largeurs de colonnes
+      ws['!cols'] = [
+        { wch: 30 }, // Nom de la classe
+        { wch: 40 }, // Professeurs
+        { wch: 20 }, // Nombre d'étudiants
+        { wch: 60 }  // Liste des étudiants
+      ];
+
+      // Ajouter le worksheet au workbook
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Classes');
+
+      // Générer le nom du fichier avec la date
+      const date = new Date();
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const fileName = `classes_${dateStr}.xlsx`;
+
+      // Écrire le fichier
+      window.XLSX.writeFile(wb, fileName);
+
+      // Message de succès
+      console.log('Fichier Excel exporté avec succès:', fileName);
+
+    } catch (error) {
+      console.error('Erreur lors de l\'exportation Excel:', error);
+      alert('Erreur lors de l\'exportation du fichier Excel. Veuillez réessayer.');
+    }
+  };
+
   const styles = {
     container: {
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f3e8ff 100%)',
       padding: '0',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     },
@@ -252,12 +325,11 @@ const ListeCours = () => {
       textAlign: 'center',
       gap: '20px'
     },
-    headerLeft: {
+    headerButtons: {
       display: 'flex',
-      alignItems: 'center',
-      gap: '0.75rem'
+      gap: '1rem',
+      alignItems: 'center'
     },
-    
     title: {
       fontSize: '32px',
       fontWeight: 'bold',
@@ -273,6 +345,21 @@ const ListeCours = () => {
     },
     addButton: {
       background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+      color: 'white',
+      border: 'none',
+      padding: '0.75rem 1.5rem',
+      borderRadius: '0.75rem',
+      fontWeight: '600',
+      cursor: 'pointer',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      transition: 'all 0.2s ease',
+      fontSize: '1rem'
+    },
+    exportButton: {
+      background: 'linear-gradient(135deg, #10b981, #059669)',
       color: 'white',
       border: 'none',
       padding: '0.75rem 1.5rem',
@@ -862,21 +949,38 @@ const ListeCours = () => {
                 <h1 style={{ ...styles.title, textAlign: 'center', width: '100%' }}>Gestion des Classes</h1>
               </div>
             </div>
-            <button
-              onClick={() => setShowAjoutModal(true)}
-              style={styles.addButton}
-              onMouseEnter={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
-              }}
-            >
-              <Plus size={20} />
-              Nouveau Classe
-            </button>
+            <div style={styles.headerButtons}>
+              <button
+                onClick={exportCoursToExcel}
+                style={styles.exportButton}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                <Download size={20} />
+                Exporter (Excel)
+              </button>
+              <button
+                onClick={() => setShowAjoutModal(true)}
+                style={styles.addButton}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 20px 25px -5px rgba(0, 0, 0, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+                }}
+              >
+                <Plus size={20} />
+                Nouveau Classe
+              </button>
+            </div>
           </div>
         </div>
 

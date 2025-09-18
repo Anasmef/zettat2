@@ -439,20 +439,18 @@ const generatePDF = (p) => {
   // === CORPS DU CHÈQUE ===
   let yPos = 45;
 
-  // Ligne "Payé à l'ordre de" (style chèque)
+  // Ligne avec nom étudiant et classe sur la même ligne
   doc.setFontSize(9);
   doc.setTextColor(...colors.dark);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Reçu de:', 15, yPos);
-  
-  // Ligne pour le nom
-  doc.setDrawColor(...colors.border);
-  doc.setLineWidth(0.3);
-  doc.line(35, yPos + 1, 120, yPos + 1);
-  
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(p.etudiant?.nomComplet || '___________________', 40, yPos - 1);
+  doc.text(p.etudiant?.nomComplet || '___________________', 15, yPos);
+  
+  // Classe sur la même ligne
+  const classe = Array.isArray(p.cours) ? p.cours.join(', ') : p.cours;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Classe:', 75, yPos);
+  doc.setFont('helvetica', 'normal');
+  doc.text(classe, 95, yPos);
 
   // Montant en chiffres (coin droit)
   doc.setFillColor(...colors.light);
@@ -465,7 +463,7 @@ const generatePDF = (p) => {
   doc.setFont('helvetica', 'bold');
   doc.text(`${p.montant} DH`, 167, yPos - 2, { align: 'center' });
 
-  // === DEUXIÈME LIGNE ===
+  // === DEUXIÈME LIGNE - MONTANT EN LETTRES ===
   yPos += 12;
   
   doc.setFontSize(9);
@@ -477,26 +475,27 @@ const generatePDF = (p) => {
   doc.setDrawColor(...colors.border);
   doc.line(40, yPos + 1, 195, yPos + 1);
   
-  // Conversion du montant en lettres (fonction à implémenter si nécessaire)
+  // Conversion du montant en lettres et en chiffres
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   const montantEnLettres = convertirMontantEnLettres(p.montant);
-  doc.text(montantEnLettres, 45, yPos - 1);
+  doc.text(`${montantEnLettres} (${p.montant} DH)`, 45, yPos - 1);
 
-  // === TROISIÈME LIGNE ===
+  // === TROISIÈME LIGNE - PÉRIODE ===
   yPos += 12;
   
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.text('Classe:', 15, yPos);
+  doc.text('Période:', 15, yPos);
   doc.setFont('helvetica', 'normal');
-  const classe = Array.isArray(p.cours) ? p.cours.join(', ') : p.cours;
-  doc.text(classe, 30, yPos);
   
-  doc.setFont('helvetica', 'bold');
-  doc.text('Période:', 120, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`${formatDate(p.moisDebut)} (${p.nombreMois} mois)`, 140, yPos);
+  // Calculer la date de fin
+  const dateDebut = new Date(p.moisDebut);
+  const dateFin = new Date(dateDebut);
+  dateFin.setMonth(dateFin.getMonth() + Number(p.nombreMois));
+  
+  const periodeText = `Du ${formatDate(p.moisDebut)} au ${dateFin.toLocaleDateString('fr-FR')}`;
+  doc.text(periodeText, 35, yPos);
 
   // === SIGNATURE ET DATE ===
   yPos += 15;
@@ -544,34 +543,101 @@ const generatePDF = (p) => {
 
 // Fonction helper pour convertir le montant en lettres
 function convertirMontantEnLettres(montant) {
-  // Implémentation basique - peut être améliorée
+  if (!montant || montant === 0) return 'zéro dirhams';
+  
   const unites = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
   const dizaines = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix'];
-  const centaines = ['', 'cent', 'deux cents', 'trois cents', 'quatre cents', 'cinq cents', 'six cents', 'sept cents', 'huit cents', 'neuf cents'];
-  
-  if (montant < 1000) {
-    // Conversion simple pour les montants inférieurs à 1000
-    if (montant < 10) return `${unites[montant]} dirhams`;
-    if (montant < 100) {
-      const d = Math.floor(montant / 10);
-      const u = montant % 10;
-      return `${dizaines[d]}${u > 0 ? '-' + unites[u] : ''} dirhams`;
+  const dizSpeciales = {
+    10: 'dix', 11: 'onze', 12: 'douze', 13: 'treize', 14: 'quatorze', 15: 'quinze', 16: 'seize',
+    70: 'soixante-dix', 71: 'soixante et onze', 72: 'soixante-douze', 73: 'soixante-treize',
+    74: 'soixante-quatorze', 75: 'soixante-quinze', 76: 'soixante-seize', 77: 'soixante-dix-sept',
+    78: 'soixante-dix-huit', 79: 'soixante-dix-neuf',
+    80: 'quatre-vingts', 90: 'quatre-vingt-dix', 91: 'quatre-vingt-onze', 92: 'quatre-vingt-douze',
+    93: 'quatre-vingt-treize', 94: 'quatre-vingt-quatorze', 95: 'quatre-vingt-quinze',
+    96: 'quatre-vingt-seize', 97: 'quatre-vingt-dix-sept', 98: 'quatre-vingt-dix-huit', 99: 'quatre-vingt-dix-neuf'
+  };
+
+  function convertirGroupe(n) {
+    if (n === 0) return '';
+    if (n < 10) return unites[n];
+    if (dizSpeciales[n]) return dizSpeciales[n];
+    
+    const d = Math.floor(n / 10);
+    const u = n % 10;
+    
+    if (n < 20) {
+      return unites[n - 10] ? `dix-${unites[n - 10]}` : 'dix';
     }
-    const c = Math.floor(montant / 100);
-    const reste = montant % 100;
-    let result = centaines[c];
-    if (reste > 0) {
-      if (reste < 10) result += ` ${unites[reste]}`;
-      else {
-        const d = Math.floor(reste / 10);
-        const u = reste % 10;
-        result += ` ${dizaines[d]}${u > 0 ? '-' + unites[u] : ''}`;
-      }
+    
+    if (d === 7) {
+      return u === 1 ? 'soixante et onze' : `soixante-${convertirGroupe(10 + u)}`;
     }
-    return `${result} dirhams`;
+    
+    if (d === 9) {
+      return `quatre-vingt-${convertirGroupe(10 + u)}`;
+    }
+    
+    if (u === 0) {
+      return d === 8 ? 'quatre-vingts' : dizaines[d];
+    }
+    
+    if (u === 1 && (d === 2 || d === 3 || d === 4 || d === 5 || d === 6)) {
+      return `${dizaines[d]} et un`;
+    }
+    
+    return `${dizaines[d]}-${unites[u]}`;
   }
+
+  function convertirCentaines(n) {
+    if (n === 0) return '';
+    if (n < 100) return convertirGroupe(n);
+    
+    const c = Math.floor(n / 100);
+    const reste = n % 100;
+    
+    let result = '';
+    if (c === 1) {
+      result = reste === 0 ? 'cent' : 'cent ';
+    } else {
+      result = `${unites[c]} cents`;
+      if (reste > 0) result += ' ';
+    }
+    
+    if (reste > 0) {
+      result += convertirGroupe(reste);
+    }
+    
+    return result;
+  }
+
+  function convertirNombre(n) {
+    if (n === 0) return 'zéro';
+    if (n < 1000) return convertirCentaines(n);
+    
+    const milliers = Math.floor(n / 1000);
+    const reste = n % 1000;
+    
+    let result = '';
+    if (milliers === 1) {
+      result = 'mille';
+    } else {
+      result = `${convertirCentaines(milliers)} mille`;
+    }
+    
+    if (reste > 0) {
+      result += ` ${convertirCentaines(reste)}`;
+    }
+    
+    return result;
+  }
+
+  const partie_entiere = Math.floor(montant);
+  let resultat = convertirNombre(partie_entiere);
   
-  return `${montant} dirhams`; // Fallback pour les gros montants
+  // Capitaliser la première lettre
+  resultat = resultat.charAt(0).toUpperCase() + resultat.slice(1);
+  
+  return `${resultat} dirhams`;
 }
 
   const openDetailModal = (paiement) => {

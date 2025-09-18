@@ -280,60 +280,215 @@ const EmploiDuTemps = () => {
     setTimeout(() => setMessage({ type: '', text: '' }), 4000);
   };
 
-  // Télécharger le tableau en CSV
-  const downloadTable = () => {
+  // Fonction pour charger la bibliothèque XLSX si nécessaire
+  const loadXLSXLibrary = () => {
+    return new Promise((resolve, reject) => {
+      if (typeof window.XLSX !== 'undefined') {
+        resolve(window.XLSX);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      script.onload = () => {
+        if (typeof window.XLSX !== 'undefined') {
+          resolve(window.XLSX);
+        } else {
+          reject(new Error('Impossible de charger la bibliothèque XLSX'));
+        }
+      };
+      script.onerror = () => reject(new Error('Erreur de chargement de la bibliothèque XLSX'));
+      document.head.appendChild(script);
+    });
+  };
+
+  // Télécharger l'emploi du temps en Excel avec un design professionnel
+  const downloadTable = async () => {
     if (selectedCours.length === 0) {
       setMessage({ type: 'error', text: 'Sélectionnez au moins un cours pour télécharger' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       return;
     }
 
-    let csvContent = '';
-    
-    selectedCours.forEach(coursId => {
-      const cours = coursList.find(c => c._id === coursId);
-      if (!cours) return;
-
-      csvContent += `\nCOURS: ${cours.nom}\n`;
-      csvContent += `Semaine du ${formatDate(weekDates[0])} au ${formatDate(weekDates[5])}\n\n`;
+    try {
+      // Charger la bibliothèque XLSX
+      await loadXLSXLibrary();
       
-      csvContent += 'Horaires;';
-      jours.forEach((jour, index) => {
-        csvContent += `${jour} (${formatDate(weekDates[index])});`;
-      });
-      csvContent += '\n';
+      setMessage({ type: 'info', text: 'Génération du fichier Excel en cours...' });
 
-      creneaux.forEach(creneau => {
-        csvContent += `${creneau.label};`;
+      // Créer un nouveau workbook
+      const wb = window.XLSX.utils.book_new();
+
+      selectedCours.forEach((coursId, coursIndex) => {
+        const cours = coursList.find(c => c._id === coursId);
+        if (!cours) return;
+
+        // Préparer les données pour ce cours
+        const worksheetData = [];
         
-        jours.forEach(jour => {
-          const key = `${jour}-${creneau.debut}-${creneau.fin}`;
-          const seanceData = emploiDuTemps[coursId]?.[key] || {};
-          
-          const profNom = profList.find(p => p._id === seanceData.professeur)?.nom || '';
-          const matiere = seanceData.matiere || '';
-          const salle = seanceData.salle || '';
-          
-          csvContent += `"${profNom}${matiere ? ' - ' + matiere : ''}${salle ? ' (Salle: ' + salle + ')' : ''}";`;
+        // En-tête principal avec le nom du cours
+        worksheetData.push([`EMPLOI DU TEMPS - ${cours.nom.toUpperCase()}`]);
+        worksheetData.push([`Semaine du ${formatDate(weekDates[0])} au ${formatDate(weekDates[5])}`]);
+        worksheetData.push(['']); // Ligne vide
+
+        // Professeurs assignés
+        const professeursAssignes = getProfesseursForCours(coursId);
+        if (professeursAssignes.length > 0) {
+          worksheetData.push(['Professeurs assignés:']);
+          professeursAssignes.forEach(prof => {
+            worksheetData.push([`• ${prof.nom} - ${prof.matiere}`]);
+          });
+        } else {
+          worksheetData.push(['⚠️ Aucun professeur assigné à ce cours']);
+        }
+        worksheetData.push(['']); // Ligne vide
+
+        // En-têtes du tableau
+        const headerRow = ['HORAIRES'];
+        jours.forEach((jour, index) => {
+          headerRow.push(`${jour}\n${formatDate(weekDates[index])}`);
         });
-        csvContent += '\n';
+        worksheetData.push(headerRow);
+
+        // Données du tableau
+        creneaux.forEach(creneau => {
+          const row = [creneau.label];
+          
+          jours.forEach(jour => {
+            const key = `${jour}-${creneau.debut}-${creneau.fin}`;
+            const seanceData = emploiDuTemps[coursId]?.[key] || {};
+            
+            const profNom = profList.find(p => p._id === seanceData.professeur)?.nom || '';
+            const matiere = seanceData.matiere || '';
+            const salle = seanceData.salle || '';
+            
+            let cellContent = '';
+            if (profNom) {
+              cellContent = `${profNom}`;
+              if (matiere) cellContent += `\n${matiere}`;
+              if (salle) cellContent += `\nSalle: ${salle}`;
+            }
+            
+            row.push(cellContent);
+          });
+          
+          worksheetData.push(row);
+        });
+
+        // Créer la worksheet
+        const ws = window.XLSX.utils.aoa_to_sheet(worksheetData);
+
+        // Styles et formatage
+        const range = window.XLSX.utils.decode_range(ws['!ref']);
+        
+        // Définir les largeurs de colonnes
+        ws['!cols'] = [
+          { wch: 15 }, // Horaires
+          { wch: 20 }, // Lundi
+          { wch: 20 }, // Mardi
+          { wch: 20 }, // Mercredi
+          { wch: 20 }, // Jeudi
+          { wch: 20 }, // Vendredi
+          { wch: 20 }  // Samedi
+        ];
+
+        // Définir les hauteurs de lignes pour l'en-tête
+        ws['!rows'] = [
+          { hpt: 25 }, // Titre principal
+          { hpt: 20 }, // Semaine
+          { hpt: 15 }, // Ligne vide
+        ];
+
+        // Fusionner les cellules pour le titre
+        if (!ws['!merges']) ws['!merges'] = [];
+        ws['!merges'].push({
+          s: { c: 0, r: 0 },
+          e: { c: 6, r: 0 }
+        });
+        ws['!merges'].push({
+          s: { c: 0, r: 1 },
+          e: { c: 6, r: 1 }
+        });
+
+        // Styles pour les cellules (si supporté)
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cell_address = { c: C, r: R };
+            const cell_ref = window.XLSX.utils.encode_cell(cell_address);
+            
+            if (!ws[cell_ref]) continue;
+            
+            // Style pour l'en-tête principal
+            if (R === 0) {
+              ws[cell_ref].s = {
+                font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "2563EB" } },
+                alignment: { horizontal: "center", vertical: "center" }
+              };
+            }
+            // Style pour la ligne de semaine
+            else if (R === 1) {
+              ws[cell_ref].s = {
+                font: { bold: true, sz: 12 },
+                fill: { fgColor: { rgb: "F3F4F6" } },
+                alignment: { horizontal: "center" }
+              };
+            }
+            // Style pour les en-têtes de colonnes
+            else if (R === 4 + professeursAssignes.length + (professeursAssignes.length > 0 ? 0 : 1)) {
+              ws[cell_ref].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "3B82F6" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin" },
+                  bottom: { style: "thin" },
+                  left: { style: "thin" },
+                  right: { style: "thin" }
+                }
+              };
+            }
+            // Style pour les cellules de données
+            else if (R > 4 + professeursAssignes.length + (professeursAssignes.length > 0 ? 0 : 1)) {
+              ws[cell_ref].s = {
+                alignment: { horizontal: "center", vertical: "center", wrapText: true },
+                border: {
+                  top: { style: "thin" },
+                  bottom: { style: "thin" },
+                  left: { style: "thin" },
+                  right: { style: "thin" }
+                }
+              };
+              
+              // Couleur différente pour les cellules avec contenu
+              if (ws[cell_ref].v && ws[cell_ref].v.toString().trim() !== '') {
+                ws[cell_ref].s.fill = { fgColor: { rgb: "F0F9FF" } };
+              }
+            }
+          }
+        }
+
+        // Ajouter la worksheet au workbook
+        const sheetName = cours.nom.length > 31 ? cours.nom.substring(0, 28) + '...' : cours.nom;
+        window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
       });
-      
-      csvContent += '\n';
-    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `emploi_du_temps_${formatDate(weekDates[0]).replace('/', '-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Générer le nom du fichier avec la date
+      const date = new Date();
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const fileName = `emploi_du_temps_${dateStr}.xlsx`;
 
-    setMessage({ type: 'success', text: '📁 Tableau téléchargé avec succès !' });
-    setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      // Télécharger le fichier
+      window.XLSX.writeFile(wb, fileName);
+
+      setMessage({ type: 'success', text: `✅ Emploi du temps exporté avec succès: ${fileName}` });
+      setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+
+    } catch (error) {
+      console.error('Erreur lors de l\'exportation Excel:', error);
+      setMessage({ type: 'error', text: `❌ Erreur lors de l'exportation: ${error.message}` });
+      setTimeout(() => setMessage({ type: '', text: '' }), 4000);
+    }
   };
 
   // Navigation des semaines
@@ -659,7 +814,7 @@ const EmploiDuTemps = () => {
               }}
             >
               <Download size={18} />
-              Télécharger tout l'emploi du temps
+              Télécharger l'emploi du temps (Excel)
             </button>
           </div>
         )}

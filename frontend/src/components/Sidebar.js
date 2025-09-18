@@ -137,16 +137,7 @@ const Sidebar = ({ onLogout }) => {
       label: 'Liste Présences',
       icon: ClipboardList
     },
-    {
-      path: '/admin/VieScolaire',
-      label: 'Vie Scolaire',
-      icon: School
-    },
-    {
-      path: '/admin/actualites',
-      label: 'Actualités',
-      icon: Newspaper
-    },
+
     {
       path: '/admin/Bulletin',
       label: 'Bulletin',
