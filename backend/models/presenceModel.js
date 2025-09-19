@@ -9,6 +9,13 @@ const presenceSchema = new mongoose.Schema({
 
   present: { type: Boolean, default: false },
 
+    retardMinutes: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 60 // Maximum 1 heure de retard
+  },
+
   remarque: { type: String },
 
   creePar: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },

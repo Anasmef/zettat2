@@ -1496,6 +1496,77 @@ app.delete('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async 
     res.status(500).json({ message: 'Erreur lors de la suppression' });
   }
 });
+
+
+app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Récupérer les étudiants qui ont au moins un cours en commun avec ce professeur
+    const etudiants = await Etudiant.find({ 
+      cours: { $in: professeur.cours }, 
+      actif: true 
+    }).select('-motDePasse'); // Exclure le mot de passe
+
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des étudiants:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+// Route pour mettre à jour l'autorisation d'un étudiant
+app.put('/api/etudiants/:id/autorisation', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { autorise } = req.body;
+
+    if (typeof autorise !== 'boolean') {
+      return res.status(400).json({ 
+        message: 'Le champ autorise doit être un booléen' 
+      });
+    }
+
+    const etudiant = await Etudiant.findByIdAndUpdate(
+      id,
+      { autorise },
+      { new: true }
+    ).select('-motDePasse');
+
+    if (!etudiant) {
+      return res.status(404).json({ 
+        message: 'Étudiant non trouvé' 
+      });
+    }
+
+    res.json({
+      message: `Étudiant ${autorise ? 'autorisé' : 'non autorisé'} avec succès`,
+      etudiant
+    });
+
+  } catch (err) {
+    console.error('Erreur lors de la mise à jour de l\'autorisation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
 // ✅ Obtenir un seul étudiant
 // Lister tous les étudiants (Admin OU Inscripteur)
 app.get('/api/etudiants', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
@@ -1532,25 +1603,7 @@ app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });// Route pour que les professeurs récupèrent leurs étudiants
-app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
-  try {
-    const professeur = await Professeur.findById(req.professeurId);
-    if (!professeur) {
-      return res.status(404).json({ message: 'Professeur non trouvé' });
-    }
 
-    // Récupérer les étudiants qui ont au moins un cours en commun avec ce professeur
-    const etudiants = await Etudiant.find({
-      cours: { $in: professeur.cours },
-      actif: true
-    }).select('-motDePasse'); // Exclure le mot de passe
-
-    res.json(etudiants);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des étudiants:', err);
-    res.status(500).json({ message: 'Erreur serveur', error: err.message });
-  }
-});
 // Obtenir un étudiant spécifique (Admin OU Inscripteur)
 app.get('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
@@ -2243,37 +2296,7 @@ app.get('/api/professeur/mes-cours', authProfesseur, async (req, res) => {
   }
 });
 
-app.post('/api/presences', authProfesseur, async (req, res) => {
-  try {
-    const { etudiant, cours, dateSession, present, remarque, heure, periode } = req.body;
 
-    // ✅ تحقق أن هذا الأستاذ يدرّس هذا الكورس
-    const prof = await Professeur.findById(req.professeurId);
-    if (!prof.cours.includes(cours)) {
-      return res.status(403).json({ message: '❌ Vous ne pouvez pas marquer la présence pour ce cours.' });
-    }
-
-    // ✅ إنشاء كائن présence جديد مع الوقت والفترة
-    const presence = new Presence({
-      etudiant,
-      cours,
-      dateSession: new Date(dateSession),
-      present,
-      remarque,
-      heure,    // 🆕 وقت الحضور بصيغة "08:30"
-      periode,  // 🆕 'matin' أو 'soir'
-      creePar: req.professeurId,
-         matiere: prof.matiere,           // ✅ المادة تلقائياً من حساب الأستاذ
-      nomProfesseur: prof.nom   
-    });
-
-    await presence.save();
-    res.status(201).json(presence);
-
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 
 app.get('/api/debug/notifications', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
@@ -3151,7 +3174,6 @@ app.put('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, upload.
   }
 });
 
-
 // routes/professeurs.js
 app.patch('/api/professeurs/:id/actif',authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
@@ -3177,27 +3199,330 @@ app.get('/api/etudiant/profile', authEtudiant, async (req, res) => {
 });
 
 
-// ✅ 🟢 جلسات الحضور
+// ✅ API pour créer/modifier une présence avec gestion des retards
+app.post('/api/presences', authProfesseur, async (req, res) => {
+  try {
+    const { 
+      etudiant, 
+      cours, 
+      dateSession, 
+      present,
+      retardMinutes, // 🆕 Minutes de retard (0-60)
+      remarque, 
+      heure, 
+      periode 
+    } = req.body;
+
+    // ✅ تحقق أن هذا الأستاذ يدرّس هذا الكورس
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ message: '❌ Vous ne pouvez pas marquer la présence pour ce cours.' });
+    }
+
+    // 🆕 Logique pour gérer les retards
+    let finalPresent = present || false;
+    let finalRetardMinutes = 0;
+
+    // Si l'étudiant est en retard, il est considéré comme présent
+    if (retardMinutes && retardMinutes > 0) {
+      finalPresent = true;
+      finalRetardMinutes = Math.min(retardMinutes, 60); // Maximum 60 minutes
+    } else if (present) {
+      finalRetardMinutes = 0; // Pas de retard si présent normalement
+    }
+
+    // ✅ إنشاء كائن présence جديد
+    const presence = new Presence({
+      etudiant,
+      cours,
+      dateSession: new Date(dateSession),
+      present: finalPresent,
+      retardMinutes: finalRetardMinutes, // 🆕
+      remarque,
+      heure,
+      periode,
+      creePar: req.professeurId,
+      matiere: prof.matiere,
+      nomProfesseur: prof.nom   
+    });
+
+    await presence.save();
+    res.status(201).json(presence);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ 1️⃣ API pour récupérer SEULEMENT les PRÉSENCES (sans retards)
 app.get('/api/etudiant/presences', authEtudiant, async (req, res) => {
   try {
-    const presences = await Presence.find({ etudiant: req.etudiantId, present: true });
+    const presences = await Presence.find({ 
+      etudiant: req.etudiantId, 
+      present: true,
+      retardMinutes: 0  // Présent ET sans retard
+    });
     res.json(presences);
   } catch (err) {
     res.status(500).json({ message: 'خطأ في جلب بيانات الحضور', error: err.message });
   }
 });
 
-
-// ✅ 🔴 الغيابات
+// ✅ 2️⃣ API pour récupérer SEULEMENT les ABSENCES
 app.get('/api/etudiant/absences', authEtudiant, async (req, res) => {
   try {
-    const absences = await Presence.find({ etudiant: req.etudiantId, present: false });
+    const absences = await Presence.find({ 
+      etudiant: req.etudiantId, 
+      present: false  // Absent
+    });
     res.json(absences);
   } catch (err) {
     res.status(500).json({ message: 'خطأ في جلب بيانات الغيابات', error: err.message });
   }
 });
 
+// ✅ 3️⃣ API pour récupérer SEULEMENT les RETARDS
+app.get('/api/etudiant/retards', authEtudiant, async (req, res) => {
+  try {
+    const retards = await Presence.find({ 
+      etudiant: req.etudiantId, 
+      present: true,           // Présent
+      retardMinutes: { $gt: 0 } // MAIS avec retard > 0 minutes
+    });
+    res.json(retards);
+  } catch (err) {
+    res.status(500).json({ message: 'خطأ في جلب بيانات التأخير', error: err.message });
+  }
+});
+
+// 🆕 API complète avec statistiques détaillées
+app.get('/api/etudiant/presences/stats', authEtudiant, async (req, res) => {
+  try {
+    const presences = await Presence.find({ etudiant: req.etudiantId })
+      .sort({ dateSession: -1 });
+    
+    // 📊 Calcul des statistiques
+    const stats = {
+      total: presences.length,
+      presents: presences.filter(p => p.present && p.retardMinutes === 0).length,
+      absents: presences.filter(p => !p.present).length,
+      retards: presences.filter(p => p.present && p.retardMinutes > 0).length,
+      totalRetardMinutes: presences
+        .filter(p => p.retardMinutes > 0)
+        .reduce((sum, p) => sum + p.retardMinutes, 0)
+    };
+
+    // 📈 Calcul du pourcentage
+    if (stats.total > 0) {
+      stats.pourcentagePresence = Math.round(
+        ((stats.presents + stats.retards) / stats.total) * 100
+      );
+      stats.pourcentageRetard = Math.round(
+        (stats.retards / stats.total) * 100
+      );
+    }
+
+    res.json({
+      presences,
+      stats
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'خطأ في جلب الإحصائيات', error: err.message });
+  }
+});
+
+// 🆕 API pour les professeurs - voir les retards par cours
+app.get('/api/professeur/retards/:cours', authProfesseur, async (req, res) => {
+  try {
+    const { cours } = req.params;
+    const { date } = req.query; // Filtrer par date si fournie
+    
+    // ✅ تحقق أن الأستاذ يدرّس هذا الكورس
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ message: '❌ Accès non autorisé à ce cours.' });
+    }
+
+    let query = { 
+      cours, 
+      present: true,
+      retardMinutes: { $gt: 0 }
+    };
+
+    // Filtrer par date si spécifiée
+    if (date) {
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setDate(endDate.getDate() + 1);
+      
+      query.dateSession = {
+        $gte: startDate,
+        $lt: endDate
+      };
+    }
+
+    const retards = await Presence.find(query)
+      .populate('etudiant', 'nom prenom')
+      .sort({ dateSession: -1, retardMinutes: -1 });
+
+    res.json(retards);
+  } catch (err) {
+    res.status(500).json({ message: 'خطأ في جلب بيانات التأخير', error: err.message });
+  }
+});
+
+// 🆕 API pour modifier une présence existante
+app.put('/api/presences/:id', authProfesseur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { present, retardMinutes, remarque } = req.body;
+
+    const presence = await Presence.findById(id);
+    if (!presence) {
+      return res.status(404).json({ message: '❌ Présence non trouvée.' });
+    }
+
+    // ✅ تحقق أن الأستاذ يملك الصلاحية
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(presence.cours)) {
+      return res.status(403).json({ message: '❌ Accès non autorisé.' });
+    }
+
+    // 🆕 Logique de mise à jour
+    if (retardMinutes && retardMinutes > 0) {
+      presence.present = true; // En retard = présent
+      presence.retardMinutes = Math.min(retardMinutes, 60);
+    } else if (present) {
+      presence.present = true;
+      presence.retardMinutes = 0; // Pas de retard
+    } else {
+      presence.present = false;
+      presence.retardMinutes = 0; // Absent = pas de retard
+    }
+
+    if (remarque !== undefined) {
+      presence.remarque = remarque;
+    }
+
+    await presence.save();
+    res.json(presence);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🆕 API pour obtenir un résumé des présences par cours
+app.get('/api/professeur/resume/:cours', authProfesseur, async (req, res) => {
+  try {
+    const { cours } = req.params;
+    
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ message: '❌ Accès non autorisé.' });
+    }
+
+    const presences = await Presence.find({ cours })
+      .populate('etudiant', 'nom prenom');
+
+    // 📊 Grouper par étudiant
+    const resumeParEtudiant = {};
+    
+    presences.forEach(p => {
+      const etudiantId = p.etudiant._id.toString();
+      
+      if (!resumeParEtudiant[etudiantId]) {
+        resumeParEtudiant[etudiantId] = {
+          etudiant: p.etudiant,
+          total: 0,
+          presents: 0,
+          absents: 0,
+          retards: 0,
+          totalRetardMinutes: 0
+        };
+      }
+      
+      const stats = resumeParEtudiant[etudiantId];
+      stats.total++;
+      
+      if (p.present) {
+        if (p.retardMinutes > 0) {
+          stats.retards++;
+          stats.totalRetardMinutes += p.retardMinutes;
+        } else {
+          stats.presents++;
+        }
+      } else {
+        stats.absents++;
+      }
+    });
+
+    // 📈 Convertir en array et ajouter pourcentages
+    const resume = Object.values(resumeParEtudiant).map(stats => ({
+      ...stats,
+      pourcentagePresence: stats.total > 0 ? 
+        Math.round(((stats.presents + stats.retards) / stats.total) * 100) : 0,
+      pourcentageRetard: stats.total > 0 ? 
+        Math.round((stats.retards / stats.total) * 100) : 0
+    }));
+
+    res.json(resume);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🆕 API pour marquer plusieurs présences en même temps
+app.post('/api/presences/batch', authProfesseur, async (req, res) => {
+  try {
+    const { cours, dateSession, periode, presences } = req.body;
+    // presences = [{ etudiant: "id", present: true, retardMinutes: 5 }, ...]
+
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ message: '❌ Accès non autorisé à ce cours.' });
+    }
+
+    const resultats = [];
+
+    for (const data of presences) {
+      let finalPresent = data.present || false;
+      let finalRetardMinutes = 0;
+
+      if (data.retardMinutes && data.retardMinutes > 0) {
+        finalPresent = true;
+        finalRetardMinutes = Math.min(data.retardMinutes, 60);
+      } else if (data.present) {
+        finalRetardMinutes = 0;
+      }
+
+      const presence = new Presence({
+        etudiant: data.etudiant,
+        cours,
+        dateSession: new Date(dateSession),
+        present: finalPresent,
+        retardMinutes: finalRetardMinutes,
+        remarque: data.remarque,
+        periode,
+        creePar: req.professeurId,
+        matiere: prof.matiere,
+        nomProfesseur: prof.nom
+      });
+
+      await presence.save();
+      resultats.push(presence);
+    }
+
+    res.status(201).json({
+      message: `✅ ${resultats.length} présences enregistrées`,
+      presences: resultats
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ✅ 💰 الدفعات
 app.get('/api/etudiant/paiements', authEtudiant, async (req, res) => {

@@ -44,7 +44,7 @@ const InscripteurPage = () => {
       console.log('Fetching inscripteurs...');
       setLoading(true);
       
-      const res = await fetch('/api/admin/inscripteurs', { 
+      const res = await fetch('http://localhost:5000/api/admin/inscripteurs', { 
         headers,
         method: 'GET'
       });
@@ -133,8 +133,8 @@ const InscripteurPage = () => {
     
     try {
       const url = editingInscripteur 
-        ? `/api/admin/inscripteurs/${editingInscripteur._id}`
-        : '/api/admin/inscripteurs';
+        ? `http://localhost:5000/api/admin/inscripteurs/${editingInscripteur._id}`
+        : 'http://localhost:5000/api/admin/inscripteurs';
       
       const method = editingInscripteur ? 'PUT' : 'POST';
       
@@ -198,7 +198,7 @@ const InscripteurPage = () => {
     setSuccess('');
     
     try {
-      const res = await fetch(`/api/admin/inscripteurs/${inscripteurToDelete._id}`, {
+      const res = await fetch(`http://localhost:5000/api/admin/inscripteurs/${inscripteurToDelete._id}`, {
         method: 'DELETE',
         headers
       });
@@ -232,7 +232,7 @@ const InscripteurPage = () => {
       setError('');
       setSuccess('');
       
-      const res = await fetch(`/api/admin/inscripteurs/${inscripteur._id}/toggle`, {
+      const res = await fetch(`http://localhost:5000/api/admin/inscripteurs/${inscripteur._id}/toggle`, {
         method: 'PATCH',
         headers
       });

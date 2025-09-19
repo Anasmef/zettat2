@@ -89,7 +89,7 @@ const ListeProfesseurs = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/professeurs', {
+      const res = await axios.get('http://localhost:5000/api/professeurs', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(res.data);
@@ -103,7 +103,7 @@ const ListeProfesseurs = () => {
   const fetchCours = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/cours', {
+      const res = await axios.get('http://localhost:5000/api/cours', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListeCours(res.data);
@@ -208,7 +208,7 @@ const ListeProfesseurs = () => {
       formAjout.cours.forEach(c => formData.append('cours[]', c));
       if (imageFile) formData.append('image', imageFile);
 
-      const response = await axios.post('/api/professeurs', formData, {
+      const response = await axios.post('http://localhost:5000/api/professeurs', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -319,7 +319,7 @@ const ListeProfesseurs = () => {
       formModifier.cours.forEach(c => formData.append('cours[]', c));
       if (imageFileModifier) formData.append('image', imageFileModifier);
 
-      const response = await axios.put(`/api/professeurs/${professeurAModifier._id}`, formData, {
+      const response = await axios.put(`http://localhost:5000/api/professeurs/${professeurAModifier._id}`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -345,7 +345,7 @@ const ListeProfesseurs = () => {
   const handleToggleActif = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(`/api/professeurs/${id}/actif`, {}, {
+      const res = await axios.patch(`http://localhost:5000/api/professeurs/${id}/actif`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(professeurs.map(p => p._id === id ? res.data : p));
@@ -359,7 +359,7 @@ const ListeProfesseurs = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/professeurs/${id}`, {
+      await axios.delete(`http://localhost:5000/api/professeurs/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProfesseurs(professeurs.filter(p => p._id !== id));
@@ -603,25 +603,89 @@ const ListeProfesseurs = () => {
                         <div className="pas-image">N/A</div>
                       )}
                     </td>
-                    <td className="actions-colonne">
-                      <button 
-                        onClick={() => handleView(p)}
-                        className="btn-voir"
-                      >
-                      <Eye size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(p)}
-                        className="btn-modifier"
-                      >
-                      <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(p._id)}
-                        className="btn-supprimer"
-                      >
-                      <Trash2 size={16} />
-                      </button>
+                    <td className="actions-colonne" style={{ 
+                      minWidth: '300px', 
+                      width: '300px', 
+                      padding: '8px',
+                      textAlign: 'center',
+                      overflow: 'visible'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '3px', 
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap',
+                        alignItems: 'center',
+                        width: '100%'
+                      }}>
+                        <button 
+                          onClick={() => handleView(p)}
+                          title="Voir détails"
+                          style={{
+                            background: '#3b82f6',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            minWidth: '70px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <Eye size={12} />
+                          Voir
+                        </button>
+                        <button 
+                          onClick={() => handleEdit(p)}
+                          title="Modifier"
+                          style={{
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            minWidth: '80px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <Edit size={12} />
+                          Modifier
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(p._id)}
+                          title="Supprimer"
+                          style={{
+                            background: '#dc2626',
+                            color: 'white',
+                            border: '2px solid #dc2626',
+                            borderRadius: '4px',
+                            padding: '6px 10px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            minWidth: '100px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          SUPPRIMER
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

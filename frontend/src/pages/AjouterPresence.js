@@ -43,7 +43,7 @@ const AjouterPresence = () => {
           return;
         }
 
-        const res = await axios.get('/api/professeur/mes-cours', {
+        const res = await axios.get('http://localhost:5000/api/professeur/mes-cours', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -58,6 +58,15 @@ const AjouterPresence = () => {
 
   // Move the CSS class addition useEffect inside the component
   useEffect(() => {
+    // Add viewport meta tag for mobile responsiveness
+    const existingViewport = document.querySelector('meta[name="viewport"]');
+    if (!existingViewport) {
+      const viewport = document.createElement('meta');
+      viewport.name = 'viewport';
+      viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+      document.getElementsByTagName('head')[0].appendChild(viewport);
+    }
+    
     const configGrid = document.querySelector('[data-config-grid]');
     if (configGrid) {
       configGrid.classList.add('configuration-grid');
@@ -102,6 +111,16 @@ const AjouterPresence = () => {
         pointer-events: none;
       }
       
+      /* Mobile-first responsive design */
+      html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+      }
+      
+      * {
+        box-sizing: border-box !important;
+      }
+      
       /* Responsive Design */
       @media (max-width: 968px) {
         .configuration-grid {
@@ -144,6 +163,7 @@ const AjouterPresence = () => {
         
         .table-container {
           font-size: 14px !important;
+          overflow-x: auto !important;
         }
         
         .th, .td {
@@ -202,7 +222,8 @@ const AjouterPresence = () => {
       
       @media (max-width: 480px) {
         .main-content {
-          padding: 12px !important;
+          padding: 8px !important;
+          margin: 0 !important;
         }
         
         .form-content {
@@ -212,6 +233,7 @@ const AjouterPresence = () => {
         .left-column, .right-column {
           padding: 16px !important;
           gap: 16px !important;
+          margin: 0 !important;
         }
         
         .header-content {
@@ -220,6 +242,7 @@ const AjouterPresence = () => {
         
         .title {
           font-size: 20px !important;
+          text-align: center !important;
         }
         
         .title-section {
@@ -234,15 +257,225 @@ const AjouterPresence = () => {
         
         .table-container {
           border-radius: 8px !important;
+          margin: 0 -8px !important;
+          width: calc(100% + 16px) !important;
         }
         
         .submit-container {
           padding-top: 16px !important;
+          margin: 0 -8px !important;
         }
         
         .submit-button {
           padding: 14px 24px !important;
           font-size: 15px !important;
+          width: calc(100% + 16px) !important;
+          margin: 0 8px !important;
+          border-radius: 8px !important;
+        }
+        
+        /* Table mobile styling */
+        .table {
+          min-width: 100% !important;
+          display: block !important;
+          overflow-x: auto !important;
+          white-space: nowrap !important;
+        }
+        
+        .table thead {
+          display: none !important;
+        }
+        
+        .table tbody {
+          display: block !important;
+        }
+        
+        .table-row {
+          display: block !important;
+          border: 1px solid #e5e7eb !important;
+          border-radius: 8px !important;
+          margin-bottom: 12px !important;
+          padding: 12px !important;
+          background: #ffffff !important;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .table-row td {
+          display: block !important;
+          padding: 8px 0 !important;
+          border: none !important;
+          text-align: left !important;
+          position: relative !important;
+          padding-left: 50% !important;
+        }
+        
+        .table-row td:before {
+          content: attr(data-label) !important;
+          position: absolute !important;
+          left: 0 !important;
+          width: 45% !important;
+          padding-right: 10px !important;
+          white-space: nowrap !important;
+          font-weight: 600 !important;
+          color: #4b5563 !important;
+          font-size: 12px !important;
+          text-transform: uppercase !important;
+        }
+        
+        .student-info {
+          flex-direction: row !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          gap: 8px !important;
+        }
+        
+        .student-name {
+          font-size: 14px !important;
+          text-align: left !important;
+        }
+        
+        .status-select {
+          width: 100% !important;
+          max-width: 150px !important;
+        }
+        
+        .remarque-container {
+          flex-direction: row !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
+        
+        .remarque-input {
+          width: 100% !important;
+          max-width: 200px !important;
+        }
+        
+        /* Form responsive */
+        .configuration-grid {
+          grid-template-columns: 1fr !important;
+          gap: 12px !important;
+        }
+        
+        .form-group {
+          margin-bottom: 12px !important;
+        }
+        
+        .label {
+          font-size: 13px !important;
+        }
+        
+        .input, .select {
+          font-size: 14px !important;
+          padding: 10px 12px !important;
+        }
+        
+        .time-display {
+          margin-top: 6px !important;
+          padding: 6px 10px !important;
+        }
+        
+        .periode-tag {
+          padding: 10px 12px !important;
+          font-size: 14px !important;
+        }
+        
+        .instruction-message {
+          margin: 16px -8px !important;
+          padding: 16px !important;
+        }
+        
+        .instruction-title {
+          font-size: 15px !important;
+        }
+        
+        .instruction-text {
+          font-size: 13px !important;
+        }
+        
+        .presence-section {
+          margin: 20px -8px 0 -8px !important;
+          padding: 16px 8px 0 8px !important;
+        }
+        
+        .presence-title {
+          font-size: 16px !important;
+        }
+        
+        .message-container {
+          margin: 16px -8px 0 -8px !important;
+          padding: 12px 16px !important;
+          font-size: 14px !important;
+        }
+      }
+      
+      /* Extra small phones */
+      @media (max-width: 360px) {
+        .main-content {
+          padding: 4px !important;
+        }
+        
+        .form-content {
+          padding: 12px !important;
+        }
+        
+        .left-column, .right-column {
+          padding: 12px !important;
+        }
+        
+        .title {
+          font-size: 18px !important;
+        }
+        
+        .card-title-text {
+          font-size: 16px !important;
+        }
+        
+        .table-container {
+          margin: 0 -4px !important;
+          width: calc(100% + 8px) !important;
+        }
+        
+        .table-row {
+          padding: 10px !important;
+          margin-bottom: 10px !important;
+        }
+        
+        .table-row td {
+          padding: 6px 0 !important;
+          padding-left: 45% !important;
+        }
+        
+        .table-row td:before {
+          width: 40% !important;
+          font-size: 11px !important;
+        }
+        
+        .student-name {
+          font-size: 13px !important;
+        }
+        
+        .avatar {
+          width: 30px !important;
+          height: 30px !important;
+        }
+        
+        .avatar-text {
+          font-size: 12px !important;
+        }
+        
+        .status-select {
+          font-size: 12px !important;
+          padding: 5px 8px !important;
+        }
+        
+        .remarque-input {
+          font-size: 12px !important;
+          padding: 6px 8px !important;
+        }
+        
+        .submit-button {
+          font-size: 14px !important;
+          padding: 12px 20px !important;
         }
       }
     `;
@@ -283,7 +516,7 @@ const AjouterPresence = () => {
       try {
         const token = localStorage.getItem('token');
         
-        const res = await axios.get('/api/professeur/etudiants', {
+        const res = await axios.get('http://localhost:5000/api/professeur/etudiants', {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -295,6 +528,7 @@ const AjouterPresence = () => {
           nom: et.nomComplet,
           present: true,
           remarque: '',
+          retardMinutes: 0
         }));
         setPresences(initialPresences);
       } catch (error) {
@@ -323,68 +557,86 @@ const AjouterPresence = () => {
     setPresences(updated);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (isSubmitting) return;
+
+  const token = localStorage.getItem('token');
+
+  if (!selectedCours || !dateSession || !heureDebut || !heureFin) {
+    setMessage('error');
+    return;
+  }
+
+  if (heureFin <= heureDebut) {
+    setMessage('error');
+    return;
+  }
+
+  setIsSubmitting(true);
+  setMessage('loading');
+
+  const heure = `${heureDebut}-${heureFin}`;
+
+  // 🔍 DEBUGGING - Vérifiez l'état des présences avant envoi
+  console.log('=== DEBUGGING RETARDS ===');
+  presences.forEach((pres, index) => {
+    if (pres.retardMinutes > 0) {
+      console.log(`Étudiant ${index}: ${pres.nom}`, {
+        present: pres.present,
+        retardMinutes: pres.retardMinutes,
+        type: typeof pres.retardMinutes
+      });
+    }
+  });
+
+  try {
+    const promises = presences.map((pres, index) => {
+      const dataToSend = {
+        etudiant: pres.etudiant,
+        cours: selectedCours,
+        dateSession,
+        present: pres.present,
+        remarque: pres.remarque,
+        retardMinutes: Number(pres.retardMinutes) || 0, // Conversion explicite
+        heure,
+        periode
+      };
+
+      // 🔍 DEBUGGING - Log chaque donnée envoyée
+      if (pres.retardMinutes > 0) {
+        console.log(`Envoi pour ${pres.nom}:`, dataToSend);
+      }
+
+      return axios.post('http://localhost:5000/api/presences', dataToSend, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    });
+
+    const results = await Promise.all(promises);
     
-    // 🔒 Empêcher les clics multiples
-    if (isSubmitting) {
-      return; // Sortir si déjà en cours d'enregistrement
-    }
+    // 🔍 DEBUGGING - Vérifiez les réponses
+    results.forEach((result, index) => {
+      if (result.data.retardMinutes > 0) {
+        console.log(`Réponse pour ${presences[index].nom}:`, {
+          retardMinutes: result.data.retardMinutes,
+          present: result.data.present
+        });
+      }
+    });
 
-    const token = localStorage.getItem('token');
-
-    // Validation des champs requis
-    if (!selectedCours || !dateSession || !heureDebut || !heureFin) {
-      setMessage('error');
-      return;
-    }
-
-    // Validation que l'heure de fin est après l'heure de début
-    if (heureFin <= heureDebut) {
-      setMessage('error');
-      return;
-    }
-
-    // 🔒 Commencer l'enregistrement - bloquer le bouton
-    setIsSubmitting(true);
-    setMessage('loading'); // Afficher le message de chargement
-
-    // Création du format d'heure pour l'envoi
-    const heure = `${heureDebut}-${heureFin}`;
-
-    try {
-      // Enregistrer toutes les présences en parallèle (plus rapide)
-      const promises = presences.map(pres => 
-        axios.post('/api/presences', {
-          etudiant: pres.etudiant,
-          cours: selectedCours,
-          dateSession,
-          present: pres.present,
-          remarque: pres.remarque,
-          heure,
-          periode
-        }, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      );
-
-      // Attendre que toutes les requêtes se terminent
-      await Promise.all(promises);
-      
-      setMessage('success');
-      
-      // Rafraîchir après 2 secondes
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Erreur:', err);
-      setMessage('error');
-      setIsSubmitting(false); // 🔓 Réactiver le bouton en cas d'erreur
-    }
-  };
-
+    setMessage('success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+    
+  } catch (err) {
+    console.error('Erreur:', err);
+    setMessage('error');
+    setIsSubmitting(false);
+  }
+};
   // Fonction pour convertir l'heure en format 12h avec AM/PM
   const formatTimeToAMPM = (time24) => {
     if (!time24) return '';
@@ -587,125 +839,210 @@ const AjouterPresence = () => {
 
             {/* Liste des présences - 🆕 Affichée seulement si tous les champs sont remplis */}
             {areAllFieldsFilled() && presences.length > 0 && (
-              <div style={styles.presenceSection}>
-                <div style={styles.presenceHeader}>
-                  <h3 style={styles.presenceTitle}>
-                    <Users style={styles.presenceIcon} />
-                    Liste des étudiants ({presences.length})
-                  </h3>
-                </div>
-                
-                <div style={styles.tableContainer}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr style={styles.tableHeader}>
-                        <th style={styles.th}>Étudiant</th>
-                        <th style={styles.th}>Statut</th>
-                        <th style={styles.th}>Remarque</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+              <>
+                {/* Section des étudiants */}
+                <div style={styles.presenceSection}>
+                  <div style={styles.presenceHeader}>
+                    <h3 style={styles.presenceTitle}>
+                      <Users style={styles.presenceIcon} />
+                      Liste des étudiants ({presences.length})
+                    </h3>
+                  </div>
+
+                  {/* Desktop/Tablet Table View */}
+                  <div className="desktop-view" style={styles.desktopView}>
+                    <div style={styles.tableContainer}>
+                      <table style={styles.table}>
+                        <thead>
+                          <tr style={styles.tableHeader}>
+                            <th style={styles.th}>Étudiant</th>
+                            <th style={styles.th}>Statut</th>
+                            <th style={styles.th}>Retard (min)</th>
+                            <th style={styles.th}>Remarque</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {presences.map((p, i) => (
+                            <tr key={p.etudiant} style={styles.tableRow} className="table-row">
+                              <td style={styles.td}>
+                                <div style={styles.studentInfo}>
+                                  <div style={styles.avatar}>
+                                    <span style={styles.avatarText}>
+                                      {p.nom.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div style={styles.studentName}>{p.nom}</div>
+                                </div>
+                              </td>
+                              <td style={styles.td}>
+                                <select 
+                                  style={{
+                                    ...styles.statusSelect,
+                                    backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
+                                    color: p.present ? '#166534' : '#991b1b',
+                                    borderColor: p.present ? '#bbf7d0' : '#fecaca'
+                                  }}
+                                  value={p.present} 
+                                  onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
+                                >
+                                  <option value="true">✓ Présent</option>
+                                  <option value="false">✗ Absent</option>
+                                </select>
+                              </td>
+                              <td style={styles.td}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="60"
+                                  style={{
+                                    ...styles.retardInput,
+                                    opacity: p.present ? 1 : 0.5
+                                  }}
+                                  value={p.retardMinutes}
+                                  onChange={(e) => handlePresenceChange(i, 'retardMinutes', parseInt(e.target.value) || 0)}
+                                  disabled={!p.present}
+                                  placeholder="0"
+                                />
+                              </td>
+                              <td style={styles.td}>
+                                <div style={styles.remarqueContainer}>
+                                  <MessageSquare style={styles.remarqueIcon} />
+                                  <input 
+                                    type="text" 
+                                    style={styles.remarqueInput}
+                                    value={p.remarque} 
+                                    onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
+                                    placeholder="Ajouter une remarque..."
+                                    className="remarque-input"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Mobile Cards View */}
+                  <div className="mobile-view" style={styles.mobileView}>
+                    <div style={styles.mobileCardsContainer}>
                       {presences.map((p, i) => (
-                        <tr key={p.etudiant} style={styles.tableRow} className="table-row">
-                          <td style={styles.td}>
-                            <div style={styles.studentInfo}>
-                              <div style={styles.avatar}>
-                                <span style={styles.avatarText}>
+                        <div key={p.etudiant} style={styles.mobileStudentCard}>
+                          {/* En-tête de la carte avec info étudiant */}
+                          <div style={styles.mobileCardHeader}>
+                            <div style={styles.mobileStudentInfo}>
+                              <div style={styles.mobileAvatar}>
+                                <span style={styles.mobileAvatarText}>
                                   {p.nom.charAt(0).toUpperCase()}
                                 </span>
                               </div>
-                              <div style={styles.studentName}>{p.nom}</div>
+                              <div style={styles.mobileStudentName}>{p.nom}</div>
                             </div>
-                          </td>
-                          <td style={styles.td}>
-                            <select 
-                              style={{
-                                ...styles.statusSelect,
-                                backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
-                                color: p.present ? '#166534' : '#991b1b',
-                                borderColor: p.present ? '#bbf7d0' : '#fecaca'
-                              }}
-                              value={p.present} 
-                              onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
-                            >
-                              <option value="true">
-                                ✓ Présent
-                              </option>
-                              <option value="false">
-                                ✗ Absent
-                              </option>
-                            </select>
-                          </td>
-                          <td style={styles.td}>
-                            <div style={styles.remarqueContainer}>
-                              <MessageSquare style={styles.remarqueIcon} />
-                              <input 
-                                type="text" 
-                                style={styles.remarqueInput}
-                                value={p.remarque} 
-                                onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
-                                placeholder="Ajouter une remarque..."
-                                className="remarque-input"
+                          </div>
+
+                          {/* Contenu de la carte */}
+                          <div style={styles.mobileCardContent}>
+                            {/* Statut */}
+                            <div style={styles.mobileField}>
+                              <label style={styles.mobileFieldLabel}>
+                                <UserCheck style={styles.mobileFieldIcon} />
+                                Statut de présence
+                              </label>
+                              <select
+                                style={{
+                                  ...styles.mobileStatusSelect,
+                                  backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
+                                  color: p.present ? '#166534' : '#991b1b',
+                                  borderColor: p.present ? '#bbf7d0' : '#fecaca'
+                                }}
+                                value={p.present}
+                                onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
+                              >
+                                <option value="true">✓ Présent</option>
+                                <option value="false">✗ Absent</option>
+                              </select>
+                            </div>
+
+                            {/* Retard */}
+                            <div style={styles.mobileField}>
+                              <label style={styles.mobileFieldLabel}>
+                                <Clock style={styles.mobileFieldIcon} />
+                                Retard (minutes)
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                max="60"
+                                style={{
+                                  ...styles.mobileRetardInput,
+                                  opacity: p.present ? 1 : 0.5
+                                }}
+                                value={p.retardMinutes}
+                                onChange={(e) => handlePresenceChange(i, 'retardMinutes', parseInt(e.target.value) || 0)}
+                                disabled={!p.present}
+                                placeholder="0"
                               />
                             </div>
-                          </td>
-                        </tr>
+
+                            {/* Remarque */}
+                            <div style={styles.mobileField}>
+                              <label style={styles.mobileFieldLabel}>
+                                <MessageSquare style={styles.mobileFieldIcon} />
+                                Remarque
+                              </label>
+                              <input
+                                type="text"
+                                style={styles.mobileRemarqueInput}
+                                value={p.remarque}
+                                onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
+                                placeholder="Ajouter une remarque..."
+                              />
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+
+                  {/* Bouton de soumission */}
+                  <div style={styles.submitContainer}>
+                    <button
+                      type="submit"
+                      style={{
+                        ...styles.submitButton,
+                        opacity: isSubmitting ? 0.6 : 1,
+                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                        background: isSubmitting
+                          ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                          : 'linear-gradient(135deg, #3b82f6, #4f46e5)'
+                      }}
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="submit-button"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div style={{
+                            width: '20px',
+                            height: '20px',
+                            border: '2px solid #ffffff',
+                            borderTop: '2px solid transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite'
+                          }} />
+                          Enregistrement en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Save style={styles.buttonIcon} />
+                          Enregistrer la présence
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-                
-                {/* Bouton d'enregistrement */}
-                <div style={styles.submitContainer}>
-                  <button 
-                    type="submit" 
-                    style={{
-                      ...styles.submitButton,
-                      opacity: isSubmitting ? 0.6 : 1,
-                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                      background: isSubmitting 
-                        ? 'linear-gradient(135deg, #9ca3af, #6b7280)' 
-                        : 'linear-gradient(135deg, #3b82f6, #4f46e5)'
-                    }}
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                    className="submit-button"
-                    onMouseEnter={(e) => {
-                      if (!isSubmitting) {
-                        e.target.style.background = 'linear-gradient(135deg, #1e40af, #3730a3)';
-                        e.target.style.transform = 'translateY(-2px)';
-                        e.target.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.4)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSubmitting) {
-                        e.target.style.background = 'linear-gradient(135deg, #3b82f6, #4f46e5)';
-                        e.target.style.transform = 'translateY(0)';
-                        e.target.style.boxShadow = '0 4px 15px rgba(59, 130, 246, 0.3)';
-                      }
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div style={{
-                          width: '20px',
-                          height: '20px',
-                          border: '2px solid #ffffff',
-                          borderTop: '2px solid transparent',
-                          borderRadius: '50%',
-                          animation: 'spin 1s linear infinite'
-                        }} />
-                        Enregistrement en cours...
-                      </>
-                    ) : (
-                      <>
-                        <Save style={styles.buttonIcon} />
-                        Enregistrer la présence
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+              </>
             )}
 
             {/* Message de statut */}
@@ -755,7 +1092,9 @@ const styles = {
   container: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    width: '100%',
+    overflow: 'hidden'
   },
   header: {
     background: 'rgba(255, 255, 255, 0.9)',
@@ -1070,6 +1409,16 @@ const styles = {
     transition: 'all 0.2s ease',
     minWidth: '120px'
   },
+  retardInput: {
+    width: '80px',
+    padding: '8px 12px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '6px',
+    fontSize: '14px',
+    textAlign: 'center',
+    outline: 'none',
+    transition: 'all 0.2s ease'
+  },
   remarqueContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -1129,6 +1478,107 @@ const styles = {
   messageIcon: {
     width: '20px',
     height: '20px'
+  },
+  // Ajout des nouveaux styles pour mobile
+  desktopView: {
+    display: 'block'
+  },
+  mobileView: {
+    display: 'none'
+  },
+  mobileCardsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px'
+  },
+  mobileStudentCard: {
+    background: '#ffffff',
+    borderRadius: '12px',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.08)',
+    border: '1px solid #e5e7eb',
+    overflow: 'hidden',
+    transition: 'box-shadow 0.2s ease'
+  },
+  mobileCardHeader: {
+    background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+    padding: '16px',
+    borderBottom: '1px solid #e5e7eb'
+  },
+  mobileStudentInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  mobileAvatar: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+  },
+  mobileAvatarText: {
+    color: '#ffffff',
+    fontSize: '18px',
+    fontWeight: '600'
+  },
+  mobileStudentName: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#1f2937'
+  },
+  mobileCardContent: {
+    padding: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px'
+  },
+  mobileField: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  mobileFieldLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151'
+  },
+  mobileFieldIcon: {
+    width: '16px',
+    height: '16px',
+    color: '#3b82f6'
+  },
+  mobileStatusSelect: {
+    padding: '12px 16px',
+    border: '2px solid',
+    borderRadius: '8px',
+    fontSize: '16px',
+    fontWeight: '500',
+    outline: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  mobileRetardInput: {
+    padding: '12px 16px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '16px',
+    textAlign: 'center',
+    outline: 'none',
+    transition: 'all 0.2s ease'
+  },
+  mobileRemarqueInput: {
+    padding: '12px 16px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '16px',
+    outline: 'none',
+    transition: 'all 0.2s ease'
   }
 };
 

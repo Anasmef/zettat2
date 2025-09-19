@@ -47,7 +47,7 @@ const ListePresences = () => {
           return;
         }
 
-        const res = await axios.get('/api/professeur/presences', {
+        const res = await axios.get('http://localhost:5000/api/professeur/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -69,6 +69,7 @@ const ListePresences = () => {
         const sessions = Object.entries(grouped).map(([key, values]) => {
           const [date, cours, heure, periode, matiere, nomProfesseur] = key.split('_');
           const presentCount = values.filter(p => p.present).length;
+          const retardCount = values.filter(p => p.present && p.retardMinutes > 0).length; // 🆕
           const totalCount = values.length;
           return {
             date,
@@ -79,6 +80,7 @@ const ListePresences = () => {
             nomProfesseur,
             presences: values,
             presentCount,
+            retardCount, // 🆕
             totalCount,
             attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
           };
@@ -807,6 +809,12 @@ const ListePresences = () => {
                       </div>
                     </th>
                     <th style={styles.th}>Taux de présence</th>
+                    <th style={styles.th}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AlertCircle size={16} />
+                        Retards
+                      </div>
+                    </th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
@@ -863,6 +871,20 @@ const ListePresences = () => {
                         </div>
                       </td>
                       <td style={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ 
+                            fontSize: '14px', 
+                            fontWeight: '500', 
+                            color: session.retardCount > 0 ? '#f59e0b' : '#6b7280' 
+                          }}>
+                            {session.retardCount}
+                          </span>
+                          {session.retardCount > 0 && (
+                            <AlertCircle size={14} color="#f59e0b" />
+                          )}
+                        </div>
+                      </td>
+                      <td style={styles.td}>
                         <button
                           className="button"
                           style={styles.button}
@@ -910,6 +932,10 @@ const ListePresences = () => {
                       <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Clock size={12} />
 {formatHoraire(session.heure, session.periode)}
+                      </p>
+                      <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={12} />
+                        {session.retardCount} retard{session.retardCount !== 1 ? 's' : ''}
                       </p>
                     </div>
                     <button
@@ -1011,6 +1037,15 @@ const ListePresences = () => {
                     </div>
                     <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{sessionActive.totalCount - sessionActive.presentCount}</p>
                   </div>
+                  <div style={{ ...styles.statCard, backgroundColor: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <AlertCircle size={20} />
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>Retards</span>
+                    </div>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+                      {sessionActive.presences.filter(p => p.present && p.retardMinutes > 0).length}
+                    </p>
+                  </div>
                   <div style={{ ...styles.statCard, ...styles.statCardBlue }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <Users size={20} />
@@ -1033,6 +1068,7 @@ const ListePresences = () => {
                         <tr>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Étudiant</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Statut</th>
+                          <th style={{ ...styles.th, padding: '12px 16px' }}>Retard (min)</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Remarque</th>
                         </tr>
                       </thead>
@@ -1045,9 +1081,31 @@ const ListePresences = () => {
                               </span>
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
-                              <span style={p.present ? { ...styles.badge, ...styles.badgeGreen } : { ...styles.badge, ...styles.badgeRed }}>
-                                {p.present ? <Check size={12} /> : <X size={12} />}
-                                {p.present ? 'Présent' : 'Absent'}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={p.present ? { ...styles.badge, ...styles.badgeGreen } : { ...styles.badge, ...styles.badgeRed }}>
+                                  {p.present ? <Check size={12} /> : <X size={12} />}
+                                  {p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent'}
+                                </span>
+                                {p.retardMinutes > 0 && (
+                                  <span style={{
+                                    fontSize: '10px',
+                                    color: '#f59e0b',
+                                    backgroundColor: '#fef3c7',
+                                    padding: '2px 4px',
+                                    borderRadius: '4px',
+                                    fontWeight: '500'
+                                  }}>
+                                    +{p.retardMinutes}min
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ ...styles.td, padding: '12px 16px' }}>
+                              <span style={{ 
+                                color: p.retardMinutes > 0 ? '#f59e0b' : '#6b7280',
+                                fontWeight: p.retardMinutes > 0 ? '500' : 'normal'
+                              }}>
+                                {p.retardMinutes > 0 ? `${p.retardMinutes} min` : '—'}
                               </span>
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
@@ -1072,6 +1130,20 @@ const ListePresences = () => {
                             {p.present ? 'Présent' : 'Absent'}
                           </span>
                         </div>
+                        {p.retardMinutes > 0 && (
+                          <div style={{ marginBottom: '8px' }}>
+                            <span style={{ 
+                              fontSize: '12px',
+                              color: '#f59e0b',
+                              fontWeight: '500',
+                              backgroundColor: '#fef3c7',
+                              padding: '2px 6px',
+                              borderRadius: '4px'
+                            }}>
+                              Retard: {p.retardMinutes} min
+                            </span>
+                          </div>
+                        )}
                         {p.remarque && (
                           <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
                             <strong>Remarque:</strong> {p.remarque}

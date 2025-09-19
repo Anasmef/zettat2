@@ -67,9 +67,9 @@ const ModalEmploiSemaine = () => {
       
       // Utiliser le rôle stocké au lieu du userType prop
       if (role === 'prof') {
-        url = '/api/seances/professeur';
+        url = 'http://localhost:5000/api/seances/professeur';
       } else if (role === 'etudiant') {
-        url = '/api/seances/etudiant';
+        url = 'http://localhost:5000/api/seances/etudiant';
       } else {
         setError('Rôle utilisateur non reconnu');
         setLoading(false);

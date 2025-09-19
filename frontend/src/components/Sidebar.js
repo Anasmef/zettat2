@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   GraduationCap,
+  Lock,
   School,
   Clock,
   Users,
@@ -137,7 +138,11 @@ const Sidebar = ({ onLogout }) => {
       label: 'Liste Présences',
       icon: ClipboardList
     },
-
+    {
+      path: '/admin/autorisations',
+      label: 'Autorisations',
+      icon: Lock
+    },
     {
       path: '/admin/Bulletin',
       label: 'Bulletin',

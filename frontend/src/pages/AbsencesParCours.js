@@ -44,7 +44,7 @@ const AbsencesParCours = () => {
     const fetchCours = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch('/api/professeur/mes-cours', {
+        const response = await fetch('http://localhost:5000/api/professeur/mes-cours', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -99,7 +99,7 @@ const AbsencesParCours = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/professeur/etudiants-absences/${nomCours}`, {
+      const response = await fetch(`http://localhost:5000/api/professeur/etudiants-absences/${nomCours}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

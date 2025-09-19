@@ -8,6 +8,8 @@ const etudiantSchema = new mongoose.Schema(
     genre: { type: String, enum: ['Homme', 'Femme'], required: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     motDePasse: { type: String, required: true },
+    // Dans votre etudiantModel.js, ajoutez ce champ :
+autorise: { type: Boolean, default: false }, // Ajoutez cette ligne
     dateNaissance: { type: Date, required: true },
     lieuNaissance: { type: String, required: true, trim: true },
     nationalite: { type: String, required: true, trim: true },

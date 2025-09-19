@@ -34,7 +34,7 @@ const [dateTo, setDateTo] = useState('');
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get('/api/presences', {
+        const res = await axios.get('http://localhost:5000/api/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -52,6 +52,7 @@ const key = `${new Date(p.dateSession).toDateString()}_${p.cours}_${p.matiere ||
         const sessions = Object.entries(grouped).map(([key, values]) => {
           const [date, cours, matiere, nomProfesseur] = key.split('_');
           const presentCount = values.filter(p => p.present).length;
+          const retardCount = values.filter(p => p.present && p.retardMinutes > 0).length; // 🆕
           const totalCount = values.length;
           return { 
             date, 
@@ -60,6 +61,7 @@ const key = `${new Date(p.dateSession).toDateString()}_${p.cours}_${p.matiere ||
             nomProfesseur,
             presences: values,
             presentCount,
+            retardCount, // 🆕
             totalCount,
             attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
           };
@@ -252,7 +254,8 @@ const exportDailyPresences = (date, professorName = null) => {
         'Période': session.presences[0]?.periode || 'N/A',
         'Heure': session.presences[0]?.heure || 'N/A',
         'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Présent': p.present ? 'Oui' : 'Non',
+        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+        'Retard (min)': p.retardMinutes || 0, // 🆕
         'Remarque': p.remarque || ''
       });
     });
@@ -285,7 +288,8 @@ const exportMonthlyPresences = (month, year) => {
         'Période': session.presences[0]?.periode || 'N/A',
         'Heure': session.presences[0]?.heure || 'N/A',
         'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Statut': p.present ? 'Présent' : 'Absent',
+        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+        'Retard (min)': p.retardMinutes || 0, // 🆕
         'Remarque': p.remarque || '',
         'Total Étudiants Session': session.totalCount,
         'Présents Session': session.presentCount,
@@ -372,7 +376,8 @@ const exportByProfessor = (professorName) => {
         'Classe': session.cours,
         'Matière': session.matiere || 'N/A',
         'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Présent': p.present ? 'Oui' : 'Non',
+        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+        'Retard (min)': p.retardMinutes || 0, // 🆕
         'Remarque': p.remarque || ''
       });
     });
@@ -1041,6 +1046,12 @@ const exportByProfessor = (professorName) => {
                       </div>
                     </th>
                     <th style={styles.th}>Taux de présence</th>
+                    <th style={styles.th}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <AlertCircle size={16} />
+                        Retards
+                      </div>
+                    </th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
@@ -1092,6 +1103,20 @@ const exportByProfessor = (professorName) => {
                         </div>
                       </td>
                       <td style={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ 
+                            fontSize: '14px', 
+                            fontWeight: '500', 
+                            color: session.retardCount > 0 ? '#f59e0b' : '#6b7280' 
+                          }}>
+                            {session.retardCount}
+                          </span>
+                          {session.retardCount > 0 && (
+                            <AlertCircle size={14} color="#f59e0b" />
+                          )}
+                        </div>
+                      </td>
+                      <td style={styles.td}>
                         <button
                           className="button"
                           style={styles.button}
@@ -1122,6 +1147,10 @@ const exportByProfessor = (professorName) => {
                       <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <User size={12} />
                         {session.nomProfesseur || 'Professeur non spécifié'}
+                      </p>
+                      <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={12} />
+                        {session.retardCount} retard{session.retardCount !== 1 ? 's' : ''}
                       </p>
                     </div>
                     <button
@@ -1205,6 +1234,15 @@ const exportByProfessor = (professorName) => {
                     </div>
                     <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{sessionActive.totalCount - sessionActive.presentCount}</p>
                   </div>
+                  <div style={{ ...styles.statCard, backgroundColor: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <AlertCircle size={20} />
+                      <span style={{ fontSize: '14px', fontWeight: '500' }}>Retards</span>
+                    </div>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+                      {sessionActive.presences.filter(p => p.present && p.retardMinutes > 0).length}
+                    </p>
+                  </div>
                   <div style={{ ...styles.statCard, ...styles.statCardBlue }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                       <Users size={20} />
@@ -1239,10 +1277,24 @@ const exportByProfessor = (professorName) => {
                               </span>
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
-                              <span style={p.present ? { ...styles.badge, ...styles.badgeGreen } : { ...styles.badge, ...styles.badgeRed }}>
-                                {p.present ? <Check size={12} /> : <X size={12} />}
-                                {p.present ? 'Présent' : 'Absent'}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={p.present ? { ...styles.badge, ...styles.badgeGreen } : { ...styles.badge, ...styles.badgeRed }}>
+                                  {p.present ? <Check size={12} /> : <X size={12} />}
+                                  {p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent'}
+                                </span>
+                                {p.retardMinutes > 0 && p.present && (
+                                  <span style={{
+                                    fontSize: '10px',
+                                    backgroundColor: '#f59e0b',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '8px',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    +{p.retardMinutes}min
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
                               <span style={{ color: '#6b7280' }}>{p.remarque || '—'}</span>
@@ -1464,7 +1516,8 @@ const exportByProfessor = (professorName) => {
                               'Matière': session.matiere || 'N/A',
                               'Professeur': session.nomProfesseur || 'N/A',
                               'Étudiant': p.etudiant?.nomComplet || 'N/A',
-                              'Présent': p.present ? 'Oui' : 'Non',
+                              'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+                              'Retard (min)': p.retardMinutes || 0, // 🆕
                               'Remarque': p.remarque || ''
                             });
                           });

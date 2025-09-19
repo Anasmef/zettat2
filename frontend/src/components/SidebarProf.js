@@ -74,7 +74,12 @@ const SidebarProf = ({ onLogout }) => {
       label: 'Mon Profil',
       icon: User
     },
-     {
+    {
+      path: '/professeur/etudiants-autorises',
+      label: 'Étudiants Autorisés',
+      icon: UserCheck
+    },
+    {
           path: '/professeur/seances',
           label: 'Mes Séances',
           icon: Clock

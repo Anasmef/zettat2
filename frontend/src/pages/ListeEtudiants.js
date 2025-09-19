@@ -21,6 +21,10 @@ import {
   GraduationCap
 } from "lucide-react";
 
+// Liste complète des pays pour le select nationalité
+const countriesList = [
+  "Maroc", "Algérie", "Tunisie", "France", "Espagne", "Italie", "Allemagne", "Belgique", "Suisse", "Canada", "États-Unis", "Royaume-Uni", "Pays-Bas", "Portugal", "Turquie", "Égypte", "Arabie Saoudite", "Émirats Arabes Unis", "Qatar", "Liban", "Jordanie", "Sénégal", "Mali", "Côte d'Ivoire", "Gabon", "Cameroun", "Chine", "Japon", "Corée du Sud", "Russie", "Brésil", "Argentine", "Australie", "Inde", "Pakistan", "Afghanistan", "Soudan", "Palestine", "Irak", "Iran", "Syrie", "Libye", "Mauritanie", "Tchad", "Nigéria", "Afrique du Sud", "Suède", "Norvège", "Danemark", "Finlande", "Autriche", "Grèce", "Roumanie", "Bulgarie", "Hongrie", "Pologne", "Ukraine", "Mexique", "Chili", "Colombie", "Venezuela", "Pérou", "Bolivie", "Costa Rica", "Guatemala", "Honduras", "Nicaragua", "Panama", "Cuba", "Haïti", "République Dominicaine", "Jamaïque", "Trinité-et-Tobago", "Bahamas", "Barbade", "Saint-Kitts-et-Nevis", "Saint-Vincent-et-les-Grenadines", "Sainte-Lucie", "Antigua-et-Barbuda", "Dominique", "Grenade", "Suriname", "Guyana", "Paraguay", "Uruguay", "Équateur", "Salvador", "Belize", "Brunei", "Singapour", "Malaisie", "Indonésie", "Thaïlande", "Vietnam", "Philippines", "Mongolie", "Kazakhstan", "Ouzbékistan", "Turkménistan", "Kirghizistan", "Tadjikistan", "Azerbaïdjan", "Arménie", "Géorgie", "Estonie", "Lettonie", "Lituanie", "Slovaquie", "Slovénie", "Croatie", "Serbie", "Monténégro", "Macédoine du Nord", "Bosnie-Herzégovine", "Albanie", "Islande", "Irlande", "Luxembourg", "Liechtenstein", "Monaco", "Andorre", "Saint-Marin", "Vatican", "Malte", "Chypre", "Israël", "Nouvelle-Zélande", "Fidji", "Papouasie-Nouvelle-Guinée", "Samoa", "Tonga", "Vanuatu", "Îles Salomon", "Micronésie", "Palaos", "Nauru", "Tuvalu", "Kiribati", "Îles Marshall", "Timor oriental", "Bhoutan", "Népal", "Sri Lanka", "Maldives", "Bangladesh", "Myanmar", "Laos", "Cambodge", "Taïwan", "Hong Kong", "Macau", "Yémen", "Oman", "Koweït", "Bahreïn", "Djibouti", "Somalie", "Éthiopie", "Kenya", "Ouganda", "Tanzanie", "Rwanda", "Burundi", "Mozambique", "Zambie", "Zimbabwe", "Botswana", "Namibie", "Lesotho", "Swaziland", "Angola", "Congo", "République Démocratique du Congo", "Guinée", "Guinée-Bissau", "Guinée équatoriale", "Sierra Leone", "Libéria", "Ghana", "Togo", "Bénin", "Burkina Faso", "Niger", "Centrafrique", "Soudan du Sud", "Erythrée", "Cap-Vert", "Comores", "Seychelles", "Maurice", "Madagascar", "Sao Tomé-et-Principe", "Gambie", "Malawi", "Monténégro", "Kosovo"
+];
 
 const ListeEtudiants = () => {
   const [etudiants, setEtudiants] = useState([]);
@@ -49,7 +53,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '1AC',
+  niveau: '1AC A',
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -89,7 +93,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '1AC',
+  niveau: '1AC A',
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -111,52 +115,79 @@ const [formAjout, setFormAjout] = useState({
   const [loadingModifier, setLoadingModifier] = useState(false);
   const [etudiantAModifier, setEtudiantAModifier] = useState(null);
   
-  // Finance modal states
-  const [showFinanceModal, setShowFinanceModal] = useState(false);
-  const [etudiantFinance, setEtudiantFinance] = useState(null);
-  const [formFinance, setFormFinance] = useState({
-    prixTotal: 0,
-    paye: false,
-    pourcentageBourse: 0,
-    typePaiement: 'Cash'
-  });
-  const [messageFinance, setMessageFinance] = useState('');
-  const [loadingFinance, setLoadingFinance] = useState(false);
-  
   const navigate = useNavigate();
 
   // Niveaux disponibles mis à jour selon vos spécifications
   const niveauxDisponibles = [
   // Collège
-  "1AC",
+  "1AC A",
+  "1AC B",
   "2AC",
-  "3AC",
-
-  // Tronc Commun (واحد فقط)
-  "Tronc Commun",
-
+  "3AC A",
+  "3AC B", 
+  "3AC C",
+  
+  // Tronc Commun
+  "Tronc Commun A",
+  "Tronc Commun B",
+  "Tronc Commun C",
+  
   // 1ère Bac
-  "1BAC SM",
-  "1BAC PC",
-  "1BAC SVT",
-  "1BAC Lettres",
-  "1BAC Économie",
-  "1BAC Technique",
-
+  "1BAC SX",
+  "1BAC Économie A",
+  "1BAC Économie B",
+  
   // 2ème Bac
-  "2BAC SMA",
-  "2BAC SMB",
-  "2BAC PC",
+  "2BAC PC A",
+  "2BAC PC B",
+  "2BAC PC C",
   "2BAC SVT",
-  "2BAC Lettres",
-  "2BAC Économie",
-  "2BAC Technique"
+  "2BAC Économie A",
+  "2BAC Économie B"
 ];
 
-  // Helper للحصول على الكورسات حسب المستوى
-  const coursPourNiveau = (liste, niveau) =>
-    liste
-      .filter(c => (c.niveau || '').toLowerCase() === (niveau || '').toLowerCase());
+  // Helper للحصول على الكورسات حسب المستوى - VERSION FINALE STRICTE
+  const coursPourNiveau = (liste, niveau) => {
+    if (!niveau) return liste;
+    
+    console.log('🔍 Recherche cours pour niveau:', niveau);
+    console.log('📚 Liste complète des cours:', liste.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
+    
+    // D'abord chercher une correspondance exacte avec le niveau défini
+    const correspondanceExacte = liste.filter(c => {
+      const niveauCours = c.niveau || '';
+      return niveauCours.toLowerCase() === niveau.toLowerCase();
+    });
+    
+    console.log('✅ Correspondances exactes trouvées:', correspondanceExacte.map(c => ({ nom: c.nom, niveau: c.niveau })));
+    
+    if (correspondanceExacte.length > 0) {
+      return correspondanceExacte;
+    }
+    
+    // Si aucune correspondance exacte, chercher par nom du cours = niveau
+    // (pour les cours sans champ niveau défini)
+    const correspondanceParNom = liste.filter(c => {
+      return c.nom && c.nom.toLowerCase() === niveau.toLowerCase();
+    });
+    
+    console.log('🔄 Correspondances par nom trouvées:', correspondanceParNom.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
+    
+    if (correspondanceParNom.length > 0) {
+      return correspondanceParNom;
+    }
+    
+    // En dernier recours, correspondance par base (1AC B -> 1AC)
+    const niveauBase = niveau.replace(/ [ABC]$/i, '');
+    const correspondanceBase = liste.filter(c => {
+      const coursNiveauBase = (c.niveau || c.nom || '').replace(/ [ABC]$/i, '');
+      return coursNiveauBase.toLowerCase() === niveauBase.toLowerCase();
+    });
+    
+    console.log('🔄 Correspondances par base trouvées:', correspondanceBase.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
+    
+    return correspondanceBase;
+  };
 
   // حساب الكورسات المتاحة حسب المستوى الحالي
   const coursDisponiblesAjout = useMemo(
@@ -205,11 +236,11 @@ const [formAjout, setFormAjout] = useState({
       const headers = { Authorization: `Bearer ${token}` };
       
       try {
-        const res = await axios.get('/api/etudiants/filtered', { headers });
+        const res = await axios.get('http://localhost:5000/api/etudiants/filtered', { headers });
         setEtudiants(res.data);
       } catch (err) {
         // fallback to original route
-        const res = await axios.get('/api/etudiants', { headers });
+        const res = await axios.get('http://localhost:5000/api/etudiants', { headers });
         setEtudiants(res.data);
       }
     } catch (err) {
@@ -222,7 +253,7 @@ const [formAjout, setFormAjout] = useState({
   const fetchCours = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/cours', {
+      const res = await axios.get('http://localhost:5000/api/cours', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListeCours(res.data);
@@ -288,7 +319,7 @@ if (recherche) {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '1AC',
+    niveau: '1AC A',
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -365,7 +396,7 @@ const handleSubmitAjout = async (e) => {
       console.log(`${key}: ${value}`);
     }
 
-    const response = await axios.post('/api/etudiants', formData, {
+    const response = await axios.post('http://localhost:5000/api/etudiants', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -385,7 +416,7 @@ const handleSubmitAjout = async (e) => {
       nomCompletMere: '',
       travailPere: '',
       travailMere: '',
-      niveau: '1AC',
+      niveau: '1AC A',
       telephoneEtudiant: '',
       telephonePere: '',
       telephoneMere: '',
@@ -432,7 +463,7 @@ const openEditModal = (etudiant) => {
     nomCompletMere: etudiant.nomCompletMere || '',
     travailPere: etudiant.travailPere || '',
     travailMere: etudiant.travailMere || '',
-    niveau: etudiant.niveau || '1AC',
+    niveau: etudiant.niveau || '1AC A',
     telephoneEtudiant: etudiant.telephoneEtudiant || '',
     telephonePere: etudiant.telephonePere || '',
     telephoneMere: etudiant.telephoneMere || '',
@@ -470,7 +501,7 @@ const closeEditModal = () => {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '1AC',
+    niveau: '1AC A',
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -549,7 +580,7 @@ const closeEditModal = () => {
       console.log(`${key}: ${value}`);
     }
 
-    const response = await axios.put(`/api/etudiants/${etudiantAModifier._id}`, formData, {
+    const response = await axios.put(`http://localhost:5000/api/etudiants/${etudiantAModifier._id}`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -575,7 +606,7 @@ const closeEditModal = () => {
   const handleToggleActif = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(`/api/etudiants/${id}/actif`, {}, {
+      const res = await axios.patch(`http://localhost:5000/api/etudiants/${id}/actif`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEtudiants(etudiants.map(e => e._id === id ? res.data : e));
@@ -589,7 +620,7 @@ const closeEditModal = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/etudiants/${id}`, {
+      await axios.delete(`http://localhost:5000/api/etudiants/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEtudiants(etudiants.filter(e => e._id !== id));
@@ -664,69 +695,6 @@ const closeEditModal = () => {
   // Permission helper
   const canViewFinance = () => {
     return userRole === 'admin' || userRole === 'paiement_manager';
-  };
-
-  // Finance modal handlers
-  const handleFinanceEdit = (etudiant) => {
-    setEtudiantFinance(etudiant);
-    setFormFinance({
-      prixTotal: etudiant.prixTotal || 0,
-      paye: !!etudiant.paye,
-      pourcentageBourse: etudiant.pourcentageBourse || 0,
-      typePaiement: etudiant.typePaiement || 'Cash'
-    });
-    setShowFinanceModal(true);
-    setMessageFinance('');
-  };
-
-  const onChangeFinance = (e) => {
-    const { name, value } = e.target;
-    const parseBool = (v) => (v === true || v === 'true');
-    setFormFinance(prev => ({
-      ...prev,
-      [name]: name === 'paye' ? parseBool(value) : 
-               (name === 'prixTotal' || name === 'pourcentageBourse') ? Number(value) : value
-    }));
-  };
-
-  const handleSubmitFinance = async (e) => {
-    e.preventDefault();
-    if (!etudiantFinance?._id) return;
-    
-    setLoadingFinance(true);
-    
-    try {
-      const token = localStorage.getItem('token');
-      await axios.patch(`/api/etudiants/${etudiantFinance._id}/finance`, formFinance, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      setMessageFinance('✅ Informations financières mises à jour avec succès');
-      await fetchEtudiants();
-      
-      setTimeout(() => {
-        setShowFinanceModal(false);
-        setMessageFinance('');
-      }, 2000);
-      
-    } catch (err) {
-      console.error('Erreur mise à jour finance:', err);
-      setMessageFinance('❌ Erreur lors de la mise à jour financière');
-    } finally {
-      setLoadingFinance(false);
-    }
-  };
-
-  const closeFinanceModal = () => {
-    setShowFinanceModal(false);
-    setEtudiantFinance(null);
-    setFormFinance({
-      prixTotal: 0,
-      paye: false,
-      pourcentageBourse: 0,
-      typePaiement: 'Cash'
-    });
-    setMessageFinance('');
   };
 
   // Finance fields component for forms
@@ -981,44 +949,89 @@ const closeEditModal = () => {
                         </span>
                       </td>
                     )}
-                    <td className="actions-colonne">
-                      <button 
-                        onClick={() => handleView(e)}
-                        className="btn-voir"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleEdit(e)}
-                        className="btn-modifier"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      {canViewFinance() && (
+                    <td className="actions-colonne" style={{ 
+                      minWidth: '300px', 
+                      width: '300px', 
+                      padding: '8px',
+                      textAlign: 'center',
+                      overflow: 'visible'
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '3px', 
+                        justifyContent: 'center',
+                        flexWrap: 'nowrap',
+                        alignItems: 'center',
+                        width: '100%'
+                      }}>
                         <button 
-                          onClick={() => handleFinanceEdit(e)} 
-                          className="btn-finance"
-                          title="Modifier finances"
+                          onClick={() => handleView(e)}
+                          title="Voir détails"
                           style={{
-                            background: '#f59e0b',
+                            background: '#3b82f6',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
-                            padding: '8px',
-                            margin: '0 2px',
+                            padding: '5px 8px',
                             cursor: 'pointer',
-                            fontSize: '14px'
+                            fontSize: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            minWidth: '70px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap'
                           }}
                         >
-                          💰
+                          <Eye size={12} />
+                          Voir
                         </button>
-                      )}
-                      <button 
-                        onClick={() => handleDelete(e._id)}
-                        className="btn-supprimer"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                        <button 
+                          onClick={() => handleEdit(e)}
+                          title="Modifier"
+                          style={{
+                            background: '#10b981',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            minWidth: '80px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <Edit size={12} />
+                          Modifier
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(e._id)}
+                          title="Supprimer"
+                          style={{
+                            background: '#dc2626',
+                            color: 'white',
+                            border: '2px solid #dc2626',
+                            borderRadius: '4px',
+                            padding: '6px 10px',
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            minWidth: '100px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          SUPPRIMER
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1245,16 +1258,18 @@ const closeEditModal = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>Nationalité *</label>
-                  <input
-                    type="text"
+                  <select
                     name="nationalite"
-                    placeholder="Nationalité"
                     value={formAjout.nationalite}
                     onChange={handleChangeAjout}
                     required
-                  />
+                  >
+                    <option value="">Sélectionner un pays...</option>
+                    {countriesList.map((country) => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </select>
                 </div>
-
                 <div className="form-group">
                   <label>Niveau *</label>
                   <select name="niveau" value={formAjout.niveau} onChange={handleChangeAjout} required>
@@ -1556,14 +1571,17 @@ const closeEditModal = () => {
               <div className="form-row">
                 <div className="form-group">
                   <label>Nationalité *</label>
-                  <input
-                    type="text"
+                  <select
                     name="nationalite"
-                    placeholder="Nationalité"
                     value={formModifier.nationalite}
                     onChange={handleChangeModifier}
                     required
-                  />
+                  >
+                    <option value="">Sélectionner un pays...</option>
+                    {countriesList.map((country) => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">
@@ -1811,83 +1829,6 @@ const closeEditModal = () => {
                 </button>
                 <button type="submit" disabled={loadingModifier} className="btn-enregistrer">
                   {loadingModifier ? 'Modification...' : 'Enregistrer les modifications'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Finance Modal */}
-      {showFinanceModal && etudiantFinance && (
-        <div className="modal-overlay" onClick={closeFinanceModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Modifier les informations financières</h3>
-              <p style={{margin: '5px 0', color: '#666', fontSize: '14px'}}>
-                Étudiant: <strong>{etudiantFinance.nomComplet}</strong>
-              </p>
-              <button className="btn-fermer-modal" onClick={closeFinanceModal}>×</button>
-            </div>
-            
-            <form onSubmit={handleSubmitFinance} className="form-ajout-etudiant">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Prix Total *</label>
-                  <input
-                    type="number"
-                    name="prixTotal"
-                    min="0"
-                    step="0.01"
-                    value={formFinance.prixTotal}
-                    onChange={onChangeFinance}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Payé *</label>
-                  <select name="paye" value={String(formFinance.paye)} onChange={onChangeFinance}>
-                    <option value="true">Oui</option>
-                    <option value="false">Non</option>
-                  </select>
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Pourcentage Bourse (%)</label>
-                  <input
-                    type="number"
-                    name="pourcentageBourse"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={formFinance.pourcentageBourse}
-                    onChange={onChangeFinance}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Type Paiement</label>
-                  <select name="typePaiement" value={formFinance.typePaiement} onChange={onChangeFinance}>
-                    <option value="Cash">Cash</option>
-                    <option value="Virement">Virement</option>
-                    <option value="Chèque">Chèque</option>
-                    <option value="En ligne">En ligne</option>
-                  </select>
-                </div>
-              </div>
-
-              {messageFinance && (
-                <div className={`message-ajout ${messageFinance.includes('✅') ? 'success' : 'error'}`}>
-                  {messageFinance}
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button type="button" onClick={closeFinanceModal} className="btn-annuler">
-                  Annuler
-                </button>
-                <button type="submit" disabled={loadingFinance} className="btn-enregistrer">
-                  {loadingFinance ? 'Mise à jour...' : 'Enregistrer'}
                 </button>
               </div>
             </form>

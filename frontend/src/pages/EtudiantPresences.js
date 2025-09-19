@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, CheckCircle, XCircle, BookOpen, MessageCircle, Search, X, Filter, Users, Clock } from 'lucide-react';
+import { Calendar, CheckCircle, XCircle, BookOpen, MessageCircle, Search, X, Filter, Users, Clock, AlertCircle } from 'lucide-react';
 import Sidebar from '../components/sidebaretudiant';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,7 +11,8 @@ const handleLogout = () => {
 const EtudiantPresencesAbsences = () => {
   const [presences, setPresences] = useState([]);
   const [absences, setAbsences] = useState([]);
-  const [activeTab, setActiveTab] = useState('presences'); // 'presences' ou 'absences'
+  const [retards, setRetards] = useState([]);
+  const [activeTab, setActiveTab] = useState('presences'); // 'presences', 'absences' ou 'retards'
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,25 +27,31 @@ const EtudiantPresencesAbsences = () => {
       navigate('/');
     }
   }, [navigate]);
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
         
         // Récupérer les présences
-        const presencesRes = await fetch('/api/etudiant/presences', {
+        const presencesRes = await fetch('http://localhost:5000/api/etudiant/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const presencesData = await presencesRes.json();
         setPresences(presencesData);
 
         // Récupérer les absences
-        const absencesRes = await fetch('/api/etudiant/absences', {
+        const absencesRes = await fetch('http://localhost:5000/api/etudiant/absences', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const absencesData = await absencesRes.json();
         setAbsences(absencesData);
+
+        // Récupérer les retards
+        const retardsRes = await fetch('http://localhost:5000/api/etudiant/retards', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const retardsData = await retardsRes.json();
+        setRetards(retardsData);
 
         // Initialiser les données filtrées avec les présences par défaut
         setFilteredData(presencesData);
@@ -60,7 +67,8 @@ const EtudiantPresencesAbsences = () => {
 
   // Effet pour filtrer les données selon l'onglet actif et les critères de recherche
   useEffect(() => {
-    const currentData = activeTab === 'presences' ? presences : absences;
+    const currentData = activeTab === 'presences' ? presences : 
+                       activeTab === 'absences' ? absences : retards;
     let filtered = currentData;
 
     // Filtre par texte (cours ou remarque)
@@ -117,7 +125,7 @@ const EtudiantPresencesAbsences = () => {
     }
 
     setFilteredData(filtered);
-  }, [searchTerm, dateFilter, dateRange, presences, absences, activeTab]);
+  }, [searchTerm, dateFilter, dateRange, presences, absences, retards, activeTab]);
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -153,7 +161,8 @@ const EtudiantPresencesAbsences = () => {
   };
 
   const hasActiveFilters = searchTerm || dateFilter || dateRange.start || dateRange.end;
-  const currentData = activeTab === 'presences' ? presences : absences;
+  const currentData = activeTab === 'presences' ? presences : 
+                     activeTab === 'absences' ? absences : retards;
 
   if (loading) {
     return (
@@ -182,6 +191,10 @@ const EtudiantPresencesAbsences = () => {
             <div style={styles.statItem}>
               <span style={styles.statNumber}>{absences.length}</span>
               <span style={styles.statLabel}>Absences</span>
+            </div>
+            <div style={styles.statItem}>
+              <span style={styles.statNumber}>{retards.length}</span>
+              <span style={styles.statLabel}>Retards</span>
             </div>
             <div style={styles.statItem}>
               <span style={styles.statNumber}>{filteredData.length}</span>
@@ -213,6 +226,16 @@ const EtudiantPresencesAbsences = () => {
           >
             <XCircle size={20} />
             <span>Absences ({absences.length})</span>
+          </button>
+          <button
+            onClick={() => handleTabChange('retards')}
+            style={{
+              ...styles.tabButton,
+              ...(activeTab === 'retards' ? styles.activeTab : styles.inactiveTab)
+            }}
+          >
+            <Clock size={20} />
+            <span>Retards ({retards.length})</span>
           </button>
         </div>
       </div>
@@ -317,23 +340,37 @@ const EtudiantPresencesAbsences = () => {
           <div style={styles.emptyState}>
             {activeTab === 'presences' ? (
               <CheckCircle size={64} color="#d1d5db" />
-            ) : (
+            ) : activeTab === 'absences' ? (
               <XCircle size={64} color="#d1d5db" />
+            ) : (
+              <Clock size={64} color="#d1d5db" />
             )}
             <h3 style={styles.emptyTitle}>
               {hasActiveFilters ? 'Aucun résultat trouvé' : 
-                `Aucune ${activeTab === 'presences' ? 'présence' : 'absence'} enregistrée`
+                `Aucun${activeTab === 'retards' ? '' : 'e'} ${
+                  activeTab === 'presences' ? 'présence' : 
+                  activeTab === 'absences' ? 'absence' : 'retard'
+                } enregistré${activeTab === 'retards' ? '' : 'e'}`
               }
             </h3>
             <p style={styles.emptyText}>
               {hasActiveFilters 
-                ? `Aucune ${activeTab === 'presences' ? 'présence' : 'absence'} ne correspond aux critères de recherche. Essayez de modifier vos filtres.`
-                : `Vos ${activeTab === 'presences' ? 'présences' : 'absences'} aux séances apparaîtront ici une fois enregistrées.`
+                ? `Aucun${activeTab === 'retards' ? '' : 'e'} ${
+                    activeTab === 'presences' ? 'présence' : 
+                    activeTab === 'absences' ? 'absence' : 'retard'
+                  } ne correspond aux critères de recherche. Essayez de modifier vos filtres.`
+                : `Vos ${
+                    activeTab === 'presences' ? 'présences' : 
+                    activeTab === 'absences' ? 'absences' : 'retards'
+                  } aux séances apparaîtront ici une fois enregistrés.`
               }
             </p>
             {hasActiveFilters && (
               <button onClick={clearAllFilters} style={styles.clearSearchButton}>
-                Afficher toutes les {activeTab === 'presences' ? 'présences' : 'absences'}
+                Afficher tous les {
+                  activeTab === 'presences' ? 'présences' : 
+                  activeTab === 'absences' ? 'absences' : 'retards'
+                }
               </button>
             )}
           </div>
@@ -346,14 +383,18 @@ const EtudiantPresencesAbsences = () => {
                     <BookOpen size={20} color="#4f46e5" />
                     <span style={styles.courseName}>{item.cours}</span>
                   </div>
-                  <div style={activeTab === 'presences' ? styles.presentBadge : styles.absentBadge}>
+                  <div style={activeTab === 'presences' ? styles.presentBadge : 
+                              activeTab === 'absences' ? styles.absentBadge : styles.retardBadge}>
                     {activeTab === 'presences' ? (
                       <CheckCircle size={16} color="#10b981" />
-                    ) : (
+                    ) : activeTab === 'absences' ? (
                       <XCircle size={16} color="#ef4444" />
+                    ) : (
+                      <Clock size={16} color="#f59e0b" />
                     )}
                     <span style={styles.statusText}>
-                      {activeTab === 'presences' ? 'Présent' : 'Absent'}
+                      {activeTab === 'presences' ? 'Présent' : 
+                       activeTab === 'absences' ? 'Absent' : 'En retard'}
                     </span>
                   </div>
                 </div>
@@ -373,6 +414,18 @@ const EtudiantPresencesAbsences = () => {
                       </span>
                     </div>
                   </div>
+                  {/* Affichage du retard en minutes pour les retards */}
+                  {activeTab === 'retards' && item.retardMinutes && (
+                    <div style={styles.remarqueInfo}>
+                      <Clock size={18} color="#f59e0b" />
+                      <div style={styles.remarqueDetails}>
+                        <span style={styles.remarqueLabel}>Retard</span>
+                        <span style={styles.remarqueValue}>
+                          {item.retardMinutes} minute{item.retardMinutes > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   {/* remarque */}
                   {item.remarque && (
                     <div style={styles.remarqueInfo}>
@@ -662,7 +715,7 @@ const styles = {
     flex: '1 1 150px',
   },
 
-  dateLabel: {
+  dateRangeLabel: {
     fontSize: '0.875rem',
     fontWeight: '500',
     color: '#374151',
@@ -817,6 +870,17 @@ const styles = {
     backgroundColor: '#fecaca',
     borderRadius: '0.5rem',
     border: '1px solid #fca5a5',
+    flexShrink: 0,
+  },
+
+  retardBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.375rem 0.75rem',
+    backgroundColor: '#fef3c7',
+    borderRadius: '0.5rem',
+    border: '1px solid #fcd34d',
     flexShrink: 0,
   },
   

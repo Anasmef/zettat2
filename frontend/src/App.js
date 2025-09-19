@@ -70,6 +70,9 @@ import ProfesseurProfil from './pages/ProfesseurProfil';
 import InscripteurPage from './pages/InscripteurPage';
 import InscripteurDashboard from './pages/InscripteurDashboard';
 import AbsencesParCours from './pages/AbsencesParCours';
+import AutorisationEtudiants from './pages/AutorisationEtudiants';
+import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
+
 
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
@@ -362,7 +365,9 @@ function AppContent() {
         <Route path="/professeur/live" element={<ProfLiveCours />} />
         <Route path="/prof/documents" element={<DocumentsProfesseur />} />
         <Route path="/professeur/messages" element={<MessageProf />} />
+<Route path="/admin/autorisations" element={<AutorisationEtudiants />} />
 
+<Route path="/professeur/etudiants-autorises" element={<EtudiantsAutorisesProfesseur />} />
         {/* Routes Étudiant */}
         <Route path="/etudiant/messages" element={<MessageEtudiant />} />
         <Route path="/professeur/profil" element={<ProfesseurProfil />} />

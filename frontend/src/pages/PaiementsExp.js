@@ -131,7 +131,7 @@ const PaiementsExp = () => {
         return;
       }
 
-      const res = await fetch('/api/paiements/exp', {
+      const res = await fetch('http://localhost:5000/api/paiements/exp', {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -44,7 +44,7 @@ const ExercicesCoursProf = () => {
     const fetchExercices = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get(`/api/professeur/exercices/${nomCours}`, {
+        const res = await axios.get(`http://localhost:5000/api/professeur/exercices/${nomCours}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -93,7 +93,7 @@ const ExercicesCoursProf = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`/api/professeur/exercices/${id}/remarque`, {
+      await axios.put(`http://localhost:5000/api/professeur/exercices/${id}/remarque`, {
         remarque
       }, {
         headers: { Authorization: `Bearer ${token}` }
