@@ -8,7 +8,7 @@ const LiveCoursEtudiant = () => {
     const fetchCours = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/etudiant/mes-cours', {
+        const res = await fetch('/api/etudiant/mes-cours', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

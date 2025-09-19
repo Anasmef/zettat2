@@ -236,11 +236,11 @@ const [formAjout, setFormAjout] = useState({
       const headers = { Authorization: `Bearer ${token}` };
       
       try {
-        const res = await axios.get('http://localhost:5000/api/etudiants/filtered', { headers });
+        const res = await axios.get('/api/etudiants/filtered', { headers });
         setEtudiants(res.data);
       } catch (err) {
         // fallback to original route
-        const res = await axios.get('http://localhost:5000/api/etudiants', { headers });
+        const res = await axios.get('/api/etudiants', { headers });
         setEtudiants(res.data);
       }
     } catch (err) {
@@ -253,7 +253,7 @@ const [formAjout, setFormAjout] = useState({
   const fetchCours = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/cours', {
+      const res = await axios.get('/api/cours', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setListeCours(res.data);
@@ -396,7 +396,7 @@ const handleSubmitAjout = async (e) => {
       console.log(`${key}: ${value}`);
     }
 
-    const response = await axios.post('http://localhost:5000/api/etudiants', formData, {
+    const response = await axios.post('/api/etudiants', formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -580,7 +580,7 @@ const closeEditModal = () => {
       console.log(`${key}: ${value}`);
     }
 
-    const response = await axios.put(`http://localhost:5000/api/etudiants/${etudiantAModifier._id}`, formData, {
+    const response = await axios.put(`/api/etudiants/${etudiantAModifier._id}`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -606,7 +606,7 @@ const closeEditModal = () => {
   const handleToggleActif = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.patch(`http://localhost:5000/api/etudiants/${id}/actif`, {}, {
+      const res = await axios.patch(`/api/etudiants/${id}/actif`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEtudiants(etudiants.map(e => e._id === id ? res.data : e));
@@ -620,7 +620,7 @@ const closeEditModal = () => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/etudiants/${id}`, {
+      await axios.delete(`/api/etudiants/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEtudiants(etudiants.filter(e => e._id !== id));

@@ -32,7 +32,7 @@ const AutorisationEtudiants = () => {
   const fetchEtudiants = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/etudiants', {
+      const res = await fetch('/api/etudiants', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -103,7 +103,7 @@ const AutorisationEtudiants = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/etudiants/${etudiantId}/autorisation`, {
+      const res = await fetch(`/api/etudiants/${etudiantId}/autorisation`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

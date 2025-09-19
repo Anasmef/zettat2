@@ -99,7 +99,7 @@ const VieScolairePage = () => {
         params.append('search', searchTerm.trim());
       }
 
-      const response = await fetch(`http://localhost:5000/api/vie-scolaire?${params}`);
+      const response = await fetch(`/api/vie-scolaire?${params}`);
       
       if (!response.ok) {
         throw new Error(`Erreur ${response.status}: ${response.statusText}`);
@@ -123,7 +123,7 @@ const VieScolairePage = () => {
   // Fonction pour charger une activité spécifique
   const fetchActivityDetails = async (activityId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/vie-scolaire/${activityId}`);
+      const response = await fetch(`/api/vie-scolaire/${activityId}`);
       
       if (!response.ok) {
         throw new Error(`Erreur ${response.status}: ${response.statusText}`);

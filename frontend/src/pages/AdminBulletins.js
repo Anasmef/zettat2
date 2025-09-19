@@ -132,7 +132,7 @@ const AdminBulletins = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/bulletins', {
+      const res = await fetch('/api/bulletins', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -331,7 +331,7 @@ const AdminBulletins = () => {
     try {
       const token = localStorage.getItem('token');
       const promises = group.etudiants.map(etudiant => 
-        fetch(`http://localhost:5000/api/bulletins/${etudiant._id}`, {
+        fetch(`/api/bulletins/${etudiant._id}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${token}` }
         })

@@ -43,7 +43,7 @@ const AjouterPresence = () => {
           return;
         }
 
-        const res = await axios.get('http://localhost:5000/api/professeur/mes-cours', {
+        const res = await axios.get('/api/professeur/mes-cours', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -516,7 +516,7 @@ const AjouterPresence = () => {
       try {
         const token = localStorage.getItem('token');
         
-        const res = await axios.get('http://localhost:5000/api/professeur/etudiants', {
+        const res = await axios.get('/api/professeur/etudiants', {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -609,7 +609,7 @@ const AjouterPresence = () => {
         console.log(`Envoi pour ${pres.nom}:`, dataToSend);
       }
 
-      return axios.post('http://localhost:5000/api/presences', dataToSend, {
+      return axios.post('/api/presences', dataToSend, {
         headers: { Authorization: `Bearer ${token}` },
       });
     });

@@ -21,7 +21,7 @@ const EtudiantsAutorisesProfesseur = () => {
   const fetchEtudiants = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/professeur/etudiants', {
+      const res = await fetch('/api/professeur/etudiants', {
         headers: { Authorization: `Bearer ${token}` }
       });
 

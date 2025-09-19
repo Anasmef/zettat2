@@ -56,7 +56,7 @@ const Dashboardmanager = () => {
           'Content-Type': 'application/json'
         };
 
-        const res = await fetch('http://localhost:5000/api/rappels', { headers });
+        const res = await fetch('/api/rappels', { headers });
         if (!res.ok) throw new Error('Erreur lors du chargement des rappels');
 
         const data = await res.json();
@@ -88,7 +88,7 @@ const Dashboardmanager = () => {
   const handleUpdateRappel = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/rappels/${id}`, {
+      const res = await fetch(`/api/rappels/${id}`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -112,7 +112,7 @@ const Dashboardmanager = () => {
   const handleDeleteRappel = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/rappels/${id}`, {
+      const res = await fetch(`/api/rappels/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -136,9 +136,9 @@ const Dashboardmanager = () => {
       
       const token = localStorage.getItem('token');
       console.log('Token:', token ? 'Présent' : 'Absent');
-      console.log('URL appelée:', 'http://localhost:5000/api/paiement-manager/stats');
+      console.log('URL appelée:', '/api/paiement-manager/stats');
       
-      const res = await fetch('http://localhost:5000/api/paiement-manager/stats', {
+      const res = await fetch('/api/paiement-manager/stats', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -170,7 +170,7 @@ const Dashboardmanager = () => {
   const checkNouveauxEtudiants = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/paiement-manager/etudiants-nouveaux', {
+      const res = await fetch('/api/paiement-manager/etudiants-nouveaux', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -207,7 +207,7 @@ const Dashboardmanager = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(
-        `http://localhost:5000/api/etudiants/${selectedEtudiant._id}/finance`,
+        `/api/etudiants/${selectedEtudiant._id}/finance`,
         {
           method: 'PATCH',
           headers: { 
