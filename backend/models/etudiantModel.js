@@ -5,31 +5,30 @@ const etudiantSchema = new mongoose.Schema(
   {
     // Identité de l'étudiant
     nomComplet: { type: String, required: true, trim: true },
-    genre: { type: String, enum: ['Homme', 'Femme'], required: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    motDePasse: { type: String, required: true },
-    // Dans votre etudiantModel.js, ajoutez ce champ :
-autorise: { type: Boolean, default: false }, // Ajoutez cette ligne
-    dateNaissance: { type: Date, required: true },
-    lieuNaissance: { type: String, required: true, trim: true },
-    nationalite: { type: String, required: true, trim: true },
+    genre: { type: String, enum: ['Homme', 'Femme'], trim: true },
+    email: { type: String, unique: true, lowercase: true, trim: true },
+    motDePasse: { type: String },
+    autorise: { type: Boolean, default: false },
+    dateNaissance: { type: Date },
+    lieuNaissance: { type: String, trim: true },
+    nationalite: { type: String, trim: true },
 
     // Scolarité (libre pour pouvoir ajouter des valeurs côté frontend)
-    niveau: { type: String, required: true, trim: true },
+    niveau: { type: String, trim: true },
 
     // Parents
-    nomCompletPere: { type: String, required: true, trim: true },
-    nomCompletMere: { type: String, required: true, trim: true },
+    nomCompletPere: { type: String, trim: true },
+    nomCompletMere: { type: String, trim: true },
     travailPere: { type: String, default: '', trim: true },
     travailMere: { type: String, default: '', trim: true },
 
     // Téléphones
-    telephoneEtudiant: { type: String, required: true, trim: true },
+    telephoneEtudiant: { type: String, trim: true },
     telephonePere: { type: String, default: '', trim: true },
     telephoneMere: { type: String, default: '', trim: true },
 
     // Code Massar
-    codeMassar: { type: String, required: true, unique: true, trim: true },
+    codeMassar: { type: String, unique: true, trim: true },
 
     // Adresse
     adresse: { type: String, default: '', trim: true },
@@ -68,7 +67,6 @@ creeParInscripteur: {
     // Année scolaire (ex: 2025/2026)
     anneeScolaire: {
       type: String,
-      required: true,
       validate: {
         validator: v => /^\d{4}\/\d{4}$/.test(v),
         message: "L'année scolaire doit être au format YYYY/YYYY (ex: 2025/2026)"

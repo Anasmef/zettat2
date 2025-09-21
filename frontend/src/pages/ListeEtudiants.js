@@ -53,7 +53,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '1AC A',
+  niveau: '1AC', // valeur par défaut modifiée
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -93,7 +93,7 @@ const [formAjout, setFormAjout] = useState({
   nomCompletMere: '',
   travailPere: '',
   travailMere: '',
-  niveau: '1AC A',
+  niveau: '1AC', // valeur par défaut modifiée
   telephoneEtudiant: '',
   telephonePere: '',
   telephoneMere: '',
@@ -120,30 +120,25 @@ const [formAjout, setFormAjout] = useState({
   // Niveaux disponibles mis à jour selon vos spécifications
   const niveauxDisponibles = [
   // Collège
-  "1AC A",
-  "1AC B",
-  "2AC",
-  "3AC A",
-  "3AC B", 
-  "3AC C",
+  "1AC",
+  "2AC", 
+  "3AC",
+  
   
   // Tronc Commun
-  "Tronc Commun A",
-  "Tronc Commun B",
-  "Tronc Commun C",
+  "Tronc Commun",
+ 
   
   // 1ère Bac
-  "1BAC SX",
-  "1BAC Économie A",
-  "1BAC Économie B",
+  "1BAC SC",
+  "1BAC Économie",
+ 
   
   // 2ème Bac
-  "2BAC PC A",
-  "2BAC PC B",
-  "2BAC PC C",
-  "2BAC SVT",
-  "2BAC Économie A",
-  "2BAC Économie B"
+  "2BAC PC",
+ 
+  "2BAC Économie",
+ 
 ];
 
   // Helper للحصول على الكورسات حسب المستوى - VERSION FINALE STRICTE
@@ -153,40 +148,24 @@ const [formAjout, setFormAjout] = useState({
     console.log('🔍 Recherche cours pour niveau:', niveau);
     console.log('📚 Liste complète des cours:', liste.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
     
-    // D'abord chercher une correspondance exacte avec le niveau défini
-    const correspondanceExacte = liste.filter(c => {
-      const niveauCours = c.niveau || '';
-      return niveauCours.toLowerCase() === niveau.toLowerCase();
+    // Rechercher les cours qui commencent par le niveau sélectionné
+    // Par exemple si niveau = "1AC", on trouve "1AC A", "1AC B", etc.
+    const coursCorrespondants = liste.filter(c => {
+      const niveauCours = c.niveau || c.nom || '';
+      // Correspondance exacte
+      if (niveauCours.toLowerCase() === niveau.toLowerCase()) {
+        return true;
+      }
+      // Correspondance avec variations (1AC trouve 1AC A, 1AC B, etc.)
+      if (niveauCours.toLowerCase().startsWith(niveau.toLowerCase())) {
+        // Vérifier que c'est bien une variation du niveau (avec A, B, C à la fin)
+        const suffixe = niveauCours.substring(niveau.length).trim();
+        return suffixe === '' || /^[ABC]$/i.test(suffixe);
+      }
+      return false;
     });
-    
-    console.log('✅ Correspondances exactes trouvées:', correspondanceExacte.map(c => ({ nom: c.nom, niveau: c.niveau })));
-    
-    if (correspondanceExacte.length > 0) {
-      return correspondanceExacte;
-    }
-    
-    // Si aucune correspondance exacte, chercher par nom du cours = niveau
-    // (pour les cours sans champ niveau défini)
-    const correspondanceParNom = liste.filter(c => {
-      return c.nom && c.nom.toLowerCase() === niveau.toLowerCase();
-    });
-    
-    console.log('🔄 Correspondances par nom trouvées:', correspondanceParNom.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
-    
-    if (correspondanceParNom.length > 0) {
-      return correspondanceParNom;
-    }
-    
-    // En dernier recours, correspondance par base (1AC B -> 1AC)
-    const niveauBase = niveau.replace(/ [ABC]$/i, '');
-    const correspondanceBase = liste.filter(c => {
-      const coursNiveauBase = (c.niveau || c.nom || '').replace(/ [ABC]$/i, '');
-      return coursNiveauBase.toLowerCase() === niveauBase.toLowerCase();
-    });
-    
-    console.log('🔄 Correspondances par base trouvées:', correspondanceBase.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
-    
-    return correspondanceBase;
+    console.log('✅ Cours trouvés pour', niveau, ':', coursCorrespondants.map(c => ({ nom: c.nom, niveau: c.niveau })));
+    return coursCorrespondants;
   };
 
   // حساب الكورسات المتاحة حسب المستوى الحالي
@@ -210,24 +189,6 @@ const [formAjout, setFormAjout] = useState({
   useEffect(() => {
     filtrerEtudiants();
   }, [etudiants, recherche, filtreGenre, filtreCours, filtreNiveau, filtreActif]);
-
-  // تعبئة الكورسات تلقائيًا حسب المستوى للنموذج الأساسي
-  useEffect(() => {
-    setFormAjout(prev => ({
-      ...prev,
-      cours: coursDisponiblesAjout.map(c => c.nom)
-    }));
-  }, [coursDisponiblesAjout]);
-
-  // تعبئة الكورسات تلقائيًا حسب المستوى لنموذج التعديل
-  useEffect(() => {
-    if (showEditModal) {
-      setFormModifier(prev => ({
-        ...prev,
-        cours: coursDisponiblesModifier.map(c => c.nom)
-      }));
-    }
-  }, [coursDisponiblesModifier, showEditModal]);
 
   const fetchEtudiants = async () => {
     try {
@@ -319,7 +280,7 @@ if (recherche) {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '1AC A',
+    niveau: '1AC', // valeur par défaut modifiée
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -416,7 +377,7 @@ const handleSubmitAjout = async (e) => {
       nomCompletMere: '',
       travailPere: '',
       travailMere: '',
-      niveau: '1AC A',
+      niveau: '1AC', // valeur par défaut modifiée
       telephoneEtudiant: '',
       telephonePere: '',
       telephoneMere: '',
@@ -463,7 +424,7 @@ const openEditModal = (etudiant) => {
     nomCompletMere: etudiant.nomCompletMere || '',
     travailPere: etudiant.travailPere || '',
     travailMere: etudiant.travailMere || '',
-    niveau: etudiant.niveau || '1AC A',
+    niveau: etudiant.niveau || '1AC',
     telephoneEtudiant: etudiant.telephoneEtudiant || '',
     telephonePere: etudiant.telephonePere || '',
     telephoneMere: etudiant.telephoneMere || '',
@@ -501,7 +462,7 @@ const closeEditModal = () => {
     nomCompletMere: '',
     travailPere: '',
     travailMere: '',
-    niveau: '1AC A',
+    niveau: '1AC', // valeur par défaut modifiée
     telephoneEtudiant: '',
     telephonePere: '',
     telephoneMere: '',
@@ -1238,7 +1199,6 @@ const closeEditModal = () => {
                     name="dateNaissance"
                     value={formAjout.dateNaissance}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
 
@@ -1250,7 +1210,6 @@ const closeEditModal = () => {
                     placeholder="Lieu de naissance"
                     value={formAjout.lieuNaissance}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
               </div>
@@ -1262,7 +1221,6 @@ const closeEditModal = () => {
                     name="nationalite"
                     value={formAjout.nationalite}
                     onChange={handleChangeAjout}
-                    required
                   >
                     <option value="">Sélectionner un pays...</option>
                     {countriesList.map((country) => (
@@ -1272,7 +1230,7 @@ const closeEditModal = () => {
                 </div>
                 <div className="form-group">
                   <label>Niveau *</label>
-                  <select name="niveau" value={formAjout.niveau} onChange={handleChangeAjout} required>
+                  <select name="niveau" value={formAjout.niveau} onChange={handleChangeAjout}>
                     {niveauxDisponibles.map(niveau => (
                       <option key={niveau} value={niveau}>{niveau}</option>
                     ))}
@@ -1289,7 +1247,6 @@ const closeEditModal = () => {
                     placeholder="Nom complet du père"
                     value={formAjout.nomCompletPere}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
 
@@ -1301,7 +1258,6 @@ const closeEditModal = () => {
                     placeholder="Nom complet de la mère"
                     value={formAjout.nomCompletMere}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
               </div>
@@ -1364,7 +1320,6 @@ const closeEditModal = () => {
                     placeholder="Téléphone de l'étudiant"
                     value={formAjout.telephoneEtudiant}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
 
@@ -1376,7 +1331,6 @@ const closeEditModal = () => {
                     placeholder="Code Massar"
                     value={formAjout.codeMassar}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
               </div>
@@ -1390,7 +1344,6 @@ const closeEditModal = () => {
                     placeholder="Email"
                     value={formAjout.email}
                     onChange={handleChangeAjout}
-                    required
                   />
                 </div>
 
@@ -1402,7 +1355,6 @@ const closeEditModal = () => {
                     placeholder="Mot de passe (minimum 6 caractères)"
                     value={formAjout.motDePasse}
                     onChange={handleChangeAjout}
-                    required
                     minLength="6"
                   />
                 </div>
@@ -1423,13 +1375,13 @@ const closeEditModal = () => {
                 <label>Classe </label>
                 <div className="cours-selection-container">
                   {coursDisponiblesAjout.map((cours) => (
-                    <div key={cours._id} className="cours-chip selected">
+                    <div key={cours._id} className={`cours-chip ${formAjout.cours.includes(cours.nom) ? 'selected' : ''}`} onClick={() => handleSelectCoursAjout(cours.nom)}>
                       <span className="cours-nom">{cours.nom}</span>
-                      <span className="cours-check">✓</span>
+                      {formAjout.cours.includes(cours.nom) && <span className="cours-check">✓</span>}
                     </div>
                   ))}
                 </div>
-                <small>يتم تعيين الكورسات تلقائيًا حسب المستوى المختار.</small>
+                <small>Sélectionnez les classes correspondant au niveau {formAjout.niveau}</small>
               </div>
 
               <div className="form-row">
@@ -1551,7 +1503,6 @@ const closeEditModal = () => {
                     name="dateNaissance"
                     value={formModifier.dateNaissance}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
 
@@ -1563,7 +1514,6 @@ const closeEditModal = () => {
                     placeholder="Lieu de naissance"
                     value={formModifier.lieuNaissance}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
               </div>
@@ -1575,7 +1525,6 @@ const closeEditModal = () => {
                     name="nationalite"
                     value={formModifier.nationalite}
                     onChange={handleChangeModifier}
-                    required
                   >
                     <option value="">Sélectionner un pays...</option>
                     {countriesList.map((country) => (
@@ -1586,7 +1535,7 @@ const closeEditModal = () => {
 
                 <div className="form-group">
                   <label>Niveau *</label>
-                  <select name="niveau" value={formModifier.niveau} onChange={handleChangeModifier} required>
+                  <select name="niveau" value={formModifier.niveau} onChange={handleChangeModifier}>
                     {niveauxDisponibles.map(niveau => (
                       <option key={niveau} value={niveau}>{niveau}</option>
                     ))}
@@ -1603,7 +1552,6 @@ const closeEditModal = () => {
                     placeholder="Nom complet du père"
                     value={formModifier.nomCompletPere}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
 
@@ -1615,7 +1563,6 @@ const closeEditModal = () => {
                     placeholder="Nom complet de la mère"
                     value={formModifier.nomCompletMere}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
               </div>
@@ -1678,7 +1625,6 @@ const closeEditModal = () => {
                     placeholder="Téléphone de l'étudiant"
                     value={formModifier.telephoneEtudiant}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
 
@@ -1690,7 +1636,6 @@ const closeEditModal = () => {
                     placeholder="Code Massar"
                     value={formModifier.codeMassar}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
               </div>
@@ -1704,7 +1649,6 @@ const closeEditModal = () => {
                     placeholder="Email"
                     value={formModifier.email}
                     onChange={handleChangeModifier}
-                    required
                   />
                 </div>
 
@@ -1739,13 +1683,13 @@ const closeEditModal = () => {
                 <label>Classe</label>
                 <div className="cours-selection-container">
                   {coursDisponiblesModifier.map((cours) => (
-                    <div key={cours._id} className="cours-chip selected">
+                    <div key={cours._id} className={`cours-chip ${formModifier.cours.includes(cours.nom) ? 'selected' : ''}`} onClick={() => handleSelectCoursModifier(cours.nom)}>
                       <span className="cours-nom">{cours.nom}</span>
-                      <span className="cours-check">✓</span>
+                      {formModifier.cours.includes(cours.nom) && <span className="cours-check">✓</span>}
                     </div>
                   ))}
                 </div>
-                <small>الكورسات مرتبطة بالمستوى ولا يمكن تغييرها لمستوى آخر.</small>
+                <small>Sélectionnez les classes correspondant au niveau {formModifier.niveau}</small>
               </div>
 
               <div className="form-row">
@@ -2001,7 +1945,7 @@ const closeEditModal = () => {
           </div>
 
           <div className="info-card">
-            <div className="info-label">Pourcentage Bourse</div>
+                       <div className="info-label">Pourcentage Bourse</div>
             <div className="info-value">{etudiantSelectionne.pourcentageBourse || 0}%</div>
           </div>
 

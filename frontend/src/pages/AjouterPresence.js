@@ -274,137 +274,38 @@ const AjouterPresence = () => {
           border-radius: 8px !important;
         }
         
-        /* Table mobile styling */
-        .table {
-          min-width: 100% !important;
-          display: block !important;
-          overflow-x: auto !important;
-          white-space: nowrap !important;
+        /* Media queries pour mobile */
+        @media (max-width: 768px) {
+          .desktop-view {
+            display: none !important;
+          }
+          .mobile-view {
+            display: block !important;
+          }
         }
-        
-        .table thead {
-          display: none !important;
-        }
-        
-        .table tbody {
-          display: block !important;
-        }
-        
-        .table-row {
-          display: block !important;
-          border: 1px solid #e5e7eb !important;
-          border-radius: 8px !important;
-          margin-bottom: 12px !important;
-          padding: 12px !important;
-          background: #ffffff !important;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        }
-        
-        .table-row td {
-          display: block !important;
-          padding: 8px 0 !important;
-          border: none !important;
-          text-align: left !important;
-          position: relative !important;
-          padding-left: 50% !important;
-        }
-        
-        .table-row td:before {
-          content: attr(data-label) !important;
-          position: absolute !important;
-          left: 0 !important;
-          width: 45% !important;
-          padding-right: 10px !important;
-          white-space: nowrap !important;
-          font-weight: 600 !important;
-          color: #4b5563 !important;
-          font-size: 12px !important;
-          text-transform: uppercase !important;
-        }
-        
-        .student-info {
-          flex-direction: row !important;
-          align-items: center !important;
-          justify-content: flex-start !important;
-          gap: 8px !important;
-        }
-        
-        .student-name {
-          font-size: 14px !important;
-          text-align: left !important;
-        }
-        
-        .status-select {
-          width: 100% !important;
-          max-width: 150px !important;
-        }
-        
-        .remarque-container {
-          flex-direction: row !important;
-          align-items: center !important;
-          gap: 8px !important;
-        }
-        
-        .remarque-input {
-          width: 100% !important;
-          max-width: 200px !important;
-        }
-        
-        /* Form responsive */
-        .configuration-grid {
-          grid-template-columns: 1fr !important;
-          gap: 12px !important;
-        }
-        
-        .form-group {
-          margin-bottom: 12px !important;
-        }
-        
-        .label {
-          font-size: 13px !important;
-        }
-        
-        .input, .select {
-          font-size: 14px !important;
-          padding: 10px 12px !important;
-        }
-        
-        .time-display {
-          margin-top: 6px !important;
-          padding: 6px 10px !important;
-        }
-        
-        .periode-tag {
-          padding: 10px 12px !important;
-          font-size: 14px !important;
-        }
-        
-        .instruction-message {
-          margin: 16px -8px !important;
-          padding: 16px !important;
-        }
-        
-        .instruction-title {
-          font-size: 15px !important;
-        }
-        
-        .instruction-text {
-          font-size: 13px !important;
-        }
-        
-        .presence-section {
-          margin: 20px -8px 0 -8px !important;
-          padding: 16px 8px 0 8px !important;
-        }
-        
-        .presence-title {
-          font-size: 16px !important;
-        }
-        
-        .message-container {
-          margin: 16px -8px 0 -8px !important;
-          padding: 12px 16px !important;
-          font-size: 14px !important;
+        @media (max-width: 480px) {
+          .desktop-view {
+            display: none !important;
+          }
+          .mobile-view {
+            display: block !important;
+          }
+          .mobile-student-card {
+            margin-bottom: 16px !important;
+          }
+          .mobile-card-content {
+            padding: 16px !important;
+            gap: 14px !important;
+          }
+          .mobile-field-label {
+            font-size: 13px !important;
+          }
+          .mobile-status-select,
+          .mobile-retard-input,
+          .mobile-remarque-input {
+            font-size: 15px !important;
+            padding: 10px 14px !important;
+          }
         }
       }
       
