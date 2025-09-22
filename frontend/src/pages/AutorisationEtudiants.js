@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, User, BookOpen, GraduationCap, AlertCircle, Search, Filter } from 'lucide-react';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
-
+import * as XLSX from 'xlsx';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -131,6 +131,44 @@ const AutorisationEtudiants = () => {
     }
   };
 
+  // Export Excel - tous les étudiants du cours sélectionné
+  const handleExportExcelTous = () => {
+    if (!filtreCours) return;
+    const etudiantsCours = etudiantsFiltres.filter(e => e.cours && e.cours.includes(filtreCours));
+    if (etudiantsCours.length === 0) return;
+    const data = etudiantsCours.map(e => ({
+      Nom: e.nomComplet,
+      Niveau: e.niveau,
+      Classe: (e.cours || []).join(', '),
+      CodeMassar: e.codeMassar,
+      Email: e.email,
+      Autorisé: e.autorise ? 'Oui' : 'Non',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Etudiants');
+    XLSX.writeFile(wb, `etudiants_${filtreCours}_tous.xlsx`);
+  };
+
+  // Export Excel - uniquement les étudiants autorisés du cours sélectionné
+  const handleExportExcelAutorises = () => {
+    if (!filtreCours) return;
+    const etudiantsAutorises = etudiantsFiltres.filter(e => e.autorise && e.cours && e.cours.includes(filtreCours));
+    if (etudiantsAutorises.length === 0) return;
+    const data = etudiantsAutorises.map(e => ({
+      Nom: e.nomComplet,
+      Niveau: e.niveau,
+      Classe: (e.cours || []).join(', '),
+      CodeMassar: e.codeMassar,
+      Email: e.email,
+      Autorisé: 'Oui',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Etudiants Autorisés');
+    XLSX.writeFile(wb, `etudiants_${filtreCours}_autorises.xlsx`);
+  };
+
   if (loading) {
     return (
       <div style={styles.container}>
@@ -222,6 +260,44 @@ const AutorisationEtudiants = () => {
                   <option key={cours} value={cours}>{cours}</option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={handleExportExcelTous}
+                style={{
+                  marginTop: '8px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontWeight: '500',
+                  fontSize: '14px',
+                  cursor: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
+                  opacity: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
+                }}
+                disabled={!(filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)))}
+              >
+                Exporter Excel (par cours - tous)
+              </button>
+              <button
+                type="button"
+                onClick={handleExportExcelAutorises}
+                style={{
+                  marginTop: '8px',
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  padding: '8px 14px',
+                  fontWeight: '500',
+                  fontSize: '14px',
+                  cursor: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
+                  opacity: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
+                }}
+                disabled={!(filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)))}
+              >
+                Exporter Excel (par cours - autorisés)
+              </button>
             </div>
 
             {/* Filtre Statut */}

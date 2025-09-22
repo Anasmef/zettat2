@@ -74,12 +74,17 @@ const EtudiantsAutorisesProfesseur = () => {
     return filtered;
   };
 
-  const filteredEtudiants = getFilteredEtudiants();
+  // Calcul des stats en fonction du cours sélectionné
+  const etudiantsCours = selectedCours
+    ? etudiants.filter(e => e.cours && e.cours.some(cours => cours.toLowerCase() === selectedCours.toLowerCase()))
+    : [];
   const stats = {
-    total: etudiants.length,
-    autorises: etudiants.filter(e => e.autorise === true).length,
-    nonAutorises: etudiants.filter(e => e.autorise === false).length,
+    total: etudiantsCours.length,
+    autorises: etudiantsCours.filter(e => e.autorise === true).length,
+    nonAutorises: etudiantsCours.filter(e => e.autorise === false).length,
   };
+
+  const filteredEtudiants = getFilteredEtudiants();
 
   if (loading) {
     return (
@@ -121,21 +126,7 @@ const EtudiantsAutorisesProfesseur = () => {
             </h1>
           </div>
           
-          {/* Stats */}
-          <div style={styles.statsContainer}>
-            <div style={styles.statCard}>
-              <span style={styles.statNumber}>{stats.total}</span>
-              <span style={styles.statLabel}>Total</span>
-            </div>
-            <div style={styles.statCard}>
-              <span style={{...styles.statNumber, color: '#22c55e'}}>{stats.autorises}</span>
-              <span style={styles.statLabel}>Autorisés</span>
-            </div>
-            <div style={styles.statCard}>
-              <span style={{...styles.statNumber, color: '#ef4444'}}>{stats.nonAutorises}</span>
-              <span style={styles.statLabel}>Non autorisés</span>
-            </div>
-          </div>
+      
         </div>
       </div>
 
@@ -208,7 +199,13 @@ const EtudiantsAutorisesProfesseur = () => {
 
       {/* Main Content */}
       <div style={styles.mainContent}>
-        {filteredEtudiants.length === 0 ? (
+        {selectedCours === '' ? (
+          <div style={styles.emptyState}>
+            <User size={64} color="#d1d5db" />
+            <h3 style={styles.emptyTitle}>Veuillez sélectionner un cours</h3>
+            <p style={styles.emptyText}>Choisissez un cours pour afficher les étudiants correspondants.</p>
+          </div>
+        ) : filteredEtudiants.length === 0 ? (
           <div style={styles.emptyState}>
             <User size={64} color="#d1d5db" />
             <h3 style={styles.emptyTitle}>
@@ -221,7 +218,7 @@ const EtudiantsAutorisesProfesseur = () => {
             </h3>
             <p style={styles.emptyText}>
               {filter === 'tous' 
-                ? 'Il n\'y a pas d\'étudiants dans vos cours pour le moment.'
+                ? 'Il n\'y a pas d\'étudiants dans ce cours pour le moment.'
                 : 'Changez le filtre pour voir d\'autres étudiants.'
               }
             </p>
@@ -719,7 +716,7 @@ styleSheet.textContent = `
     }
     
     .statNumber {
-      font-size: 20px;
+      fontSize: '20px',
     }
     
     .filterGroup {
