@@ -234,7 +234,7 @@ const exportToExcel = (data, filename, sheetName = 'Présences') => {
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
-// Export présences par jour
+// Export présences par jour avec toutes les classes dans une seule page
 const exportDailyPresences = (date, professorName = null) => {
   const sessionsOfDay = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date).toDateString();
@@ -243,32 +243,86 @@ const exportDailyPresences = (date, professorName = null) => {
            (!professorName || session.nomProfesseur === professorName);
   });
 
-  const data = [];
+  if (sessionsOfDay.length === 0) {
+    alert('Aucune donnée trouvée pour cette date');
+    return;
+  }
+
+  // Grouper par classe
+  const sessionsByClass = {};
   sessionsOfDay.forEach(session => {
-    session.presences.forEach(p => {
-      data.push({
-        'Date': formatDate(session.date),
-        'Classe': session.cours,
-        'Matière': session.matiere || 'N/A',
-        'Professeur': session.nomProfesseur || 'N/A',
-        'Période': session.presences[0]?.periode || 'N/A',
-        'Heure': session.presences[0]?.heure || 'N/A',
-        'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-        'Retard (min)': p.retardMinutes || 0, // 🆕
-        'Remarque': p.remarque || ''
+    if (!sessionsByClass[session.cours]) {
+      sessionsByClass[session.cours] = [];
+    }
+    sessionsByClass[session.cours].push(session);
+  });
+
+  // Créer les données avec séparateurs pour chaque classe
+  const allData = [];
+  let isFirstClass = true;
+
+  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
+    // Ajouter un séparateur de classe (sauf pour la première)
+    if (!isFirstClass) {
+      allData.push({
+        '': '',
+        ' ': '',
+        '  ': '',
+        '   ': '',
+        '    ': '',
+        '     ': '',
+        '      ': '',
+        '       ': ''
+      });
+    }
+    // Ajouter l'en-tête de classe
+    allData.push({
+      '': `=== CLASSE: ${className} ===`,
+      ' ': '',
+      '  ': '',
+      '   ': '',
+      '    ': '',
+      '     ': '',
+      '      ': '',
+      '       ': ''
+    });
+    // Ajouter l'en-tête des colonnes
+    allData.push({
+      '': 'Matière',
+      ' ': 'Professeur',
+      '  ': 'Période',
+      '   ': 'Heure',
+      '    ': 'Étudiant',
+      '     ': 'Statut',
+      '      ': 'Retard (min)',
+      '       ': 'Remarque'
+    });
+    // Ajouter les données de la classe
+    sessions.forEach(session => {
+      session.presences.forEach(p => {
+        allData.push({
+          '': session.matiere || 'N/A',
+          ' ': session.nomProfesseur || 'N/A',
+          '  ': session.presences[0]?.periode || 'N/A',
+          '   ': session.presences[0]?.heure || 'N/A',
+          '    ': p.etudiant?.nomComplet || 'N/A',
+          '     ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+          '      ': p.retardMinutes || 0,
+          '       ': p.remarque || ''
+        });
       });
     });
+    isFirstClass = false;
   });
 
   const filename = professorName 
     ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName}`
     : `presences_${formatDate(date).replace(/\//g, '-')}`;
   
-  exportToExcel(data, filename);
+  exportToExcel(allData, filename, 'Présences par Classe');
 };
 
-// Export présences par mois avec détails des étudiants
+// Export présences par mois avec toutes les classes dans une seule page
 const exportMonthlyPresences = (month, year) => {
   const monthSessions = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date);
@@ -276,43 +330,97 @@ const exportMonthlyPresences = (month, year) => {
            sessionDate.getFullYear() === parseInt(year);
   });
 
-  const data = [];
-  
+  if (monthSessions.length === 0) {
+    alert('Aucune donnée trouvée pour ce mois');
+    return;
+  }
+
+  // Grouper par classe
+  const sessionsByClass = {};
   monthSessions.forEach(session => {
-    session.presences.forEach(p => {
-      data.push({
-        'Date': formatDate(session.date),
-        'Classe': session.cours,
-        'Matière': session.matiere || 'N/A',
-        'Professeur': session.nomProfesseur || 'N/A',
-        'Période': session.presences[0]?.periode || 'N/A',
-        'Heure': session.presences[0]?.heure || 'N/A',
-        'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-        'Retard (min)': p.retardMinutes || 0, // 🆕
-        'Remarque': p.remarque || '',
-        'Total Étudiants Session': session.totalCount,
-        'Présents Session': session.presentCount,
-        'Taux Présence Session': `${session.attendanceRate}%`
-      });
-    });
+    if (!sessionsByClass[session.cours]) {
+      sessionsByClass[session.cours] = [];
+    }
+    sessionsByClass[session.cours].push(session);
   });
 
-  // Tri par date puis par classe
-  data.sort((a, b) => {
-    const dateA = new Date(a.Date.split('/').reverse().join('-'));
-    const dateB = new Date(b.Date.split('/').reverse().join('-'));
-    if (dateA.getTime() !== dateB.getTime()) {
-      return dateA - dateB;
+  // Créer les données avec séparateurs pour chaque classe
+  const allData = [];
+  let isFirstClass = true;
+
+  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
+    // Ajouter un séparateur de classe (sauf pour la première)
+    if (!isFirstClass) {
+      allData.push({
+        '': '',
+        ' ': '',
+        '  ': '',
+        '   ': '',
+        '    ': '',
+        '     ': '',
+        '      ': '',
+        '       ': '',
+        '        ': '',
+        '         ': '',
+        '          ': ''
+      });
     }
-    return a.Classe.localeCompare(b.Classe);
+    // Ajouter l'en-tête de classe
+    allData.push({
+      '': `=== CLASSE: ${className} ===`,
+      ' ': '',
+      '  ': '',
+      '   ': '',
+      '    ': '',
+      '     ': '',
+      '      ': '',
+      '       ': '',
+      '        ': '',
+      '         ': '',
+      '          ': ''
+    });
+    // Ajouter l'en-tête des colonnes
+    allData.push({
+      '': 'Date',
+      ' ': 'Matière',
+      '  ': 'Professeur',
+      '   ': 'Période',
+      '    ': 'Heure',
+      '     ': 'Étudiant',
+      '      ': 'Statut',
+      '       ': 'Retard (min)',
+      '        ': 'Remarque',
+      '         ': 'Total Étudiants',
+      '          ': 'Taux Présence'
+    });
+    // Trier les sessions par date
+    sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Ajouter les données de la classe
+    sessions.forEach(session => {
+      session.presences.forEach(p => {
+        allData.push({
+          '': formatDate(session.date),
+          ' ': session.matiere || 'N/A',
+          '  ': session.nomProfesseur || 'N/A',
+          '   ': session.presences[0]?.periode || 'N/A',
+          '    ': session.presences[0]?.heure || 'N/A',
+          '     ': p.etudiant?.nomComplet || 'N/A',
+          '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+          '       ': p.retardMinutes || 0,
+          '        ': p.remarque || '',
+          '         ': session.totalCount,
+          '          ': `${session.attendanceRate}%`
+        });
+      });
+    });
+    isFirstClass = false;
   });
 
   const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
-  exportToExcel(data, `presences_${monthName}_${year}_detaillees`);
+  exportToExcel(allData, `presences_${monthName}_${year}`, 'Présences par Classe');
 };
 
-// Export présences par mois avec feuilles séparées (résumé + détails)
+// Export présences par mois avec résumé général et détails dans une seule page
 const exportMonthlyPresencesWithSummary = (month, year) => {
   const monthSessions = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date);
@@ -320,46 +428,171 @@ const exportMonthlyPresencesWithSummary = (month, year) => {
            sessionDate.getFullYear() === parseInt(year);
   });
 
-  // Feuille 1: Résumé par session
-  const summaryData = monthSessions.map(session => ({
-    'Date': formatDate(session.date),
-    'Classe': session.cours,
-    'Matière': session.matiere || 'N/A',
-    'Professeur': session.nomProfesseur || 'N/A',
-    'Période': session.presences[0]?.periode || 'N/A',
-    'Total Étudiants': session.totalCount,
-    'Présents': session.presentCount,
-    'Absents': session.totalCount - session.presentCount,
-    'Taux de Présence': `${session.attendanceRate}%`
-  }));
+  if (monthSessions.length === 0) {
+    alert('Aucune donnée trouvée pour ce mois');
+    return;
+  }
 
-  // Feuille 2: Détails par étudiant
-  const detailsData = [];
+  // Grouper par classe
+  const sessionsByClass = {};
   monthSessions.forEach(session => {
-    session.presences.forEach(p => {
-      detailsData.push({
-        'Date': formatDate(session.date),
-        'Classe': session.cours,
-        'Matière': session.matiere || 'N/A',
-        'Professeur': session.nomProfesseur || 'N/A',
-        'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Statut': p.present ? 'Présent' : 'Absent',
-        'Remarque': p.remarque || ''
-      });
+    if (!sessionsByClass[session.cours]) {
+      sessionsByClass[session.cours] = [];
+    }
+    sessionsByClass[session.cours].push(session);
+  });
+
+  // Créer toutes les données dans une seule page
+  const allData = [];
+
+  // Ajouter le titre principal
+  allData.push({
+    '': `RAPPORT MENSUEL - ${new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' }).toUpperCase()} ${year}`,
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': ''
+  });
+
+  allData.push({
+    '': '',
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': ''
+  });
+
+  // Section RÉSUMÉ GÉNÉRAL
+  allData.push({
+    '': '=== RÉSUMÉ GÉNÉRAL ===',
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': ''
+  });
+
+  // En-tête du résumé
+  allData.push({
+    '': 'Classe',
+    ' ': 'Nb Sessions',
+    '  ': 'Moy. Étudiants',
+    '   ': 'Total Présences',
+    '    ': 'Total Absences',
+    '     ': 'Total Retards',
+    '      ': 'Taux Moyen Présence'
+  });
+
+  // Données du résumé
+  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
+    const totalSessions = sessions.length;
+    const totalStudents = sessions.reduce((sum, s) => sum + s.totalCount, 0);
+    const totalPresents = sessions.reduce((sum, s) => sum + s.presentCount, 0);
+    const totalRetards = sessions.reduce((sum, s) => sum + s.retardCount, 0);
+    const avgAttendance = totalStudents > 0 ? Math.round((totalPresents / totalStudents) * 100) : 0;
+
+    allData.push({
+      '': className,
+      ' ': totalSessions,
+      '  ': Math.round(totalStudents / totalSessions),
+      '   ': totalPresents,
+      '    ': totalStudents - totalPresents,
+      '     ': totalRetards,
+      '      ': `${avgAttendance}%`
     });
   });
 
-  // Création du fichier Excel avec plusieurs feuilles
-  const wb = XLSX.utils.book_new();
-  
-  const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Résumé');
-  
-  const wsDetails = XLSX.utils.json_to_sheet(detailsData);
-  XLSX.utils.book_append_sheet(wb, wsDetails, 'Détails');
+  // Espaces entre résumé et détails
+  allData.push({
+    '': '',
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': '',
+    '       ': ''
+  });
+
+  // Section DÉTAILS PAR CLASSE
+  allData.push({
+    '': '=== DÉTAILS PAR CLASSE ===',
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': '',
+    '       ': ''
+  });
+
+  let isFirstClass = true;
+
+  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
+    // Espacement entre classes
+    if (!isFirstClass) {
+      allData.push({
+        '': '',
+        ' ': '',
+        '  ': '',
+        '   ': '',
+        '    ': '',
+        '     ': '',
+        '      ': '',
+        '       ': ''
+      });
+    }
+    // En-tête de classe
+    allData.push({
+      '': `--- CLASSE: ${className} ---`,
+      ' ': '',
+      '  ': '',
+      '   ': '',
+      '    ': '',
+      '     ': '',
+      '      ': '',
+      '       ': ''
+    });
+    // En-tête des colonnes pour les détails
+    allData.push({
+      '': 'Date',
+      ' ': 'Matière',
+      '  ': 'Professeur',
+      '   ': 'Période',
+      '    ': 'Heure',
+      '     ': 'Étudiant',
+      '      ': 'Statut',
+      '       ': 'Retard (min)',
+      '        ': 'Remarque'
+    });
+    // Trier par date
+    sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Données détaillées de la classe
+    sessions.forEach(session => {
+      session.presences.forEach(p => {
+        allData.push({
+          '': formatDate(session.date),
+          ' ': session.matiere || 'N/A',
+          '  ': session.nomProfesseur || 'N/A',
+          '   ': session.presences[0]?.periode || 'N/A',
+          '    ': session.presences[0]?.heure || 'N/A',
+          '     ': p.etudiant?.nomComplet || 'N/A',
+          '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+          '       ': p.retardMinutes || 0,
+          '        ': p.remarque || ''
+        });
+      });
+    });
+    isFirstClass = false;
+  });
 
   const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
-  XLSX.writeFile(wb, `presences_${monthName}_${year}_complet.xlsx`);
+  exportToExcel(allData, `presences_${monthName}_${year}_rapport_complet`, 'Rapport Mensuel');
 };
 
 // Export par professeur
@@ -368,22 +601,46 @@ const exportByProfessor = (professorName) => {
     session.nomProfesseur === professorName
   );
 
-  const data = [];
+  if (professorSessions.length === 0) {
+    alert('Aucune donnée trouvée pour ce professeur');
+    return;
+  }
+
+  const allData = [];
+  // En-tête
+  allData.push({
+    '': `=== PRÉSENCES DE ${professorName} ===`,
+    ' ': '',
+    '  ': '',
+    '   ': '',
+    '    ': '',
+    '     ': '',
+    '      ': '',
+    '       ': ''
+  });
+  allData.push({
+    '': 'Date',
+    ' ': 'Classe',
+    '  ': 'Matière',
+    '   ': 'Étudiant',
+    '    ': 'Statut',
+    '     ': 'Retard (min)',
+    '      ': 'Remarque'
+  });
   professorSessions.forEach(session => {
     session.presences.forEach(p => {
-      data.push({
-        'Date': formatDate(session.date),
-        'Classe': session.cours,
-        'Matière': session.matiere || 'N/A',
-        'Étudiant': p.etudiant?.nomComplet || 'N/A',
-        'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-        'Retard (min)': p.retardMinutes || 0, // 🆕
-        'Remarque': p.remarque || ''
+      allData.push({
+        '': formatDate(session.date),
+        ' ': session.cours,
+        '  ': session.matiere || 'N/A',
+        '   ': p.etudiant?.nomComplet || 'N/A',
+        '    ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+        '     ': p.retardMinutes || 0,
+        '      ': p.remarque || ''
       });
     });
   });
-
-  exportToExcel(data, `presences_${professorName.replace(/\s+/g, '_')}`);
+  exportToExcel(allData, `presences_${professorName.replace(/\s+/g, '_')}`, `Présences ${professorName}`);
 };
 
   const styles = {
@@ -1505,34 +1762,120 @@ const exportByProfessor = (professorName) => {
                     <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
                       Export complet (données actuellement filtrées)
                     </h4>
-                    <button
-                      onClick={() => {
-                        const data = [];
-                        filteredSessions.forEach(session => {
-                          session.presences.forEach(p => {
-                            data.push({
-                              'Date': formatDate(session.date),
-                              'Classe': session.cours,
-                              'Matière': session.matiere || 'N/A',
-                              'Professeur': session.nomProfesseur || 'N/A',
-                              'Étudiant': p.etudiant?.nomComplet || 'N/A',
-                              'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-                              'Retard (min)': p.retardMinutes || 0, // 🆕
-                              'Remarque': p.remarque || ''
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => {
+                          // Export traditionnel en une seule feuille
+                          const data = [];
+                          filteredSessions.forEach(session => {
+                            session.presences.forEach(p => {
+                              data.push({
+                                'Date': formatDate(session.date),
+                                'Classe': session.cours,
+                                'Matière': session.matiere || 'N/A',
+                                'Professeur': session.nomProfesseur || 'N/A',
+                                'Étudiant': p.etudiant?.nomComplet || 'N/A',
+                                'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+                                'Retard (min)': p.retardMinutes || 0,
+                                'Remarque': p.remarque || ''
+                              });
                             });
                           });
-                        });
-                        exportToExcel(data, 'presences_complet');
-                        setShowExportModal(false);
-                      }}
-                      style={{
-                        ...styles.button,
-                        backgroundColor: '#dc2626',
-                        color: 'white'
-                      }}
-                    >
-                      Exporter toutes les données filtrées
-                    </button>
+                          exportToExcel(data, 'presences_complet');
+                          setShowExportModal(false);
+                        }}
+                        style={{
+                          ...styles.button,
+                          backgroundColor: '#dc2626',
+                          color: 'white'
+                        }}
+                      >
+                        Export simple
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Export avec toutes les classes organisées dans une seule page
+                          const sessionsByClass = {};
+                          filteredSessions.forEach(session => {
+                            if (!sessionsByClass[session.cours]) {
+                              sessionsByClass[session.cours] = [];
+                            }
+                            sessionsByClass[session.cours].push(session);
+                          });
+
+                          const allData = [];
+                          let isFirstClass = true;
+
+                          Object.entries(sessionsByClass).forEach(([className, sessions]) => {
+                            // Espacement بين classes
+                            if (!isFirstClass) {
+                              allData.push({
+                                '': '',
+                                ' ': '',
+                                '  ': '',
+                                '   ': '',
+                                '    ': '',
+                                '     ': '',
+                                '      ': '',
+                                '       ': ''
+                              });
+                            }
+                            // En-tête de classe
+                            allData.push({
+                              '': `=== CLASSE: ${className} ===`,
+                              ' ': '',
+                              '  ': '',
+                              '   ': '',
+                              '    ': '',
+                              '     ': '',
+                              '      ': '',
+                              '       ': ''
+                            });
+                            // En-tête des colonnes
+                            allData.push({
+                              '': 'Date',
+                              ' ': 'Matière',
+                              '  ': 'Professeur',
+                              '   ': 'Période',
+                              '    ': 'Heure',
+                              '     ': 'Étudiant',
+                              '      ': 'Statut',
+                              '       ': 'Retard (min)',
+                              '        ': 'Remarque'
+                            });
+                            // Trier par date
+                            sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+                            // Données de la classe
+                            sessions.forEach(session => {
+                              session.presences.forEach(p => {
+                                allData.push({
+                                  '': formatDate(session.date),
+                                  ' ': session.matiere || 'N/A',
+                                  '  ': session.nomProfesseur || 'N/A',
+                                  '   ': session.presences[0]?.periode || 'N/A',
+                                  '    ': session.presences[0]?.heure || 'N/A',
+                                  '     ': p.etudiant?.nomComplet || 'N/A',
+                                  '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+                                  '       ': p.retardMinutes || 0,
+                                  '        ': p.remarque || ''
+                                });
+                              });
+                            });
+                            isFirstClass = false;
+                          });
+
+                          exportToExcel(allData, 'presences_complet_par_classe', 'Présences par Classe');
+                          setShowExportModal(false);
+                        }}
+                        style={{
+                          ...styles.button,
+                          backgroundColor: '#7c3aed',
+                          color: 'white'
+                        }}
+                      >
+                        Export par classe
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
