@@ -103,6 +103,12 @@ const Sidebar = ({ onLogout }) => {
       label: 'Professeurs',
       icon: User
     },
+
+    {
+      path: '/admin/professeursmanagement',
+      label: 'Gestion Professeurs',
+      icon: Users
+    },
     {
       path: '/ajouter-paiement',
       label: 'Nouveau Paiement',

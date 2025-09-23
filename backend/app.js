@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
+
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const Actualite = require('./models/Actualite');
@@ -1495,6 +1497,609 @@ app.patch('/api/etudiants/:id/actif', authAdminOrInscripteurOrPaiementManager, a
   }
 });
 
+// ✅ Récupérer tous les professeurs avec leurs statistiques
+app.get('/api/admin/professeurs-avec-stats', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeurs = await Professeur.find({})
+      .select('nom email matiere cours actif retards absences statistiques telephone')
+      .lean();
+    
+    // Transformer les données pour correspondre à ce que le frontend attend
+    const professeursTransformes = professeurs.map(prof => ({
+      _id: prof._id,
+      nom: prof.nom,
+      email: prof.email,
+      matiere: prof.matiere,
+      cours: prof.cours,
+      telephone: prof.telephone,
+      actif: prof.actif,
+      retards: prof.statistiques?.totalRetards || 0,
+      absences: prof.statistiques?.totalAbsences || 0,
+      tempsRetardTotal: prof.statistiques?.tempsRetardTotal || 0,
+      absencesJustifiees: prof.statistiques?.absencesJustifiees || 0,
+      dernierRetard: prof.statistiques?.dernierRetard || null,
+      derniereAbsence: prof.statistiques?.derniereAbsence || null
+    }));
+    
+    res.json(professeursTransformes);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la récupération des professeurs' });
+  }
+});
+
+// ✅ Ajouter un retard à un professeur (route spécifique admin)
+app.post('/api/admin/professeur/:id/retard', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { tempsRetard, cours, remarque } = req.body;
+    
+    if (!tempsRetard) {
+      return res.status(400).json({ message: 'Temps de retard requis' });
+    }
+
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    const retardData = {
+      date: new Date(),
+      tempsRetard: parseInt(tempsRetard),
+      cours: cours || '',
+      remarque: remarque || '',
+      signalePar: req.user.id,
+      signaleParModel: req.user.role === 'admin' ? 'Admin' : 'Inscripteur'
+    };
+
+    await professeur.ajouterRetard(retardData);
+    
+    res.json({ 
+      message: 'Retard ajouté avec succès', 
+      professeur: {
+        id: professeur._id,
+        nom: professeur.nom,
+        statistiques: professeur.statistiques
+      }
+    });
+  } catch (err) {
+    console.error('Erreur ajout retard:', err);
+    res.status(500).json({ message: 'Erreur lors de l\'ajout du retard' });
+  }
+});
+
+// ✅ Ajouter une absence à un professeur (route spécifique admin)
+app.post('/api/admin/professeur/:id/absence', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { cours, justifiee, raisonJustification, remarque } = req.body;
+
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    const absenceData = {
+      date: new Date(),
+      cours: cours || '',
+      justifiee: justifiee || false,
+      raisonJustification: justifiee ? raisonJustification || '' : '',
+      remarque: remarque || '',
+      signalePar: req.user.id,
+      signaleParModel: req.user.role === 'admin' ? 'Admin' : 'Inscripteur'
+    };
+
+    await professeur.ajouterAbsence(absenceData);
+    
+    res.json({ 
+      message: 'Absence ajoutée avec succès', 
+      professeur: {
+        id: professeur._id,
+        nom: professeur.nom,
+        statistiques: professeur.statistiques
+      }
+    });
+  } catch (err) {
+    console.error('Erreur ajout absence:', err);
+    res.status(500).json({ message: 'Erreur lors de l\'ajout de l\'absence' });
+  }
+});
+
+
+// Votre code complet corrigé :
+app.post('/api/admin/send-prof-individual-report', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { destinataire, rapport } = req.body;
+    
+    if (!destinataire || !rapport) {
+      return res.status(400).json({ message: 'Destinataire et rapport requis' });
+    }
+
+    // Configuration du transporteur email (CORRIGÉ)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">
+          📊 RAPPORT COMPLET ACTUALISÉ - ${rapport.professeur.nom}
+        </h2>
+        
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1e40af; margin-top: 0;">👨‍🏫 INFORMATIONS</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li style="padding: 5px 0;"><strong>Nom:</strong> ${rapport.professeur.nom}</li>
+            <li style="padding: 5px 0;"><strong>Email:</strong> ${rapport.professeur.email}</li>
+            <li style="padding: 5px 0;"><strong>Matière:</strong> ${rapport.professeur.matiere}</li>
+            <li style="padding: 5px 0;"><strong>Téléphone:</strong> ${rapport.professeur.telephone || 'N/A'}</li>
+          </ul>
+        </div>
+
+        <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #1e40af; margin-top: 0;">📈 STATISTIQUES ACTUALISÉES</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li style="padding: 5px 0;"><strong>Total Retards:</strong> <span style="color: #dc2626;">${rapport.statistiques?.totalRetards || 0}</span></li>
+            <li style="padding: 5px 0;"><strong>Total Absences:</strong> <span style="color: #dc2626;">${rapport.statistiques?.totalAbsences || 0}</span></li>
+            <li style="padding: 5px 0;"><strong>Temps retard total:</strong> <span style="color: #f59e0b;">${rapport.statistiques?.tempsRetardTotal || 0} minutes</span></li>
+            <li style="padding: 5px 0;"><strong>Absences justifiées:</strong> <span style="color: #10b981;">${rapport.statistiques?.absencesJustifiees || 0}</span></li>
+          </ul>
+        </div>
+
+        <!-- TOUS LES RETARDS -->
+        <div style="margin: 20px 0;">
+          <h3 style="color: #1e40af;">⏰ TOUS LES RETARDS (${rapport.retards?.length || 0})</h3>
+          ${rapport.retards && rapport.retards.length > 0 ? 
+            rapport.retards.map((retard, index) => 
+              `<div style="margin: 10px 0; padding: 15px; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <strong>📅 ${new Date(retard.date).toLocaleDateString('fr-FR')}</strong>
+                  <span style="background: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${retard.tempsRetard} minutes</span>
+                </div>
+                <div><strong>Cours:</strong> ${retard.cours || 'N/A'}</div>
+                ${retard.remarque ? `<div><strong>Remarque:</strong> ${retard.remarque}</div>` : ''}
+              </div>`
+            ).join('') 
+            : '<p style="color: #6b7280; font-style: italic;">Aucun retard enregistré</p>'
+          }
+        </div>
+
+        <!-- TOUTES LES ABSENCES -->
+        <div style="margin: 20px 0;">
+          <h3 style="color: #1e40af;">❌ TOUTES LES ABSENCES (${rapport.absences?.length || 0})</h3>
+          ${rapport.absences && rapport.absences.length > 0 ? 
+            rapport.absences.map((absence, index) => 
+              `<div style="margin: 10px 0; padding: 15px; background: ${absence.justifiee ? '#f0fdf4' : '#fef2f2'}; border-left: 4px solid ${absence.justifiee ? '#10b981' : '#dc2626'}; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <strong>📅 ${new Date(absence.date).toLocaleDateString('fr-FR')}</strong>
+                  <span style="background: ${absence.justifiee ? '#10b981' : '#dc2626'}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${absence.justifiee ? 'JUSTIFIÉE' : 'NON JUSTIFIÉE'}</span>
+                </div>
+                <div><strong>Cours:</strong> ${absence.cours || 'N/A'}</div>
+                ${absence.raisonJustification ? `<div><strong>Justification:</strong> ${absence.raisonJustification}</div>` : ''}
+                ${absence.remarque ? `<div><strong>Remarque:</strong> ${absence.remarque}</div>` : ''}
+              </div>`
+            ).join('') 
+            : '<p style="color: #6b7280; font-style: italic;">Aucune absence enregistrée</p>'
+          }
+        </div>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+          Rapport complet généré le ${rapport.date} - Données actualisées en temps réel
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: destinataire,
+      subject: `📊 Rapport Complet Actualisé - ${rapport.professeur.nom} - ${rapport.date}`,
+      html: htmlContent
+    };
+
+    await transporter.sendMail(mailOptions);
+    
+    res.json({ message: 'Rapport complet envoyé avec succès par email' });
+  } catch (err) {
+    console.error('Erreur envoi email:', err);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email: ' + err.message });
+  }
+});
+
+// ✅ Ajouter un retard à un professeur
+app.post('/api/professeurs/:id/retard', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { date, tempsRetard, cours, remarque } = req.body;
+    
+    if (!date || !tempsRetard) {
+      return res.status(400).json({ message: 'Date et temps de retard sont requis' });
+    }
+
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    const retardData = {
+      date: new Date(date),
+      tempsRetard: parseInt(tempsRetard),
+      cours: cours || '',
+      remarque: remarque || '',
+      signalePar: req.user.id,
+      signaleParModel: 'Admin'
+    };
+
+    await professeur.ajouterRetard(retardData);
+    
+    res.json({ 
+      message: 'Retard ajouté avec succès', 
+      professeur: {
+        id: professeur._id,
+        nom: professeur.nom,
+        statistiques: professeur.statistiques
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de l\'ajout du retard' });
+  }
+});
+
+// ✅ Ajouter une absence à un professeur
+app.post('/api/professeurs/:id/absence', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { date, cours, justifiee, raisonJustification, remarque } = req.body;
+    
+    if (!date) {
+      return res.status(400).json({ message: 'Date est requise' });
+    }
+
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    const absenceData = {
+      date: new Date(date),
+      cours: cours || '',
+      justifiee: justifiee || false,
+      raisonJustification: justifiee ? raisonJustification || '' : '',
+      remarque: remarque || '',
+      signalePar: req.user.id,
+      signaleParModel: 'Admin'
+    };
+
+    await professeur.ajouterAbsence(absenceData);
+    
+    res.json({ 
+      message: 'Absence ajoutée avec succès', 
+      professeur: {
+        id: professeur._id,
+        nom: professeur.nom,
+        statistiques: professeur.statistiques
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de l\'ajout de l\'absence' });
+  }
+});
+
+// ✅ Supprimer un retard spécifique
+app.delete('/api/professeurs/:id/retard/:retardId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    professeur.retards = professeur.retards.filter(
+      retard => retard._id.toString() !== req.params.retardId
+    );
+
+    await professeur.calculerStatistiques();
+    
+    res.json({ message: 'Retard supprimé avec succès' });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la suppression du retard' });
+  }
+});
+
+// ✅ Supprimer une absence spécifique
+app.delete('/api/professeurs/:id/absence/:absenceId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    professeur.absences = professeur.absences.filter(
+      absence => absence._id.toString() !== req.params.absenceId
+    );
+
+    await professeur.calculerStatistiques();
+    
+    res.json({ message: 'Absence supprimée avec succès' });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la suppression de l\'absence' });
+  }
+});
+
+// ✅ Obtenir les statistiques globales
+app.get('/api/professeurs/statistiques', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const totalProfesseurs = await Professeur.countDocuments({});
+    const professeursActifs = await Professeur.countDocuments({ actif: true });
+    
+    const professeursAvecRetards = await Professeur.countDocuments({
+      'statistiques.totalRetards': { $gt: 0 }
+    });
+    
+    const professeursAvecAbsences = await Professeur.countDocuments({
+      'statistiques.totalAbsences': { $gt: 0 }
+    });
+
+    // Calculer les totaux
+    const pipeline = [
+      {
+        $group: {
+          _id: null,
+          totalRetards: { $sum: '$statistiques.totalRetards' },
+          totalAbsences: { $sum: '$statistiques.totalAbsences' },
+          totalTempsRetard: { $sum: '$statistiques.tempsRetardTotal' },
+          totalAbsencesJustifiees: { $sum: '$statistiques.absencesJustifiees' }
+        }
+      }
+    ];
+
+    const [statistiques] = await Professeur.aggregate(pipeline);
+
+    res.json({
+      totalProfesseurs,
+      professeursActifs,
+      professeursAvecRetards,
+      professeursAvecAbsences,
+      totalRetards: statistiques?.totalRetards || 0,
+      totalAbsences: statistiques?.totalAbsences || 0,
+      totalTempsRetard: statistiques?.totalTempsRetard || 0,
+      totalAbsencesJustifiees: statistiques?.totalAbsencesJustifiees || 0,
+      totalAbsencesNonJustifiees: (statistiques?.totalAbsences || 0) - (statistiques?.totalAbsencesJustifiees || 0)
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du calcul des statistiques' });
+  }
+});
+
+// ✅ Envoyer les statistiques par email
+app.post('/api/professeurs/:id/envoyer-stats', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    // Configuration du transporteur email (à adapter selon votre service)
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail', // ou votre service email
+      auth: {
+        user: process.env.EMAIL_USER, // votre email
+        pass: process.env.EMAIL_PASSWORD // votre mot de passe d'application
+      }
+    });
+
+    // Formatage des données pour l'email
+    const statsText = `
+RAPPORT STATISTIQUES - ${professeur.nom}
+==========================================
+
+📊 RÉSUMÉ GÉNÉRAL:
+• Total Retards: ${professeur.statistiques.totalRetards}
+• Total Absences: ${professeur.statistiques.totalAbsences}
+• Temps de retard total: ${professeur.statistiques.tempsRetardTotal} minutes
+• Absences justifiées: ${professeur.statistiques.absencesJustifiees}
+• Absences non justifiées: ${professeur.statistiques.totalAbsences - professeur.statistiques.absencesJustifiees}
+
+⏰ DÉTAIL DES RETARDS:
+${professeur.retards.map((retard, index) => 
+  `${index + 1}. ${new Date(retard.date).toLocaleDateString('fr-FR')} - ${retard.tempsRetard}min - Cours: ${retard.cours || 'N/A'} - Remarque: ${retard.remarque || 'Aucune'}`
+).join('\n') || 'Aucun retard enregistré'}
+
+❌ DÉTAIL DES ABSENCES:
+${professeur.absences.map((absence, index) => 
+  `${index + 1}. ${new Date(absence.date).toLocaleDateString('fr-FR')} - Cours: ${absence.cours || 'N/A'} - ${absence.justifiee ? 'JUSTIFIÉE' : 'NON JUSTIFIÉE'} - Raison: ${absence.raisonJustification || absence.remarque || 'Aucune'}`
+).join('\n') || 'Aucune absence enregistrée'}
+
+Rapport généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}
+    `;
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'teamofppt@gmail.com',
+      subject: `📊 Statistiques Professeur - ${professeur.nom} - ${new Date().toLocaleDateString('fr-FR')}`,
+      text: statsText,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563eb; border-bottom: 2px solid #3b82f6; padding-bottom: 10px;">
+            📊 RAPPORT STATISTIQUES - ${professeur.nom}
+          </h2>
+          
+          <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #1e40af; margin-top: 0;">📈 RÉSUMÉ GÉNÉRAL</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="padding: 5px 0;"><strong>Total Retards:</strong> <span style="color: #dc2626;">${professeur.statistiques.totalRetards}</span></li>
+              <li style="padding: 5px 0;"><strong>Total Absences:</strong> <span style="color: #dc2626;">${professeur.statistiques.totalAbsences}</span></li>
+              <li style="padding: 5px 0;"><strong>Temps de retard total:</strong> <span style="color: #f59e0b;">${professeur.statistiques.tempsRetardTotal} minutes</span></li>
+              <li style="padding: 5px 0;"><strong>Absences justifiées:</strong> <span style="color: #10b981;">${professeur.statistiques.absencesJustifiees}</span></li>
+              <li style="padding: 5px 0;"><strong>Absences non justifiées:</strong> <span style="color: #dc2626;">${professeur.statistiques.totalAbsences - professeur.statistiques.absencesJustifiees}</span></li>
+            </ul>
+          </div>
+
+          <div style="margin: 20px 0;">
+            <h3 style="color: #1e40af;">⏰ DÉTAIL DES RETARDS</h3>
+            ${professeur.retards.length > 0 ? 
+              `<ol style="line-height: 1.6;">
+                ${professeur.retards.map(retard => 
+                  `<li style="margin: 10px 0; padding: 10px; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+                    <strong>Date:</strong> ${new Date(retard.date).toLocaleDateString('fr-FR')}<br>
+                    <strong>Temps:</strong> ${retard.tempsRetard} minutes<br>
+                    <strong>Cours:</strong> ${retard.cours || 'N/A'}<br>
+                    <strong>Remarque:</strong> ${retard.remarque || 'Aucune'}
+                  </li>`
+                ).join('')}
+              </ol>` 
+              : '<p style="color: #6b7280; font-style: italic;">Aucun retard enregistré</p>'
+            }
+          </div>
+
+          <div style="margin: 20px 0;">
+            <h3 style="color: #1e40af;">❌ DÉTAIL DES ABSENCES</h3>
+            ${professeur.absences.length > 0 ? 
+              `<ol style="line-height: 1.6;">
+                ${professeur.absences.map(absence => 
+                  `<li style="margin: 10px 0; padding: 10px; background: ${absence.justifiee ? '#f0fdf4' : '#fef2f2'}; border-left: 4px solid ${absence.justifiee ? '#10b981' : '#dc2626'}; border-radius: 4px;">
+                    <strong>Date:</strong> ${new Date(absence.date).toLocaleDateString('fr-FR')}<br>
+                    <strong>Cours:</strong> ${absence.cours || 'N/A'}<br>
+                    <strong>Statut:</strong> <span style="color: ${absence.justifiee ? '#10b981' : '#dc2626'}; font-weight: bold;">${absence.justifiee ? 'JUSTIFIÉE' : 'NON JUSTIFIÉE'}</span><br>
+                    <strong>Raison:</strong> ${absence.raisonJustification || absence.remarque || 'Aucune'}
+                  </li>`
+                ).join('')}
+              </ol>` 
+              : '<p style="color: #6b7280; font-style: italic;">Aucune absence enregistrée</p>'
+            }
+          </div>
+
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+            Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    
+    res.json({ message: 'Statistiques envoyées par email avec succès' });
+  } catch (err) {
+    console.error('Erreur envoi email:', err);
+    res.status(500).json({ message: 'Erreur lors de l\'envoi de l\'email' });
+  }
+});
+
+// ✅ Filtrer les professeurs par type
+app.get('/api/professeurs/filtre/:type', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    let query = {};
+    
+    switch (req.params.type) {
+      case 'retards':
+        query = { 'statistiques.totalRetards': { $gt: 0 } };
+        break;
+      case 'absences':
+        query = { 'statistiques.totalAbsences': { $gt: 0 } };
+        break;
+      case 'actifs':
+        query = { actif: true };
+        break;
+      case 'inactifs':
+        query = { actif: false };
+        break;
+      default:
+        query = {}; // tous
+    }
+
+    const professeurs = await Professeur.find(query)
+      .select('nom email matiere cours actif retards absences statistiques')
+      .lean();
+    
+    res.json(professeurs);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors du filtrage' });
+  }
+});
+
+// ✅ Récupérer l'historique complet d'un professeur
+app.get('/api/professeurs/:id/historique', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id)
+      .populate('retards.signalePar', 'nom')
+      .populate('absences.signalePar', 'nom')
+      .lean();
+
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    res.json({
+      professeur: {
+        nom: professeur.nom,
+        email: professeur.email,
+        matiere: professeur.matiere
+      },
+      retards: professeur.retards,
+      absences: professeur.absences,
+      statistiques: professeur.statistiques
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la récupération de l\'historique' });
+  }
+});
+
+// ✅ Récupérer l'historique complet d'un professeur (route admin spécifique)
+app.get('/api/admin/professeur/:id/historique', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id)
+      .populate('retards.signalePar', 'nom')
+      .populate('absences.signalePar', 'nom')
+      .lean();
+
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    // Trier les retards et absences par date (plus récent en premier)
+    const retardsTries = professeur.retards.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const absencesTries = professeur.absences.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json({
+      professeur: {
+        nom: professeur.nom,
+        email: professeur.email,
+        matiere: professeur.matiere,
+        telephone: professeur.telephone
+      },
+      retards: retardsTries,
+      absences: absencesTries,
+      statistiques: professeur.statistiques
+    });
+  } catch (err) {
+    console.error('Erreur récupération historique:', err);
+    res.status(500).json({ message: 'Erreur lors de la récupération de l\'historique' });
+  }
+});
+
+// ✅ Récupérer l'historique complet d'un professeur
+app.get('/api/professeurs/:id/historique', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.params.id)
+      .populate('retards.signalePar', 'nom')
+      .populate('absences.signalePar', 'nom')
+      .lean();
+
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur introuvable' });
+    }
+
+    res.json({
+      professeur: {
+        nom: professeur.nom,
+        email: professeur.email,
+        matiere: professeur.matiere
+      },
+      retards: professeur.retards,
+      absences: professeur.absences,
+      statistiques: professeur.statistiques
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la récupération de l\'historique' });
+  }
+});
 app.delete('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     await Etudiant.findByIdAndDelete(req.params.id);
