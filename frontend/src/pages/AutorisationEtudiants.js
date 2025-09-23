@@ -335,85 +335,144 @@ document.head.appendChild(styleSheet);
   };
 
   // Export Excel - TOUTES LES CLASSES avec options (Modifié)
-  const handleExportToutesLesClasses = async () => {
-    setExporting(true);
+ // Remplacez la fonction handleExportToutesLesClasses par cette version :
+
+const handleExportToutesLesClasses = async () => {
+  setExporting(true);
+  
+  try {
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
     
-    try {
-      const today = new Date();
-      const dateStr = today.toISOString().split('T')[0];
-      
-      let etudiantsAExporter = etudiants;
-      
-      // Filtrer par classe si une classe spécifique est sélectionnée
-      if (exportClasseGlobal) {
-        etudiantsAExporter = etudiantsAExporter.filter(e => 
-          e.cours && e.cours.includes(exportClasseGlobal)
-        );
-      }
-      
-      // Filtrer par type d'autorisation
-      if (exportTypeGlobal === 'autorises') {
-        etudiantsAExporter = etudiantsAExporter.filter(e => e.autorise === true);
-      }
-      
-      if (etudiantsAExporter.length === 0) {
-        setError('Aucun étudiant trouvé avec les critères sélectionnés');
-        setTimeout(() => setError(''), 3000);
-        return;
-      }
-      
-      // Préparer les données
-      const data = etudiantsAExporter.map(e => ({
-        Nom: e.nomComplet || 'N/A',
-        Niveau: e.niveau || 'N/A',
-        Classe: (e.cours && e.cours.length > 0) ? e.cours.join(', ') : 'Aucune classe',
-        Autorisé: e.autorise ? 'Oui' : 'Non'
-      }));
-      
-      // Créer la feuille Excel
-      const ws = XLSX.utils.json_to_sheet(data);
-      
-      // Ajuster la largeur des colonnes
-      const colWidths = [
-        { wch: 25 }, // Nom
-        { wch: 15 }, // Niveau
-        { wch: 30 }, // Classe
-        { wch: 12 }  // Autorisé
-      ];
-      ws['!cols'] = colWidths;
-      
-      // Créer le classeur
-      const wb = XLSX.utils.book_new();
-      const sheetName = exportClasseGlobal ? `Classe ${exportClasseGlobal}` : 'Toutes les Classes';
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-      
-      // Générer le nom du fichier
-      let fileName = 'etudiants';
-      if (exportClasseGlobal) {
-        fileName += `_${exportClasseGlobal}`;
-      } else {
-        fileName += '_toutes_classes';
-      }
-      if (exportTypeGlobal === 'autorises') {
-        fileName += '_autorises';
-      }
-      fileName += `_${dateStr}.xlsx`;
-      
-      // Télécharger le fichier
-      XLSX.writeFile(wb, fileName);
-      
-      // Afficher un message de succès
-      const message = `Export réussi ! ${etudiantsAExporter.length} étudiant(s) exporté(s)`;
-      setError(message);
-      setTimeout(() => setError(''), 3000);
-      
-    } catch (err) {
-      setError('Erreur lors de l\'export Excel');
-      console.error(err);
-    } finally {
-      setExporting(false);
+    let classesToExport = [];
+    
+    // Si une classe spécifique est sélectionnée
+    if (exportClasseGlobal) {
+      classesToExport = [exportClasseGlobal];
+    } else {
+      // Sinon, prendre toutes les classes uniques triées
+      classesToExport = coursUniques.sort();
     }
-  };
+    
+    if (classesToExport.length === 0) {
+      setError('Aucune classe trouvée');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    // Créer un tableau de données combiné pour toutes les classes
+    let allData = [];
+    let totalExported = 0;
+    let classesProcessed = 0;
+
+    // Pour chaque classe, ajouter ses données au tableau principal
+    for (const classe of classesToExport) {
+      // Filtrer les étudiants de cette classe
+      let etudiantsClasse = etudiants.filter(e => 
+        e.cours && e.cours.includes(classe)
+      );
+      
+      // Appliquer le filtre d'autorisation si nécessaire
+      if (exportTypeGlobal === 'autorises') {
+        etudiantsClasse = etudiantsClasse.filter(e => e.autorise === true);
+      }
+      
+      // Skip si aucun étudiant dans cette classe
+      if (etudiantsClasse.length === 0) {
+        continue;
+      }
+
+      // Ajouter une ligne de titre pour la classe (si ce n'est pas la première)
+      if (allData.length > 0) {
+        // Ligne vide de séparation
+        allData.push({
+          Nom: '',
+          Niveau: '',
+          Classe: '',
+          Autorisé: ''
+        });
+      }
+
+      // Ligne de titre de la classe
+      allData.push({
+        Nom: `=== CLASSE ${classe} ===`,
+        Niveau: `${etudiantsClasse.length} étudiant(s)`,
+        Classe: '',
+        Autorisé: ''
+      });
+
+      // Ligne d'en-têtes pour cette classe
+      allData.push({
+        Nom: 'Nom',
+        Niveau: 'Niveau',
+        Classe: 'Classe',
+        Autorisé: 'Autorisé'
+      });
+      
+      // Ajouter les données des étudiants de cette classe
+      etudiantsClasse.forEach(e => {
+        allData.push({
+          Nom: e.nomComplet || 'N/A',
+          Niveau: e.niveau || 'N/A',
+          Classe: classe,
+          Autorisé: e.autorise ? 'Oui' : 'Non'
+        });
+      });
+      
+      totalExported += etudiantsClasse.length;
+      classesProcessed++;
+    }
+    
+    if (allData.length === 0) {
+      setError('Aucun étudiant trouvé avec les critères sélectionnés');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    // Créer la feuille Excel unique avec toutes les données
+    const ws = XLSX.utils.json_to_sheet(allData);
+    
+    // Ajuster la largeur des colonnes
+    const colWidths = [
+      { wch: 30 }, // Nom
+      { wch: 15 }, // Niveau
+      { wch: 20 }, // Classe
+      { wch: 12 }  // Autorisé
+    ];
+    ws['!cols'] = colWidths;
+
+    // Créer le classeur avec une seule feuille
+    const wb = XLSX.utils.book_new();
+    const sheetName = exportClasseGlobal ? exportClasseGlobal : 'Toutes les Classes';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    
+    // Générer le nom du fichier
+    let fileName = exportClasseGlobal 
+      ? `classe_${exportClasseGlobal.replace(/[^a-zA-Z0-9]/g, '_')}`
+      : 'toutes_les_classes_combines';
+    
+    if (exportTypeGlobal === 'autorises') {
+      fileName += '_autorises';
+    }
+    fileName += `_${dateStr}.xlsx`;
+    
+    // Télécharger le fichier
+    XLSX.writeFile(wb, fileName);
+    
+    const message = exportClasseGlobal 
+      ? `Export réussi ! ${totalExported} étudiant(s) exporté(s)`
+      : `Export réussi ! ${classesProcessed} classes avec ${totalExported} étudiant(s) dans une seule page`;
+    setError(message);
+    
+    setTimeout(() => setError(''), 4000);
+    
+  } catch (err) {
+    setError('Erreur lors de l\'export Excel');
+    console.error(err);
+  } finally {
+    setExporting(false);
+  }
+};
 
   if (loading) {
     return (
@@ -578,36 +637,6 @@ document.head.appendChild(styleSheet);
                   <option key={cours} value={cours}>{cours}</option>
                 ))}
               </select>
-              <div style={styles.exportButtonsContainer}>
-                <button
-                  type="button"
-                  onClick={handleExportExcelTous}
-                  style={{
-                    ...styles.exportButton,
-                    backgroundColor: '#3b82f6',
-                    cursor: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
-                    opacity: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
-                  }}
-                  disabled={!(filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)))}
-                >
-                  <Download size={14} />
-                  Export Cours (Tous)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExportExcelAutorises}
-                  style={{
-                    ...styles.exportButton,
-                    backgroundColor: '#10b981',
-                    cursor: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
-                    opacity: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
-                  }}
-                  disabled={!(filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)))}
-                >
-                  <CheckCircle size={14} />
-                  Export Cours (Autorisés)
-                </button>
-              </div>
             </div>
 
             {/* Filtre Statut */}
