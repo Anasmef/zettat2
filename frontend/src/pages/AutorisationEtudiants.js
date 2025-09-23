@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, User, BookOpen, GraduationCap, AlertCircle, Search, Filter } from 'lucide-react';
+import { CheckCircle, XCircle, User, BookOpen, GraduationCap, AlertCircle, Search, Filter, Download, Users } from 'lucide-react';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 import * as XLSX from 'xlsx';
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/';
+};
+
 const AutorisationEtudiants = () => {
   const [etudiants, setEtudiants] = useState([]);
   const [etudiantsFiltres, setEtudiantsFiltres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState({});
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
   
   // États pour les filtres
   const [recherche, setRecherche] = useState('');
@@ -20,9 +22,176 @@ const AutorisationEtudiants = () => {
   const [filtreCours, setFiltreCours] = useState('');
   const [filtreStatut, setFiltreStatut] = useState('');
 
+  // Nouveaux états pour l'export global
+  const [exportTypeGlobal, setExportTypeGlobal] = useState('tous'); // 'tous' ou 'autorises'
+  const [exportClasseGlobal, setExportClasseGlobal] = useState(''); // classe spécifique ou '' pour toutes
+
   useEffect(() => {
     fetchEtudiants();
   }, []);
+
+  // Add CSS animation
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .exportGlobalButton:hover:not(:disabled) {
+    background-color: #4f46e5 !important;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+    transform: translateY(-2px) !important;
+  }
+
+  .exportGlobalButton:active:not(:disabled) {
+    transform: translateY(0px) !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3) !important;
+  }
+
+  .exportGlobalButton:disabled {
+    background-color: #9ca3af !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .exportSelect:focus {
+    border-color: #4f46e5 !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+  }
+
+  .inputRecherche:focus, .selectFiltre:focus {
+    border-color: #4f46e5 !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+  }
+  
+  @media (max-width: 768px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .card {
+      margin: 0 8px;
+    }
+    
+    .mainContent {
+      padding: 16px 8px;
+    }
+    
+    .headerContent {
+      padding: 0 16px;
+    }
+
+    .headerTop {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .exportGlobalSection {
+      width: 100%;
+      align-items: stretch;
+    }
+
+    .exportOptionsRow {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .exportOption {
+      width: 100%;
+    }
+
+    .exportSelect {
+      min-width: auto;
+      width: 100%;
+    }
+
+    .exportGlobalButton {
+      width: 100%;
+      min-width: auto;
+      justify-content: center;
+    }
+    
+    .title {
+      font-size: 24px;
+    }
+    
+    .actionButtons {
+      flex-direction: column;
+    }
+
+    .filtresRow {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .filtreGroupe {
+      min-width: auto;
+      width: 100%;
+    }
+
+    .inputRecherche {
+      width: 100%;
+    }
+
+    .exportButtonsContainer {
+      flex-direction: row;
+      gap: 8px;
+    }
+
+    .exportButton {
+      flex: 1;
+      font-size: 12px;
+      padding: 6px 10px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .title {
+      font-size: 20px;
+    }
+    
+    .studentName {
+      font-size: 16px;
+    }
+    
+    .card {
+      padding: 16px;
+    }
+
+    .exportButtonsContainer {
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .exportButton {
+      flex: none;
+    }
+
+    .exportOptionsRow {
+      gap: 8px;
+    }
+
+    .exportGlobalButton {
+      font-size: 13px;
+      padding: 10px 16px;
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .exportOptionsRow {
+      flex-wrap: wrap;
+    }
+  }
+`;
+document.head.appendChild(styleSheet);
 
   // Appliquer les filtres quand les données ou filtres changent
   useEffect(() => {
@@ -140,8 +309,6 @@ const AutorisationEtudiants = () => {
       Nom: e.nomComplet,
       Niveau: e.niveau,
       Classe: (e.cours || []).join(', '),
-      CodeMassar: e.codeMassar,
-      Email: e.email,
       Autorisé: e.autorise ? 'Oui' : 'Non',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -159,14 +326,93 @@ const AutorisationEtudiants = () => {
       Nom: e.nomComplet,
       Niveau: e.niveau,
       Classe: (e.cours || []).join(', '),
-      CodeMassar: e.codeMassar,
-      Email: e.email,
       Autorisé: 'Oui',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Etudiants Autorisés');
     XLSX.writeFile(wb, `etudiants_${filtreCours}_autorises.xlsx`);
+  };
+
+  // Export Excel - TOUTES LES CLASSES avec options (Modifié)
+  const handleExportToutesLesClasses = async () => {
+    setExporting(true);
+    
+    try {
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0];
+      
+      let etudiantsAExporter = etudiants;
+      
+      // Filtrer par classe si une classe spécifique est sélectionnée
+      if (exportClasseGlobal) {
+        etudiantsAExporter = etudiantsAExporter.filter(e => 
+          e.cours && e.cours.includes(exportClasseGlobal)
+        );
+      }
+      
+      // Filtrer par type d'autorisation
+      if (exportTypeGlobal === 'autorises') {
+        etudiantsAExporter = etudiantsAExporter.filter(e => e.autorise === true);
+      }
+      
+      if (etudiantsAExporter.length === 0) {
+        setError('Aucun étudiant trouvé avec les critères sélectionnés');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+      
+      // Préparer les données
+      const data = etudiantsAExporter.map(e => ({
+        Nom: e.nomComplet || 'N/A',
+        Niveau: e.niveau || 'N/A',
+        Classe: (e.cours && e.cours.length > 0) ? e.cours.join(', ') : 'Aucune classe',
+        Autorisé: e.autorise ? 'Oui' : 'Non'
+      }));
+      
+      // Créer la feuille Excel
+      const ws = XLSX.utils.json_to_sheet(data);
+      
+      // Ajuster la largeur des colonnes
+      const colWidths = [
+        { wch: 25 }, // Nom
+        { wch: 15 }, // Niveau
+        { wch: 30 }, // Classe
+        { wch: 12 }  // Autorisé
+      ];
+      ws['!cols'] = colWidths;
+      
+      // Créer le classeur
+      const wb = XLSX.utils.book_new();
+      const sheetName = exportClasseGlobal ? `Classe ${exportClasseGlobal}` : 'Toutes les Classes';
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      
+      // Générer le nom du fichier
+      let fileName = 'etudiants';
+      if (exportClasseGlobal) {
+        fileName += `_${exportClasseGlobal}`;
+      } else {
+        fileName += '_toutes_classes';
+      }
+      if (exportTypeGlobal === 'autorises') {
+        fileName += '_autorises';
+      }
+      fileName += `_${dateStr}.xlsx`;
+      
+      // Télécharger le fichier
+      XLSX.writeFile(wb, fileName);
+      
+      // Afficher un message de succès
+      const message = `Export réussi ! ${etudiantsAExporter.length} étudiant(s) exporté(s)`;
+      setError(message);
+      setTimeout(() => setError(''), 3000);
+      
+    } catch (err) {
+      setError('Erreur lors de l\'export Excel');
+      console.error(err);
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (loading) {
@@ -180,7 +426,7 @@ const AutorisationEtudiants = () => {
     );
   }
 
-  if (error) {
+  if (error && !error.includes('réussi') && !error.includes('exporté')) {
     return (
       <div style={styles.container}>
         <div style={styles.errorContainer}>
@@ -199,18 +445,90 @@ const AutorisationEtudiants = () => {
 
   return (
     <div style={styles.container}>
-      {/* Header */}      <Sidebar onLogout={handleLogout} />
+      {/* Header */}
+      <Sidebar onLogout={handleLogout} />
       
       <div style={styles.header}>
         <div style={styles.headerContent}>
-          <h1 style={styles.title}>
-            <GraduationCap size={32} color="#4f46e5" />
-            Autorisation des Étudiants
-          </h1>
-          <p style={styles.subtitle}>
-            {etudiantsFiltres.length} étudiant{etudiantsFiltres.length > 1 ? 's' : ''} trouvé{etudiantsFiltres.length > 1 ? 's' : ''} 
-            {etudiants.length !== etudiantsFiltres.length && ` sur ${etudiants.length}`}
-          </p>
+          <div style={styles.headerTop}>
+            <div>
+              <h1 style={styles.title}>
+                <GraduationCap size={32} color="#4f46e5" />
+                Autorisation des Étudiants
+              </h1>
+              <p style={styles.subtitle}>
+                {etudiantsFiltres.length} étudiant{etudiantsFiltres.length > 1 ? 's' : ''} trouvé{etudiantsFiltres.length > 1 ? 's' : ''} 
+                {etudiants.length !== etudiantsFiltres.length && ` sur ${etudiants.length}`}
+              </p>
+            </div>
+            
+            {/* Section Export Globale Améliorée */}
+            <div style={styles.exportGlobalSection}>
+              <div style={styles.exportOptionsRow}>
+                <div style={styles.exportOption}>
+                  <label style={styles.exportLabel}>Type d'export:</label>
+                  <select
+                    value={exportTypeGlobal}
+                    onChange={(e) => setExportTypeGlobal(e.target.value)}
+                    style={styles.exportSelect}
+                  >
+                    <option value="tous">Tous les étudiants</option>
+                    <option value="autorises">Autorisés seulement</option>
+                  </select>
+                </div>
+                
+                <div style={styles.exportOption}>
+                  <label style={styles.exportLabel}>Classe:</label>
+                  <select
+                    value={exportClasseGlobal}
+                    onChange={(e) => setExportClasseGlobal(e.target.value)}
+                    style={styles.exportSelect}
+                  >
+                    <option value="">Toutes les classes</option>
+                    {coursUniques.sort().map(cours => (
+                      <option key={cours} value={cours}>{cours}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <button
+                onClick={handleExportToutesLesClasses}
+                disabled={exporting || etudiants.length === 0}
+                style={styles.exportGlobalButton}
+              >
+                {exporting ? (
+                  <>
+                    <div style={styles.miniSpinner}></div>
+                    Export en cours...
+                  </>
+                ) : (
+                  <>
+                    <Download size={20} />
+                    <Users size={20} />
+                    Exporter
+                    {exportClasseGlobal ? ` ${exportClasseGlobal}` : ' Toutes les Classes'}
+                    {exportTypeGlobal === 'autorises' ? ' (Autorisés)' : ''}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          
+          {/* Message de succès/erreur */}
+          {error && (error.includes('réussi') || error.includes('exporté')) && (
+            <div style={styles.successMessage}>
+              <CheckCircle size={16} />
+              {error}
+            </div>
+          )}
+          
+          {error && error.includes('Aucun étudiant trouvé') && (
+            <div style={styles.warningMessage}>
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
         </div>
       </div>
 
@@ -260,44 +578,36 @@ const AutorisationEtudiants = () => {
                   <option key={cours} value={cours}>{cours}</option>
                 ))}
               </select>
-              <button
-                type="button"
-                onClick={handleExportExcelTous}
-                style={{
-                  marginTop: '8px',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '8px 14px',
-                  fontWeight: '500',
-                  fontSize: '14px',
-                  cursor: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
-                  opacity: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
-                }}
-                disabled={!(filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)))}
-              >
-                Exporter Excel (par cours - tous)
-              </button>
-              <button
-                type="button"
-                onClick={handleExportExcelAutorises}
-                style={{
-                  marginTop: '8px',
-                  background: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '8px 14px',
-                  fontWeight: '500',
-                  fontSize: '14px',
-                  cursor: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
-                  opacity: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
-                }}
-                disabled={!(filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)))}
-              >
-                Exporter Excel (par cours - autorisés)
-              </button>
+              <div style={styles.exportButtonsContainer}>
+                <button
+                  type="button"
+                  onClick={handleExportExcelTous}
+                  style={{
+                    ...styles.exportButton,
+                    backgroundColor: '#3b82f6',
+                    cursor: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
+                    opacity: filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
+                  }}
+                  disabled={!(filtreCours && etudiantsFiltres.some(e => e.cours && e.cours.includes(filtreCours)))}
+                >
+                  <Download size={14} />
+                  Export Cours (Tous)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportExcelAutorises}
+                  style={{
+                    ...styles.exportButton,
+                    backgroundColor: '#10b981',
+                    cursor: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 'pointer' : 'not-allowed',
+                    opacity: filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)) ? 1 : 0.5
+                  }}
+                  disabled={!(filtreCours && etudiantsFiltres.some(e => e.autorise && e.cours && e.cours.includes(filtreCours)))}
+                >
+                  <CheckCircle size={14} />
+                  Export Cours (Autorisés)
+                </button>
+              </div>
             </div>
 
             {/* Filtre Statut */}
@@ -460,6 +770,14 @@ const styles = {
     padding: '0 16px',
   },
 
+  headerTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '24px',
+    marginBottom: '16px',
+  },
+
   title: {
     display: 'flex',
     alignItems: 'center',
@@ -474,6 +792,91 @@ const styles = {
     fontSize: '16px',
     color: '#64748b',
     margin: 0,
+  },
+
+  // Nouvelle section d'export globale
+  exportGlobalSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    alignItems: 'flex-end',
+  },
+
+  exportOptionsRow: {
+    display: 'flex',
+    gap: '16px',
+    alignItems: 'end',
+  },
+
+  exportOption: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+
+  exportLabel: {
+    fontSize: '13px',
+    fontWeight: '500',
+    color: '#374151',
+  },
+
+  exportSelect: {
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    cursor: 'pointer',
+    minWidth: '140px',
+    transition: 'border-color 0.2s ease',
+  },
+
+  exportGlobalButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px 20px',
+    backgroundColor: '#6366f1',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+    whiteSpace: 'nowrap',
+    minWidth: '200px',
+    justifyContent: 'center',
+  },
+
+  successMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    backgroundColor: '#dcfce7',
+    color: '#166534',
+    border: '1px solid #bbf7d0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    marginTop: '8px',
+  },
+
+  warningMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 16px',
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+    border: '1px solid #fde68a',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    marginTop: '8px',
   },
 
   mainContent: {
@@ -746,6 +1149,27 @@ const styles = {
     transition: 'border-color 0.2s ease',
   },
 
+  exportButtonsContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    marginTop: '8px',
+  },
+
+  exportButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 14px',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    fontWeight: '500',
+    fontSize: '13px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+
   btnViderFiltres: {
     display: 'flex',
     alignItems: 'center',
@@ -761,60 +1185,5 @@ const styles = {
     transition: 'all 0.2s ease',
   },
 };
-
-// Add CSS animation
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  button:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  
-  @media (max-width: 768px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .card {
-      margin: 0 8px;
-    }
-    
-    .mainContent {
-      padding: 16px 8px;
-    }
-    
-    .headerContent {
-      padding: 0 16px;
-    }
-    
-    .title {
-      font-size: 24px;
-    }
-    
-    .actionButtons {
-      flex-direction: column;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .title {
-      font-size: 20px;
-    }
-    
-    .studentName {
-      font-size: 16px;
-    }
-    
-    .card {
-      padding: 16px;
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default AutorisationEtudiants;
