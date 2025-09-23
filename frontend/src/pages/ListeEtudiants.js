@@ -141,32 +141,49 @@ const [formAjout, setFormAjout] = useState({
  
 ];
 
-  // Helper للحصول على الكورسات حسب المستوى - VERSION FINALE STRICTE
-  const coursPourNiveau = (liste, niveau) => {
-    if (!niveau) return liste;
+// Helper للحصول على الكورسات حسب المستوى - VERSION CORRIGÉE
+const coursPourNiveau = (liste, niveau) => {
+  if (!niveau) return liste;
+  
+  console.log('🔍 Recherche cours pour niveau:', niveau);
+  console.log('📚 Liste complète des cours:', liste.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
+  
+  const coursCorrespondants = liste.filter(c => {
+    const niveauCours = c.niveau || c.nom || '';
     
-    console.log('🔍 Recherche cours pour niveau:', niveau);
-    console.log('📚 Liste complète des cours:', liste.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
+    // Correspondance exacte
+    if (niveauCours.toLowerCase() === niveau.toLowerCase()) {
+      return true;
+    }
     
-    // Rechercher les cours qui commencent par le niveau sélectionné
-    // Par exemple si niveau = "1AC", on trouve "1AC A", "1AC B", etc.
-    const coursCorrespondants = liste.filter(c => {
-      const niveauCours = c.niveau || c.nom || '';
-      // Correspondance exacte
-      if (niveauCours.toLowerCase() === niveau.toLowerCase()) {
+    // Correspondance avec variations
+    if (niveauCours.toLowerCase().startsWith(niveau.toLowerCase())) {
+      const suffixe = niveauCours.substring(niveau.length).trim();
+      
+      // Si pas de suffixe, c'est valide
+      if (suffixe === '') {
         return true;
       }
-      // Correspondance avec variations (1AC trouve 1AC A, 1AC B, etc.)
-      if (niveauCours.toLowerCase().startsWith(niveau.toLowerCase())) {
-        // Vérifier que c'est bien une variation du niveau (avec A, B, C à la fin)
-        const suffixe = niveauCours.substring(niveau.length).trim();
-        return suffixe === '' || /^[ABC]$/i.test(suffixe);
+      
+      // Si le suffixe commence par un espace, on vérifie ce qui suit
+      if (suffixe.startsWith(' ')) {
+        const suffixeNettoye = suffixe.substring(1); // Enlever l'espace
+        
+        // Permettre n'importe quelle lettre ou combinaison de lettres/chiffres après un espace
+        // Exemples: "2BAC PC A", "2BAC PC D", "1AC B", etc.
+        return /^[A-Z0-9\s]*$/i.test(suffixeNettoye);
       }
-      return false;
-    });
-    console.log('✅ Cours trouvés pour', niveau, ':', coursCorrespondants.map(c => ({ nom: c.nom, niveau: c.niveau })));
-    return coursCorrespondants;
-  };
+      
+      // Si pas d'espace, permettre seulement des lettres simples (A, B, C, etc.)
+      return /^[A-Z]$/i.test(suffixe);
+    }
+    
+    return false;
+  });
+  
+  console.log('✅ Cours trouvés pour', niveau, ':', coursCorrespondants.map(c => ({ nom: c.nom, niveau: c.niveau })));
+  return coursCorrespondants;
+};
 
   // حساب الكورسات المتاحة حسب المستوى الحالي
   const coursDisponiblesAjout = useMemo(
