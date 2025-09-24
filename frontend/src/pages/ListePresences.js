@@ -235,7 +235,7 @@ const exportToExcel = (data, filename, sheetName = 'Présences') => {
 };
 
 // Export présences par jour avec toutes les classes dans une seule page
-const exportDailyPresences = (date, professorName = null) => {
+const exportDailyPresences = (date, professorName = null, statusFilter = 'all') => {
   const sessionsOfDay = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date).toDateString();
     const filterDate = new Date(date).toDateString();
@@ -297,33 +297,42 @@ const exportDailyPresences = (date, professorName = null) => {
       '      ': 'Retard (min)',
       '       ': 'Remarque'
     });
-    // Ajouter les données de la classe
+    // Ajouter les données de la classe avec filtre de statut
     sessions.forEach(session => {
       session.presences.forEach(p => {
-        allData.push({
-          '': session.matiere || 'N/A',
-          ' ': session.nomProfesseur || 'N/A',
-          '  ': session.presences[0]?.periode || 'N/A',
-          '   ': session.presences[0]?.heure || 'N/A',
-          '    ': p.etudiant?.nomComplet || 'N/A',
-          '     ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-          '      ': p.retardMinutes || 0,
-          '       ': p.remarque || ''
-        });
+        let includeStudent = true;
+        if (statusFilter === 'absent' && p.present) {
+          includeStudent = false;
+        } else if (statusFilter === 'retard' && (!p.present || p.retardMinutes === 0)) {
+          includeStudent = false;
+        }
+        if (includeStudent) {
+          allData.push({
+            '': session.matiere || 'N/A',
+            ' ': session.nomProfesseur || 'N/A',
+            '  ': session.presences[0]?.periode || 'N/A',
+            '   ': session.presences[0]?.heure || 'N/A',
+            '    ': p.etudiant?.nomComplet || 'N/A',
+            '     ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+            '      ': p.retardMinutes || 0,
+            '       ': p.remarque || ''
+          });
+        }
       });
     });
     isFirstClass = false;
   });
 
+  const statusSuffix = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
   const filename = professorName 
-    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName}`
-    : `presences_${formatDate(date).replace(/\//g, '-')}`;
+    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName}${statusSuffix}`
+    : `presences_${formatDate(date).replace(/\//g, '-')}${statusSuffix}`;
   
   exportToExcel(allData, filename, 'Présences par Classe');
 };
 
 // Export présences par mois avec toutes les classes dans une seule page
-const exportMonthlyPresences = (month, year) => {
+const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
   const monthSessions = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date);
     return sessionDate.getMonth() + 1 === parseInt(month) && 
@@ -395,29 +404,38 @@ const exportMonthlyPresences = (month, year) => {
     });
     // Trier les sessions par date
     sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
-    // Ajouter les données de la classe
+    // Ajouter les données de la classe avec filtre de statut
     sessions.forEach(session => {
       session.presences.forEach(p => {
-        allData.push({
-          '': formatDate(session.date),
-          ' ': session.matiere || 'N/A',
-          '  ': session.nomProfesseur || 'N/A',
-          '   ': session.presences[0]?.periode || 'N/A',
-          '    ': session.presences[0]?.heure || 'N/A',
-          '     ': p.etudiant?.nomComplet || 'N/A',
-          '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-          '       ': p.retardMinutes || 0,
-          '        ': p.remarque || '',
-          '         ': session.totalCount,
-          '          ': `${session.attendanceRate}%`
-        });
+        let includeStudent = true;
+        if (statusFilter === 'absent' && p.present) {
+          includeStudent = false;
+        } else if (statusFilter === 'retard' && (!p.present || p.retardMinutes === 0)) {
+          includeStudent = false;
+        }
+        if (includeStudent) {
+          allData.push({
+            '': formatDate(session.date),
+            ' ': session.matiere || 'N/A',
+            '  ': session.nomProfesseur || 'N/A',
+            '   ': session.presences[0]?.periode || 'N/A',
+            '    ': session.presences[0]?.heure || 'N/A',
+            '     ': p.etudiant?.nomComplet || 'N/A',
+            '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+            '       ': p.retardMinutes || 0,
+            '        ': p.remarque || '',
+            '         ': session.totalCount,
+            '          ': `${session.attendanceRate}%`
+          });
+        }
       });
     });
     isFirstClass = false;
   });
 
+  const statusSuffix = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
   const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
-  exportToExcel(allData, `presences_${monthName}_${year}`, 'Présences par Classe');
+  exportToExcel(allData, `presences_${monthName}_${year}${statusSuffix}`, 'Présences par Classe');
 };
 
 // Export présences par mois avec résumé général et détails dans une seule page
@@ -1636,8 +1654,8 @@ const exportByProfessor = (professorName) => {
                     <h4 style={{ fontSize: '16px', fontWeight: '500', marginBottom: '12px' }}>
                       Export par jour
                     </h4>
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'end' }}>
-                      <div style={{ flex: 1 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                      <div>
                         <label style={styles.filterLabel}>Date</label>
                         <input
                           type="date"
@@ -1645,7 +1663,7 @@ const exportByProfessor = (professorName) => {
                           style={styles.filterInput}
                         />
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div>
                         <label style={styles.filterLabel}>Professeur (optionnel)</label>
                         <select id="exportProfessor" style={styles.filterSelect}>
                           <option value="">Tous les professeurs</option>
@@ -1654,20 +1672,29 @@ const exportByProfessor = (professorName) => {
                           ))}
                         </select>
                       </div>
-                      <button
-                        onClick={() => {
-                          const date = document.getElementById('exportDate').value;
-                          const prof = document.getElementById('exportProfessor').value;
-                          if (date) {
-                            exportDailyPresences(date, prof || null);
-                            setShowExportModal(false);
-                          }
-                        }}
-                        style={styles.button}
-                      >
-                        Exporter
-                      </button>
+                      <div>
+                        <label style={styles.filterLabel}>Étudiants à inclure</label>
+                        <select id="exportDailyStatus" style={styles.filterSelect}>
+                          <option value="all">Tous les étudiants</option>
+                          <option value="absent">Seulement les absents</option>
+                          <option value="retard">Seulement les retards</option>
+                        </select>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        const date = document.getElementById('exportDate').value;
+                        const prof = document.getElementById('exportProfessor').value;
+                        const status = document.getElementById('exportDailyStatus').value;
+                        if (date) {
+                          exportDailyPresences(date, prof || null, status);
+                          setShowExportModal(false);
+                        }
+                      }}
+                      style={styles.button}
+                    >
+                      Exporter
+                    </button>
                   </div>
 
                   {/* Export mensuel */}
@@ -1695,14 +1722,23 @@ const exportByProfessor = (professorName) => {
                           })}
                         </select>
                       </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={styles.filterLabel}>Étudiants à inclure</label>
+                        <select id="exportMonthlyStatus" style={styles.filterSelect}>
+                          <option value="all">Tous les étudiants</option>
+                          <option value="absent">Seulement les absents</option>
+                          <option value="retard">Seulement les retards</option>
+                        </select>
+                      </div>
                     </div>
                     
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '12px' }}>
                       <button
                         onClick={() => {
                           const month = document.getElementById('exportMonth').value;
                           const year = document.getElementById('exportYear').value;
-                          exportMonthlyPresences(month, year);
+                          const status = document.getElementById('exportMonthlyStatus').value;
+                          exportMonthlyPresences(month, year, status);
                           setShowExportModal(false);
                         }}
                         style={styles.button}
