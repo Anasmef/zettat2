@@ -234,12 +234,16 @@ const exportToExcel = (data, filename, sheetName = 'Présences') => {
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 // 🆕 دالة للتصدير اليومي بجدول واضح
+// ✅ تصدير يوم واحد: كل "classe" في جدول مستقل داخل نفس الورقة
+// ✅ تصدير يوم واحد: داخل كل Classe كنقسم لجداول فرعية حسب (Prof + Période + Matière + Heure)
 const exportDailyPresences = (date, professorName = null, statusFilter = 'all', periodeFilter = '') => {
+  const isAllPeriode = !periodeFilter || periodeFilter === 'all';
+
   const sessionsOfDay = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date).toDateString();
-    const filterDate = new Date(date).toDateString();
-    const periodeMatch = !periodeFilter || (session.presences[0]?.periode === periodeFilter);
-    const profMatch = !professorName || session.nomProfesseur === professorName;
+    const filterDate  = new Date(date).toDateString();
+    const periodeMatch = isAllPeriode || (session.presences[0]?.periode === periodeFilter);
+    const profMatch    = !professorName || session.nomProfesseur === professorName;
     return sessionDate === filterDate && profMatch && periodeMatch;
   });
 
@@ -248,58 +252,126 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     return;
   }
 
-  // ====== بناء البيانات بشكل أوضح ======
-  const rows = [];
-  sessionsOfDay.forEach(session => {
-    session.presences.forEach(p => {
-      // فلترة حسب الحالة
-      let include = true;
-      if (statusFilter === 'absent' && p.present) include = false;
-      if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) include = false;
-      if (include) {
-        rows.push({
-          'Date': formatDate(session.date),
-          'Classe': session.cours,
-          'Matière': session.matiere || 'N/A',
-          'Professeur': session.nomProfesseur || 'N/A',
-          'Période': session.presences[0]?.periode || 'N/A',
-          'Heure': session.presences[0]?.heure || 'N/A',
-          'Étudiant': p.etudiant?.nomComplet || 'N/A',
-          'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-          'Retard (min)': p.retardMinutes || 0,
-          'Remarque': p.remarque || ''
-        });
-      }
-    });
+  // 1) نجمع حسب Classe
+  const classes = {};
+  sessionsOfDay.forEach(s => {
+    if (!classes[s.cours]) classes[s.cours] = [];
+    classes[s.cours].push(s);
   });
 
-  // ====== إنشاء ورقة Excel ======
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // تعيين مقاسات الأعمدة باش تكون واضحة في الطباعة
-  ws['!cols'] = [
-    { wch: 11 }, // Date
-    { wch: 18 }, // Classe
-    { wch: 16 }, // Matière
-    { wch: 18 }, // Professeur
-    { wch: 10 }, // Période
-    { wch: 10 }, // Heure
-    { wch: 28 }, // Étudiant
-    { wch: 12 }, // Statut
-    { wch: 12 }, // Retard
-    { wch: 40 }  // Remarque
+  const header = [
+    'Date','Classe','Matière','Professeur',
+    'Période','Heure','Étudiant','Statut',
+    'Retard (min)','Remarque'
   ];
+  const colWidths = [
+    { wch: 11 }, { wch: 18 }, { wch: 16 }, { wch: 18 },
+    { wch: 10 }, { wch: 10 }, { wch: 28 }, { wch: 12 },
+    { wch: 12 }, { wch: 40 }
+  ];
+
+  const aoa = [];
+  const merges = [];
+  const colsCount = header.length;
+
+  // عنوان عام
+  const bigTitle = `PRÉSENCES — ${formatDate(date)}${professorName ? ' — ' + professorName : ''}${!isAllPeriode ? ' — ' + periodeFilter : ''}`;
+  aoa.push([bigTitle, ...Array(colsCount - 1).fill('')]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
+  aoa.push(Array(colsCount).fill(''));
+
+  let currentRow = aoa.length;
+
+  // 2) داخل كل Classe: نجمع بجداول فرعية حسب (Prof + Période + Matière + Heure)
+  Object.entries(classes)
+    .sort(([a],[b]) => a.localeCompare(b,'fr'))
+    .forEach(([className, sessions], classIdx, classArr) => {
+      // عنوان Classe
+      aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
+      merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+      currentRow++;
+
+      // ⤵️ تجميع فرعي
+      const subGroups = {};
+      sessions.forEach(s => {
+        const prof   = s.nomProfesseur || 'N/A';
+        const periode= s.presences[0]?.periode || 'N/A';
+        const mat    = s.matiere || 'N/A';
+        const heure  = s.presences[0]?.heure || 'N/A';
+        const key = `${prof}||${periode}||${mat}||${heure}`;
+        if (!subGroups[key]) subGroups[key] = [];
+        subGroups[key].push(s);
+      });
+
+      // دور على كل SubGroup بترتيب واضح
+      Object.entries(subGroups)
+        .sort(([ka],[kb]) => ka.localeCompare(kb,'fr'))
+        .forEach(([key, groupSessions], sgIdx, sgArr) => {
+          const [prof, periode, mat, heure] = key.split('||');
+
+          // عنوان فرعي: Prof + Période + Matière + Heure
+          aoa.push([`Prof: ${prof} — Période: ${periode} — Matière: ${mat} — Heure: ${heure}`, ...Array(colsCount - 1).fill('')]);
+          merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+          currentRow++;
+
+          // هيدر
+          aoa.push([...header]);
+          currentRow++;
+
+          // سطور البيانات
+          groupSessions
+            .sort((a,b) => new Date(a.date) - new Date(b.date))
+            .forEach(session => {
+              session.presences.forEach(p => {
+                if (statusFilter === 'absent' && p.present) return;
+                if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) return;
+
+                aoa.push([
+                  formatDate(session.date),
+                  session.cours,
+                  session.matiere || 'N/A',
+                  session.nomProfesseur || 'N/A',
+                  session.presences[0]?.periode || 'N/A',
+                  session.presences[0]?.heure || 'N/A',
+                  p.etudiant?.nomComplet || 'N/A',
+                  p.present ? ((p.retardMinutes || 0) > 0 ? 'En retard' : 'Présent') : 'Absent',
+                  p.retardMinutes || 0,
+                  p.remarque || ''
+                ]);
+                currentRow++;
+              });
+            });
+
+          // سطر فارغ بين الجداول الفرعية
+          if (sgIdx < sgArr.length - 1) {
+            aoa.push(Array(colsCount).fill(''));
+            currentRow++;
+          }
+        });
+
+      // سطر فارغ بين الكلاسات
+      if (classIdx < classArr.length - 1) {
+        aoa.push(Array(colsCount).fill(''));
+        currentRow++;
+      }
+    });
+
+  // بناء الورقة والحفظ
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges;
+  ws['!cols']   = colWidths;
+  ws['!rows']   = [{ hpx: 28 }];
+  ws['!margins']   = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+  ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Présences Jour');
 
   const statusSuffix = statusFilter !== 'all' ? `_${statusFilter}` : '';
-  const filename = professorName
-    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName.replace(/\s+/g, '_')}${statusSuffix}`
-    : `presences_${formatDate(date).replace(/\//g, '-')}${statusSuffix}`;
-
+  const filename = `presences_${formatDate(date).replace(/\//g, '-')}_classe_groupes${statusSuffix}`;
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
+
 
 
 // Export présences par mois avec toutes les classes dans une seule page
