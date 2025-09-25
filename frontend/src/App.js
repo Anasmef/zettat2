@@ -72,7 +72,10 @@ import InscripteurDashboard from './pages/InscripteurDashboard';
 import AbsencesParCours from './pages/AbsencesParCours';
 import AutorisationEtudiants from './pages/AutorisationEtudiants';
 import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
+import ReclamationsProfesseur
+ from './pages/ReclamationsProfesseur';
 
+import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
@@ -369,6 +372,7 @@ function AppContent() {
 <Route path="/admin/autorisations" element={<AutorisationEtudiants />} />
 
 <Route path="/admin/professeursmanagement" element={<AdminProfManagement />} />
+
 
 <Route path="/professeur/etudiants-autorises" element={<EtudiantsAutorisesProfesseur />} />
         {/* Routes Étudiant */}

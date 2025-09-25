@@ -1,0 +1,382 @@
+/* ReclamationForm.css */
+
+/* Modal overlay */
+.form-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+/* Modal container */
+.form-modal-container {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 42rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Header */
+.form-modal-header {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+}
+
+.form-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-modal-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+.form-modal-subtitle {
+  color: rgba(254, 202, 202, 1);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.form-close-btn {
+  color: white;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.form-close-btn:hover {
+  background-color: rgba(239, 68, 68, 0.6);
+}
+
+/* Form styles */
+.form-container {
+  padding: 1.5rem;
+}
+
+.form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Error message */
+.form-error-message {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+}
+
+/* Form groups */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-label-icon {
+  margin-right: 0.5rem;
+}
+
+.form-select,
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.form-select:focus,
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+.form-select.error,
+.form-input.error,
+.form-textarea.error {
+  border-color: #ef4444;
+}
+
+.form-textarea {
+  resize: none;
+}
+
+.form-field-error {
+  color: #ef4444;
+  font-size: 0.875rem;
+}
+
+/* Student preview */
+.student-preview {
+  background-color: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.student-preview-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.student-info-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.student-avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.student-avatar-placeholder {
+  width: 3rem;
+  height: 3rem;
+  background-color: #d1d5db;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-details p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.student-details p:first-child {
+  font-weight: 500;
+}
+
+.student-details p:not(:first-child) {
+  color: #6b7280;
+}
+
+/* Grid layout for form fields */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Priority badges */
+.priority-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.priority-badge.low {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.priority-badge.medium {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.priority-badge.high {
+  background-color: #fed7aa;
+  color: #c2410c;
+}
+
+.priority-badge.urgent {
+  background-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Character count */
+.char-count-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.char-count {
+  font-size: 0.875rem;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+/* Preview section */
+.form-preview {
+  background-color: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.form-preview-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+}
+
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.preview-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* Form actions */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  border-radius: 0.5rem;
+  background-color: white;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background-color: #f9fafb;
+}
+
+.btn-submit {
+  padding: 0.75rem 1.5rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+.btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid white;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .form-modal-overlay {
+    padding: 0.5rem;
+  }
+  
+  .form-modal-container {
+    max-height: 95vh;
+  }
+  
+  .form-modal-header {
+    padding: 1rem;
+  }
+  
+  .form-container {
+    padding: 1rem;
+  }
+  
+  .form-modal-title {
+    font-size: 1.25rem;
+  }
+  
+  .form-header-info {
+    gap: 0.5rem;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
+    justify-content: center;
+  }
+}

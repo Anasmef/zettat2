@@ -233,14 +233,14 @@ const exportToExcel = (data, filename, sheetName = 'Présences') => {
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
-
-// Export présences par jour avec toutes les classes dans une seule page
-const exportDailyPresences = (date, professorName = null, statusFilter = 'all') => {
+// 🆕 دالة للتصدير اليومي بجدول واضح
+const exportDailyPresences = (date, professorName = null, statusFilter = 'all', periodeFilter = '') => {
   const sessionsOfDay = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date).toDateString();
     const filterDate = new Date(date).toDateString();
-    return sessionDate === filterDate && 
-           (!professorName || session.nomProfesseur === professorName);
+    const periodeMatch = !periodeFilter || (session.presences[0]?.periode === periodeFilter);
+    const profMatch = !professorName || session.nomProfesseur === professorName;
+    return sessionDate === filterDate && profMatch && periodeMatch;
   });
 
   if (sessionsOfDay.length === 0) {
@@ -248,88 +248,59 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all') 
     return;
   }
 
-  // Grouper par classe
-  const sessionsByClass = {};
+  // ====== بناء البيانات بشكل أوضح ======
+  const rows = [];
   sessionsOfDay.forEach(session => {
-    if (!sessionsByClass[session.cours]) {
-      sessionsByClass[session.cours] = [];
-    }
-    sessionsByClass[session.cours].push(session);
+    session.presences.forEach(p => {
+      // فلترة حسب الحالة
+      let include = true;
+      if (statusFilter === 'absent' && p.present) include = false;
+      if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) include = false;
+      if (include) {
+        rows.push({
+          'Date': formatDate(session.date),
+          'Classe': session.cours,
+          'Matière': session.matiere || 'N/A',
+          'Professeur': session.nomProfesseur || 'N/A',
+          'Période': session.presences[0]?.periode || 'N/A',
+          'Heure': session.presences[0]?.heure || 'N/A',
+          'Étudiant': p.etudiant?.nomComplet || 'N/A',
+          'Statut': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+          'Retard (min)': p.retardMinutes || 0,
+          'Remarque': p.remarque || ''
+        });
+      }
+    });
   });
 
-  // Créer les données avec séparateurs pour chaque classe
-  const allData = [];
-  let isFirstClass = true;
+  // ====== إنشاء ورقة Excel ======
+  const ws = XLSX.utils.json_to_sheet(rows);
 
-  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
-    // Ajouter un séparateur de classe (sauf pour la première)
-    if (!isFirstClass) {
-      allData.push({
-        '': '',
-        ' ': '',
-        '  ': '',
-        '   ': '',
-        '    ': '',
-        '     ': '',
-        '      ': '',
-        '       ': ''
-      });
-    }
-    // Ajouter l'en-tête de classe
-    allData.push({
-      '': `=== CLASSE: ${className} ===`,
-      ' ': '',
-      '  ': '',
-      '   ': '',
-      '    ': '',
-      '     ': '',
-      '      ': '',
-      '       ': ''
-    });
-    // Ajouter l'en-tête des colonnes
-    allData.push({
-      '': 'Matière',
-      ' ': 'Professeur',
-      '  ': 'Période',
-      '   ': 'Heure',
-      '    ': 'Étudiant',
-      '     ': 'Statut',
-      '      ': 'Retard (min)',
-      '       ': 'Remarque'
-    });
-    // Ajouter les données de la classe avec filtre de statut
-    sessions.forEach(session => {
-      session.presences.forEach(p => {
-        let includeStudent = true;
-        if (statusFilter === 'absent' && p.present) {
-          includeStudent = false;
-        } else if (statusFilter === 'retard' && (!p.present || p.retardMinutes === 0)) {
-          includeStudent = false;
-        }
-        if (includeStudent) {
-          allData.push({
-            '': session.matiere || 'N/A',
-            ' ': session.nomProfesseur || 'N/A',
-            '  ': session.presences[0]?.periode || 'N/A',
-            '   ': session.presences[0]?.heure || 'N/A',
-            '    ': p.etudiant?.nomComplet || 'N/A',
-            '     ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-            '      ': p.retardMinutes || 0,
-            '       ': p.remarque || ''
-          });
-        }
-      });
-    });
-    isFirstClass = false;
-  });
+  // تعيين مقاسات الأعمدة باش تكون واضحة في الطباعة
+  ws['!cols'] = [
+    { wch: 11 }, // Date
+    { wch: 18 }, // Classe
+    { wch: 16 }, // Matière
+    { wch: 18 }, // Professeur
+    { wch: 10 }, // Période
+    { wch: 10 }, // Heure
+    { wch: 28 }, // Étudiant
+    { wch: 12 }, // Statut
+    { wch: 12 }, // Retard
+    { wch: 40 }  // Remarque
+  ];
 
-  const statusSuffix = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
-  const filename = professorName 
-    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName}${statusSuffix}`
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Présences Jour');
+
+  const statusSuffix = statusFilter !== 'all' ? `_${statusFilter}` : '';
+  const filename = professorName
+    ? `presences_${formatDate(date).replace(/\//g, '-')}_${professorName.replace(/\s+/g, '_')}${statusSuffix}`
     : `presences_${formatDate(date).replace(/\//g, '-')}${statusSuffix}`;
-  
-  exportToExcel(allData, filename, 'Présences par Classe');
+
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 };
+
 
 // Export présences par mois avec toutes les classes dans une seule page
 const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
@@ -1673,6 +1644,14 @@ const exportByProfessor = (professorName) => {
                         </select>
                       </div>
                       <div>
+                        <label style={styles.filterLabel}>Période</label>
+                        <select id="exportPeriode" style={styles.filterSelect}>
+                          <option value="all">Toutes les périodes</option>
+                          <option value="matin">Matin</option>
+                          <option value="soir">Soir</option>
+                        </select>
+                      </div>
+                      <div>
                         <label style={styles.filterLabel}>Étudiants à inclure</label>
                         <select id="exportDailyStatus" style={styles.filterSelect}>
                           <option value="all">Tous les étudiants</option>
@@ -1686,8 +1665,9 @@ const exportByProfessor = (professorName) => {
                         const date = document.getElementById('exportDate').value;
                         const prof = document.getElementById('exportProfessor').value;
                         const status = document.getElementById('exportDailyStatus').value;
+                        const periode = document.getElementById('exportPeriode').value;
                         if (date) {
-                          exportDailyPresences(date, prof || null, status);
+                          exportDailyPresences(date, prof || null, status, periode);
                           setShowExportModal(false);
                         }
                       }}

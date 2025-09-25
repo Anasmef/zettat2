@@ -4201,6 +4201,7 @@ app.get('/api/admin/professeurs-par-cours/:coursNom', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur' });
   }
 });
+
 app.get('/api/professeur/profile', authProfesseur, async (req, res) => {
   try {
     const professeur = await Professeur.findById(req.professeurId).select('-motDePasse');
