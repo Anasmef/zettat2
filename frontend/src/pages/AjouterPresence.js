@@ -22,7 +22,13 @@ const AjouterPresence = () => {
   const [cours, setCours] = useState([]);
   const [etudiants, setEtudiants] = useState([]);
   const [selectedCours, setSelectedCours] = useState('');
-  const [dateSession, setDateSession] = useState('');
+  // Mettre la date du jour par défaut
+  const [dateSession, setDateSession] = useState(() => {
+    const today = new Date();
+    return today.toISOString().slice(0, 10);
+  });
+  // Utiliser un select pour les horaires prédéfinis
+  const [selectedHoraire, setSelectedHoraire] = useState('');
   const [heureDebut, setHeureDebut] = useState('');
   const [heureFin, setHeureFin] = useState('');
   const [periode, setPeriode] = useState('matin');
@@ -393,13 +399,21 @@ const AjouterPresence = () => {
     };
   }, []);
 
-  // تحديث الفترة تلقائياً عند تغيير وقت البداية
+  // Mettre à jour heureDebut, heureFin et période selon le select
   useEffect(() => {
-    if (heureDebut) {
-      const hour = parseInt(heureDebut.split(':')[0]);
-      setPeriode(hour < 12 ? 'matin' : 'soir');
+    if (selectedHoraire === 'matin') {
+      setHeureDebut('08:45');
+      setHeureFin('13:00');
+      setPeriode('matin');
+    } else if (selectedHoraire === 'apresmidi') {
+      setHeureDebut('14:00');
+      setHeureFin('16:00');
+      setPeriode('soir');
+    } else {
+      setHeureDebut('');
+      setHeureFin('');
     }
-  }, [heureDebut]);
+  }, [selectedHoraire]);
 
   // 🆕 Fonction pour vérifier si tous les champs requis sont remplis
   const areAllFieldsFilled = () => {
@@ -643,8 +657,25 @@ const AjouterPresence = () => {
                   <Clock style={styles.columnIcon} />
                   <h3 style={styles.columnTitle}>Horaire de session</h3>
                 </div>
-                
-                {/* Heure de début */}
+                {/* Select horaires prédéfinis */}
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    <Clock style={styles.labelIcon} />
+                    Sélectionner l'horaire
+                  </label>
+                  <select
+                    style={styles.select}
+                    value={selectedHoraire}
+                    onChange={e => setSelectedHoraire(e.target.value)}
+                    required
+                    className="form-select"
+                  >
+                    <option value="">Choisir un horaire...</option>
+                    <option value="matin">08:45 AM à 13:00 PM</option>
+                    <option value="apresmidi">14:00 PM à 16:00 PM</option>
+                  </select>
+                </div>
+                {/* Heure de début (readonly) */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     <Clock style={styles.labelIcon} />
@@ -653,12 +684,11 @@ const AjouterPresence = () => {
                   <input
                     type="time"
                     value={heureDebut}
-                    onChange={(e) => setHeureDebut(e.target.value)}
+                    readOnly
                     style={styles.input}
                     required
                     className="form-input"
                   />
-                  {/* Affichage automatique AM/PM */}
                   {heureDebut && (
                     <div style={styles.timeDisplay}>
                       <span style={styles.timeDisplayText}>
@@ -667,8 +697,7 @@ const AjouterPresence = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Heure de fin */}
+                {/* Heure de fin (readonly) */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     <Clock style={styles.labelIcon} />
@@ -677,12 +706,11 @@ const AjouterPresence = () => {
                   <input
                     type="time"
                     value={heureFin}
-                    onChange={(e) => setHeureFin(e.target.value)}
+                    readOnly
                     style={styles.input}
                     required
                     className="form-input"
                   />
-                  {/* Affichage automatique AM/PM */}
                   {heureFin && (
                     <div style={styles.timeDisplay}>
                       <span style={styles.timeDisplayText}>
@@ -691,7 +719,6 @@ const AjouterPresence = () => {
                     </div>
                   )}
                 </div>
-
                 {/* Période (automatique) */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
