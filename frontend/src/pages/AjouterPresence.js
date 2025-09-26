@@ -23,10 +23,13 @@ const AjouterPresence = () => {
   const [etudiants, setEtudiants] = useState([]);
   const [selectedCours, setSelectedCours] = useState('');
   // Mettre la date du jour par défaut
-  const [dateSession, setDateSession] = useState(() => {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
-  });
+const [dateSession, setDateSession] = useState(() => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+});
   // Utiliser un select pour les horaires prédéfinis
   const [selectedHoraire, setSelectedHoraire] = useState('');
   const [heureDebut, setHeureDebut] = useState('');
@@ -472,7 +475,7 @@ const AjouterPresence = () => {
     setPresences(updated);
   };
 
- const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
   
   if (isSubmitting) return;
@@ -494,18 +497,6 @@ const AjouterPresence = () => {
 
   const heure = `${heureDebut}-${heureFin}`;
 
-  // 🔍 DEBUGGING - Vérifiez l'état des présences avant envoi
-  console.log('=== DEBUGGING RETARDS ===');
-  presences.forEach((pres, index) => {
-    if (pres.retardMinutes > 0) {
-      console.log(`Étudiant ${index}: ${pres.nom}`, {
-        present: pres.present,
-        retardMinutes: pres.retardMinutes,
-        type: typeof pres.retardMinutes
-      });
-    }
-  });
-
   try {
     const promises = presences.map((pres, index) => {
       const dataToSend = {
@@ -514,15 +505,10 @@ const AjouterPresence = () => {
         dateSession,
         present: pres.present,
         remarque: pres.remarque,
-        retardMinutes: Number(pres.retardMinutes) || 0, // Conversion explicite
+        retardMinutes: Number(pres.retardMinutes) || 0,
         heure,
         periode
       };
-
-      // 🔍 DEBUGGING - Log chaque donnée envoyée
-      if (pres.retardMinutes > 0) {
-        console.log(`Envoi pour ${pres.nom}:`, dataToSend);
-      }
 
       return axios.post('/api/presences', dataToSend, {
         headers: { Authorization: `Bearer ${token}` },
@@ -531,16 +517,6 @@ const AjouterPresence = () => {
 
     const results = await Promise.all(promises);
     
-    // 🔍 DEBUGGING - Vérifiez les réponses
-    results.forEach((result, index) => {
-      if (result.data.retardMinutes > 0) {
-        console.log(`Réponse pour ${presences[index].nom}:`, {
-          retardMinutes: result.data.retardMinutes,
-          present: result.data.present
-        });
-      }
-    });
-
     setMessage('success');
     setTimeout(() => {
       window.location.reload();
@@ -548,10 +524,25 @@ const AjouterPresence = () => {
     
   } catch (err) {
     console.error('Erreur:', err);
-    setMessage('error');
+    
+    // GESTION SPÉCIFIQUE DES ERREURS
+    if (err.response && err.response.status === 409) {
+      // Erreur 409 = Session en double
+      setMessage('duplicate');
+    } else if (err.response && err.response.status === 403) {
+      // Erreur 403 = Pas autorisé pour ce cours
+      setMessage('unauthorized');
+    } else {
+      // Autres erreurs
+      setMessage('error');
+    }
+    
     setIsSubmitting(false);
   }
 };
+
+
+
   // Fonction pour convertir l'heure en format 12h avec AM/PM
   const formatTimeToAMPM = (time24) => {
     if (!time24) return '';
@@ -973,42 +964,74 @@ const AjouterPresence = () => {
               </>
             )}
 
-            {/* Message de statut */}
-            {message && (
-              <div style={{
-                ...styles.messageContainer,
-                backgroundColor: message === 'success' ? '#dcfce7' : 
-                                message === 'loading' ? '#eff6ff' : '#fee2e2',
-                borderColor: message === 'success' ? '#16a34a' : 
-                           message === 'loading' ? '#3b82f6' : '#dc2626',
-                color: message === 'success' ? '#166534' : 
-                      message === 'loading' ? '#1e40af' : '#991b1b'
-              }}>
-                {message === 'success' ? (
-                  <>
-                    <CheckCircle style={styles.messageIcon} />
-                    Présence enregistrée avec succès ! Redirection en cours...
-                  </>
-                ) : message === 'loading' ? (
-                  <>
-                    <div style={{
-                      width: '20px',
-                      height: '20px',
-                      border: '2px solid #3b82f6',
-                      borderTop: '2px solid transparent',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }} />
-                    Enregistrement en cours, veuillez patienter...
-                  </>
-                ) : (
-                  <>
-                    <XCircle style={styles.messageIcon} />
-                    Erreur: Veuillez vérifier tous les champs requis et que l'heure de fin soit après l'heure de début.
-                  </>
-                )}
-              </div>
-            )}
+           {/* Message de statut */}
+{message && (
+  <div style={{
+    ...styles.messageContainer,
+    backgroundColor: 
+      message === 'success' ? '#dcfce7' : 
+      message === 'loading' ? '#eff6ff' : 
+      message === 'duplicate' ? '#fef3c7' :
+      message === 'unauthorized' ? '#fed7e2' :
+      '#fee2e2',
+    borderColor: 
+      message === 'success' ? '#16a34a' : 
+      message === 'loading' ? '#3b82f6' : 
+      message === 'duplicate' ? '#d97706' :
+      message === 'unauthorized' ? '#e53e3e' :
+      '#dc2626',
+    color: 
+      message === 'success' ? '#166534' : 
+      message === 'loading' ? '#1e40af' : 
+      message === 'duplicate' ? '#92400e' :
+      message === 'unauthorized' ? '#9b2c2c' :
+      '#991b1b'
+  }}>
+    {message === 'success' ? (
+      <>
+        <CheckCircle style={styles.messageIcon} />
+        Présence enregistrée avec succès ! Redirection en cours...
+      </>
+    ) : message === 'loading' ? (
+      <>
+        <div style={{
+          width: '20px',
+          height: '20px',
+          border: '2px solid #3b82f6',
+          borderTop: '2px solid transparent',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        Enregistrement en cours, veuillez patienter...
+      </>
+    ) : message === 'duplicate' ? (
+      <>
+        <XCircle style={styles.messageIcon} />
+        <div>
+          <strong>⚠️ Cette séance est déjà enregistrée</strong>
+          <div style={{fontSize: '14px', marginTop: '4px'}}>
+            Vous ne pouvez pas enregistrer la même séance deux fois.
+          </div>
+        </div>
+      </>
+    ) : message === 'unauthorized' ? (
+      <>
+        <XCircle style={styles.messageIcon} />
+        <div>
+          <strong>🔒 Accès refusé</strong>
+          <div style={{fontSize: '14px', marginTop: '4px'}}>
+            Vous n'êtes pas autorisé à enregistrer la présence pour ce cours.
+          </div>
+        </div>
+      </>
+    ) : (
+      <>
+        <XCircle style={styles.messageIcon} />
+        Erreur: Veuillez vérifier tous les champs requis et que l'heure de fin soit après l'heure de début.
+      </>
+    )}
+  </div>
+)}
           </div>
         </div>
       </div>

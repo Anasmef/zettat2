@@ -1,976 +1,1053 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react';
 import { 
   AlertTriangle, 
+  Search, 
+  Filter, 
+  Download, 
   Eye, 
-  MessageSquare, 
   CheckCircle, 
   Clock, 
-  XCircle,
-  Filter,
-  Search,
+  XCircle, 
+  User, 
+  BookOpen,
+  Calendar,
+  MessageSquare,
   BarChart3,
-  Users,
-  TrendingUp,
-  Calendar
+  RefreshCw
 } from 'lucide-react';
-import './ReclamationsAdmin.css';
+import Sidebar from '../components/Sidebar';
+import * as XLSX from 'xlsx';
 
-const ReclamationsAdmin = () => {
+const AdminReclamations = () => {
   const [reclamations, setReclamations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showTraiterModal, setShowTraiterModal] = useState(false);
-  const [reclamationSelectionnee, setReclamationSelectionnee] = useState(null);
-  const [statistiques, setStatistiques] = useState(null);
+  const [error, setError] = useState('');
+  const [selectedReclamation, setSelectedReclamation] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [stats, setStats] = useState({});
   
   // Filtres
   const [filtres, setFiltres] = useState({
-    statut: 'all',
-    priorite: 'all',
-    professeur: 'all',
-    cours: 'all',
-    search: ''
+    recherche: '',
+    statut: '',
+    priorite: '',
+    cours: '',
+    professeur: '',
+    etudiant: ''
   });
-
+  
   // Pagination
   const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
+    current: 1,
+    pages: 1,
     total: 0
   });
 
-  const [professeurs, setProfesseurs] = useState([]);
-
-  const statutsConfig = {
-    'En attente': { color: 'pending', icon: Clock },
-    'En cours': { color: 'in-progress', icon: AlertTriangle },
-    'Résolue': { color: 'resolved', icon: CheckCircle },
-    'Fermée': { color: 'closed', icon: XCircle }
-  };
-
-  const prioritesConfig = {
-    'Faible': { color: 'low' },
-    'Moyenne': { color: 'medium' },
-    'Élevée': { color: 'high' },
-    'Urgente': { color: 'urgent' }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/';
   };
 
   useEffect(() => {
     fetchReclamations();
-    fetchProfesseurs();
-    fetchStatistiques();
-  }, [filtres, pagination.currentPage]);
+    fetchStats();
+  }, [filtres, pagination.current]);
 
   const fetchReclamations = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
       const params = new URLSearchParams({
-        page: pagination.currentPage,
-        limit: 15,
-        ...Object.fromEntries(
-          Object.entries(filtres).filter(([_, value]) => value !== 'all' && value !== '')
-        )
+        page: pagination.current,
+        limit: 20,
+        ...Object.fromEntries(Object.entries(filtres).filter(([_, v]) => v))
       });
 
-      const response = await axios.get(`/api/admin/reclamations?${params}`, {
+      const res = await fetch(`/api/admin/reclamations?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setReclamations(response.data.reclamations);
-      setPagination({
-        currentPage: response.data.currentPage,
-        totalPages: response.data.totalPages,
-        total: response.data.total
-      });
+      if (!res.ok) throw new Error('Erreur lors du chargement');
 
+      const data = await res.json();
+      setReclamations(data.reclamations);
+      setPagination(data.pagination);
+      setStats(data.stats);
     } catch (err) {
-      console.error('Erreur lors du chargement des réclamations:', err);
+      setError('Erreur lors du chargement des réclamations');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProfesseurs = async () => {
+  const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/professeurs/liste', {
+      const res = await fetch('/api/admin/reclamations/stats/detailed', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setProfesseurs(response.data);
+      if (res.ok) {
+        const statsData = await res.json();
+        setStats(prev => ({ ...prev, ...statsData }));
+      }
     } catch (err) {
-      console.error('Erreur lors du chargement des professeurs:', err);
+      console.error('Erreur stats:', err);
     }
   };
 
-  const fetchStatistiques = async () => {
+  const traiterReclamation = async (id, statut, commentaire = '') => {
     try {
+      setUpdating(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('/api/admin/reclamations/stats', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`/api/admin/reclamations/${id}/traiter`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ statut, commentaireAdmin: commentaire })
       });
-      setStatistiques(response.data);
+
+      if (!res.ok) throw new Error('Erreur lors du traitement');
+
+      const data = await res.json();
+      setReclamations(prev => prev.map(r => r._id === id ? data.reclamation : r));
+      setSelectedReclamation(data.reclamation);
+      fetchStats();
     } catch (err) {
-      console.error('Erreur lors du chargement des statistiques:', err);
+      setError('Erreur lors du traitement de la réclamation');
+      console.error(err);
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const handleViewDetails = async (reclamation) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/admin/reclamations/${reclamation._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setReclamationSelectionnee(response.data);
-      setShowDetailModal(true);
-    } catch (err) {
-      console.error('Erreur lors du chargement des détails:', err);
-      setReclamationSelectionnee(reclamation);
-      setShowDetailModal(true);
-    }
-  };
-
-  const handleTraiter = (reclamation) => {
-    setReclamationSelectionnee(reclamation);
-    setShowTraiterModal(true);
-  };
-
-  const handleTraiterSubmit = async (reponseData) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `/api/admin/reclamations/${reclamationSelectionnee._id}/traiter`,
-        reponseData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // Mettre à jour la liste
-      setReclamations(prev => 
-        prev.map(r => r._id === reclamationSelectionnee._id ? response.data.reclamation : r)
-      );
-
-      setShowTraiterModal(false);
-      setReclamationSelectionnee(null);
-      
-      // Rafraîchir les statistiques
-      fetchStatistiques();
-
-    } catch (err) {
-      console.error('Erreur lors du traitement:', err);
-    }
-  };
-
-  const handleFiltreChange = (key, value) => {
-    setFiltres(prev => ({
-      ...prev,
-      [key]: value
+  const exportExcel = () => {
+    const data = reclamations.map(r => ({
+      'Date création': new Date(r.createdAt).toLocaleDateString('fr-FR'),
+      'Professeur': r.professeur?.nomComplet || 'N/A',
+      'Étudiant': r.etudiant?.nomComplet || 'N/A',
+      'Cours': r.cours,
+      'Type': r.typeReclamation,
+      'Priorité': r.priorite,
+      'Statut': r.statut,
+      'Date incident': new Date(r.dateIncident).toLocaleDateString('fr-FR'),
+      'Description': r.description || ''
     }));
-    setPagination(prev => ({ ...prev, currentPage: 1 }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Réclamations');
+    XLSX.writeFile(wb, `reclamations_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const viderFiltres = () => {
+  const getPrioriteColor = (priorite) => {
+    const colors = {
+      'Faible': '#10b981',
+      'Moyenne': '#f59e0b',
+      'Élevée': '#f97316',
+      'Urgente': '#ef4444'
+    };
+    return colors[priorite] || '#6b7280';
+  };
+
+  const getStatutColor = (statut) => {
+    const colors = {
+      'En attente': '#6b7280',
+      'En cours de traitement': '#f59e0b',
+      'Résolue': '#10b981',
+      'Fermée': '#374151'
+    };
+    return colors[statut] || '#6b7280';
+  };
+
+  const resetFiltres = () => {
     setFiltres({
-      statut: 'all',
-      priorite: 'all',
-      professeur: 'all',
-      cours: 'all',
-      search: ''
+      recherche: '',
+      statut: '',
+      priorite: '',
+      cours: '',
+      professeur: '',
+      etudiant: ''
     });
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getUrgenceClass = (priorite, statut) => {
-    if (statut === 'Résolue' || statut === 'Fermée') return '';
-    
-    switch (priorite) {
-      case 'Urgente': return 'urgent';
-      case 'Élevée': return 'high-priority';
-      default: return '';
-    }
+    setPagination(prev => ({ ...prev, current: 1 }));
   };
 
   if (loading && reclamations.length === 0) {
     return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <div className="spinner"></div>
-          <p className="loading-text">Chargement des réclamations...</p>
+      <div style={styles.container}>
+        <Sidebar onLogout={handleLogout} />
+        <div style={styles.loadingContainer}>
+          <div style={styles.spinner}></div>
+          <p>Chargement des réclamations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="reclamations-admin">
-      <div className="container">
-        {/* Header avec statistiques */}
-        <div className="header">
-          <h1 className="main-title">
-            <AlertTriangle className="main-title-icon" size={32} />
-            Gestion des Réclamations
-          </h1>
-
-          {/* Cartes de statistiques */}
-          {statistiques && (
-            <div className="stats-grid">
-              <div className="stat-card">
-                <div className="stat-card-content">
-                  <div className="stat-info">
-                    <h3>Total</h3>
-                    <p className="stat-number total">
-                      {statistiques.general.total || 0}
-                    </p>
-                  </div>
-                  <div className="stat-icon blue">
-                    <BarChart3 size={24} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-content">
-                  <div className="stat-info">
-                    <h3>En attente</h3>
-                    <p className="stat-number pending">
-                      {statistiques.general.statuts?.find(s => s.statut === 'En attente')?.count || 0}
-                    </p>
-                  </div>
-                  <div className="stat-icon yellow">
-                    <Clock size={24} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-content">
-                  <div className="stat-info">
-                    <h3>En cours</h3>
-                    <p className="stat-number in-progress">
-                      {statistiques.general.statuts?.find(s => s.statut === 'En cours')?.count || 0}
-                    </p>
-                  </div>
-                  <div className="stat-icon blue">
-                    <TrendingUp size={24} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-card-content">
-                  <div className="stat-info">
-                    <h3>Résolues</h3>
-                    <p className="stat-number resolved">
-                      {statistiques.general.statuts?.find(s => s.statut === 'Résolue')?.count || 0}
-                    </p>
-                  </div>
-                  <div className="stat-icon green">
-                    <CheckCircle size={24} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Filtres */}
-        <div className="filters-section">
-          <div className="filters-header">
-            <Filter size={20} className="filters-header-icon" />
-            <h3 className="filters-title">Filtres de recherche</h3>
+    <div style={styles.container}>
+      <Sidebar onLogout={handleLogout} />
+      
+      {/* Header avec statistiques */}
+      <div style={styles.header}>
+        <div style={styles.headerContent}>
+          <div style={styles.titleSection}>
+            <h1 style={styles.title}>
+              <AlertTriangle size={32} color="#ef4444" />
+              Gestion des Réclamations
+            </h1>
+            <p style={styles.subtitle}>
+              {pagination.total} réclamation{pagination.total > 1 ? 's' : ''} au total
+            </p>
           </div>
           
-          <div className="filters-grid">
-            <div className="filter-group">
-              <label>Rechercher</label>
-              <div className="search-input-container">
-                <Search size={16} className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Étudiant, professeur..."
-                  value={filtres.search}
-                  onChange={(e) => handleFiltreChange('search', e.target.value)}
-                  className="search-input"
-                />
-              </div>
+          {/* Statistiques rapides */}
+          <div style={styles.statsRow}>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #6b7280' }}>
+              <div style={styles.statNumber}>{stats.enAttente || 0}</div>
+              <div style={styles.statLabel}>En attente</div>
             </div>
-
-            <div className="filter-group">
-              <label>Statut</label>
-              <select
-                value={filtres.statut}
-                onChange={(e) => handleFiltreChange('statut', e.target.value)}
-                className="filter-select"
-              >
-                <option value="all">Tous les statuts</option>
-                <option value="En attente">En attente</option>
-                <option value="En cours">En cours</option>
-                <option value="Résolue">Résolue</option>
-                <option value="Fermée">Fermée</option>
-              </select>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #f59e0b' }}>
+              <div style={styles.statNumber}>{stats.enCours || 0}</div>
+              <div style={styles.statLabel}>En cours</div>
             </div>
-
-            <div className="filter-group">
-              <label>Priorité</label>
-              <select
-                value={filtres.priorite}
-                onChange={(e) => handleFiltreChange('priorite', e.target.value)}
-                className="filter-select"
-              >
-                <option value="all">Toutes priorités</option>
-                <option value="Urgente">Urgente</option>
-                <option value="Élevée">Élevée</option>
-                <option value="Moyenne">Moyenne</option>
-                <option value="Faible">Faible</option>
-              </select>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #10b981' }}>
+              <div style={styles.statNumber}>{stats.resolues || 0}</div>
+              <div style={styles.statLabel}>Résolues</div>
             </div>
-
-            <div className="filter-group">
-              <label>Professeur</label>
-              <select
-                value={filtres.professeur}
-                onChange={(e) => handleFiltreChange('professeur', e.target.value)}
-                className="filter-select"
-              >
-                <option value="all">Tous les professeurs</option>
-                {professeurs.map(prof => (
-                  <option key={prof._id} value={prof._id}>{prof.nom}</option>
-                ))}
-              </select>
+            <div style={{ ...styles.statCard, borderLeft: '4px solid #ef4444' }}>
+              <div style={styles.statNumber}>{stats.urgentes || 0}</div>
+              <div style={styles.statLabel}>Urgentes</div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div className="clear-filters-container">
-              <button
-                onClick={viderFiltres}
-                className="clear-filters-btn"
-              >
-                Vider les filtres
+      {/* Filtres */}
+      <div style={styles.filtersSection}>
+        <div style={styles.filtersContainer}>
+          <div style={styles.filtersGrid}>
+            <div style={styles.searchContainer}>
+              <Search size={20} style={styles.searchIcon} />
+              <input
+                type="text"
+                placeholder="Rechercher..."
+                value={filtres.recherche}
+                onChange={(e) => setFiltres(prev => ({ ...prev, recherche: e.target.value }))}
+                style={styles.searchInput}
+              />
+            </div>
+            
+            <select
+              value={filtres.statut}
+              onChange={(e) => setFiltres(prev => ({ ...prev, statut: e.target.value }))}
+              style={styles.select}
+            >
+              <option value="">Tous les statuts</option>
+              <option value="En attente">En attente</option>
+              <option value="En cours de traitement">En cours</option>
+              <option value="Résolue">Résolue</option>
+              <option value="Fermée">Fermée</option>
+            </select>
+
+            <select
+              value={filtres.priorite}
+              onChange={(e) => setFiltres(prev => ({ ...prev, priorite: e.target.value }))}
+              style={styles.select}
+            >
+              <option value="">Toutes priorités</option>
+              <option value="Faible">Faible</option>
+              <option value="Moyenne">Moyenne</option>
+              <option value="Élevée">Élevée</option>
+              <option value="Urgente">Urgente</option>
+            </select>
+
+            <input
+              type="text"
+              placeholder="Cours..."
+              value={filtres.cours}
+              onChange={(e) => setFiltres(prev => ({ ...prev, cours: e.target.value }))}
+              style={styles.input}
+            />
+
+            <input
+              type="text"
+              placeholder="Professeur..."
+              value={filtres.professeur}
+              onChange={(e) => setFiltres(prev => ({ ...prev, professeur: e.target.value }))}
+              style={styles.input}
+            />
+
+            <div style={styles.actionButtons}>
+              <button onClick={resetFiltres} style={styles.resetButton}>
+                <Filter size={16} />
+                Réinitialiser
+              </button>
+              <button onClick={exportExcel} style={styles.exportButton}>
+                <Download size={16} />
+                Export Excel
               </button>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Liste des réclamations */}
-        <div className="reclamations-list">
-          {reclamations.length === 0 ? (
-            <div className="empty-state">
-              <AlertTriangle size={64} className="empty-icon" />
-              <h3 className="empty-title">
-                Aucune réclamation trouvée
-              </h3>
-              <p className="empty-text">
-                Aucune réclamation ne correspond aux critères de recherche.
-              </p>
-            </div>
-          ) : (
-            reclamations.map((reclamation) => {
-              const StatutIcon = statutsConfig[reclamation.statut]?.icon || AlertTriangle;
-              const urgenceClass = getUrgenceClass(reclamation.priorite, reclamation.statut);
-              
-              return (
-                <div key={reclamation._id} className={`reclamation-card ${urgenceClass}`}>
-                  <div className="reclamation-content">
-                    <div className="reclamation-main">
-                      <div className="reclamation-info">
-                        <div className="reclamation-header">
-                          <div className="student-info">
-                            {reclamation.etudiant?.image ? (
-                              <img 
-                                src={`/api${reclamation.etudiant.image}`} 
-                                alt="Étudiant" 
-                                className="student-avatar"
-                              />
-                            ) : (
-                              <div className="student-avatar-placeholder">
-                                <Users size={20} className="student-avatar-icon" />
-                              </div>
-                            )}
-                            <div className="student-details">
-                              <h3>{reclamation.etudiant?.nomComplet || 'Étudiant supprimé'}</h3>
-                              <p>Par: {reclamation.professeur?.nom}</p>
-                              <p className="course-info">
-                                {reclamation.cours} • {formatDate(reclamation.dateIncident)}
-                              </p>
-                            </div>
-                          </div>
+      {/* Messages d'erreur */}
+      {error && (
+        <div style={styles.errorMessage}>
+          <AlertTriangle size={16} />
+          {error}
+        </div>
+      )}
 
-                          <div className="badges-container">
-                            <span className={`priority-badge ${prioritesConfig[reclamation.priorite]?.color || 'low'}`}>
-                              {reclamation.priorite}
-                            </span>
-                            
-                            <span className={`status-badge ${statutsConfig[reclamation.statut]?.color || 'closed'}`}>
-                              <StatutIcon size={12} />
-                              <span>{reclamation.statut}</span>
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="description-section">
-                          <p className="description-title">
-                            {reclamation.typeReclamation}
-                          </p>
-                          <p className="description-text">
-                            {reclamation.description}
-                          </p>
-                        </div>
-
-                        <div className="metadata">
-                          <span className="metadata-item">
-                            <Calendar size={14} className="metadata-icon" />
-                            Créée le {formatDateTime(reclamation.createdAt)}
-                          </span>
-                          
-                          {reclamation.dateTraitement && (
-                            <span className="metadata-item">
-                              <CheckCircle size={14} className="metadata-icon" />
-                              Traitée le {formatDateTime(reclamation.dateTraitement)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="actions-container">
-                        <button
-                          onClick={() => handleViewDetails(reclamation)}
-                          className="btn btn-view"
-                        >
-                          <Eye size={16} />
-                          <span className="btn-text">Voir détails</span>
-                        </button>
-                        
-                        {(reclamation.statut === 'En attente' || reclamation.statut === 'En cours') && (
-                          <button
-                            onClick={() => handleTraiter(reclamation)}
-                            className="btn btn-process"
-                          >
-                            <MessageSquare size={16} />
-                            <span className="btn-text">Traiter</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
+      {/* Liste des réclamations */}
+      <div style={styles.mainContent}>
+        {reclamations.length === 0 ? (
+          <div style={styles.emptyState}>
+            <AlertTriangle size={64} color="#d1d5db" />
+            <h3>Aucune réclamation trouvée</h3>
+            <p>Il n'y a pas de réclamations correspondant aux critères sélectionnés.</p>
+          </div>
+        ) : (
+          <div style={styles.reclamationsGrid}>
+            {reclamations.map((reclamation) => (
+              <div key={reclamation._id} style={styles.reclamationCard}>
+                <div style={styles.cardHeader}>
+                  <div style={styles.cardHeaderLeft}>
+                    <span style={{
+                      ...styles.prioriteBadge,
+                      backgroundColor: `${getPrioriteColor(reclamation.priorite)}20`,
+                      color: getPrioriteColor(reclamation.priorite),
+                      border: `1px solid ${getPrioriteColor(reclamation.priorite)}40`
+                    }}>
+                      {reclamation.priorite}
+                    </span>
+                    <span style={{
+                      ...styles.statutBadge,
+                      backgroundColor: `${getStatutColor(reclamation.statut)}20`,
+                      color: getStatutColor(reclamation.statut),
+                      border: `1px solid ${getStatutColor(reclamation.statut)}40`
+                    }}>
+                      {reclamation.statut}
+                    </span>
+                  </div>
+                  <div style={styles.cardDate}>
+                    {new Date(reclamation.createdAt).toLocaleDateString('fr-FR')}
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+
+                <div style={styles.cardContent}>
+                  <h3 style={styles.reclamationType}>{reclamation.typeReclamation}</h3>
+                  
+                  <div style={styles.cardInfo}>
+                    <div style={styles.infoRow}>
+                      <User size={16} color="#6b7280" />
+                      <span>Prof: {reclamation.professeur?.nomComplet || 'N/A'}</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <User size={16} color="#6b7280" />
+                      <span>Étudiant: {reclamation.etudiant?.nomComplet || 'N/A'}</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <BookOpen size={16} color="#6b7280" />
+                      <span>Cours: {reclamation.cours}</span>
+                    </div>
+                    <div style={styles.infoRow}>
+                      <Calendar size={16} color="#6b7280" />
+                      <span>Incident: {new Date(reclamation.dateIncident).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                  </div>
+
+                  {reclamation.description && (
+                    <div style={styles.description}>
+                      <MessageSquare size={16} color="#6b7280" />
+                      <span>{reclamation.description}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.cardActions}>
+                  <button
+                    onClick={() => {
+                      setSelectedReclamation(reclamation);
+                      setShowModal(true);
+                    }}
+                    style={styles.viewButton}
+                  >
+                    <Eye size={16} />
+                    Détails
+                  </button>
+                  
+                  {reclamation.statut === 'En attente' && (
+                    <button
+                      onClick={() => traiterReclamation(reclamation._id, 'En cours de traitement')}
+                      disabled={updating}
+                      style={styles.processButton}
+                    >
+                      <Clock size={16} />
+                      Traiter
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="pagination-container">
-            <div className="pagination-content">
-              <p className="pagination-info">
-                Affichage {((pagination.currentPage - 1) * 15) + 1} à{' '}
-                {Math.min(pagination.currentPage * 15, pagination.total)} sur {pagination.total} réclamations
-              </p>
-              
-              <div className="pagination-buttons">
-                <button
-                  onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage - 1 }))}
-                  disabled={pagination.currentPage === 1}
-                  className="pagination-btn"
-                >
-                  Précédent
-                </button>
-                
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, pagination.currentPage - 2) + i;
-                  if (pageNum > pagination.totalPages) return null;
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setPagination(prev => ({ ...prev, currentPage: pageNum }))}
-                      className={`pagination-btn ${pagination.currentPage === pageNum ? 'active' : ''}`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={() => setPagination(prev => ({ ...prev, currentPage: prev.currentPage + 1 }))}
-                  disabled={pagination.currentPage === pagination.totalPages}
-                  className="pagination-btn"
-                >
-                  Suivant
-                </button>
-              </div>
-            </div>
+        {pagination.pages > 1 && (
+          <div style={styles.pagination}>
+            {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setPagination(prev => ({ ...prev, current: page }))}
+                style={{
+                  ...styles.pageButton,
+                  ...(page === pagination.current ? styles.pageButtonActive : {})
+                }}
+              >
+                {page}
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Modals */}
-      {showDetailModal && reclamationSelectionnee && (
-        <ReclamationDetailModal
-          reclamation={reclamationSelectionnee}
-          onClose={() => {
-            setShowDetailModal(false);
-            setReclamationSelectionnee(null);
-          }}
-          onTraiter={() => {
-            setShowDetailModal(false);
-            setShowTraiterModal(true);
-          }}
-        />
-      )}
-
-      {showTraiterModal && reclamationSelectionnee && (
-        <TraiterReclamationModal
-          reclamation={reclamationSelectionnee}
-          onClose={() => {
-            setShowTraiterModal(false);
-            setReclamationSelectionnee(null);
-          }}
-          onSubmit={handleTraiterSubmit}
-        />
-      )}
-    </div>
-  );
-};
-
-// Modal de détails de réclamation pour admin
-const ReclamationDetailModal = ({ reclamation, onClose, onTraiter }) => {
-  const statutsConfig = {
-    'En attente': { color: 'pending', icon: Clock },
-    'En cours': { color: 'in-progress', icon: AlertTriangle },
-    'Résolue': { color: 'resolved', icon: CheckCircle },
-    'Fermée': { color: 'closed', icon: XCircle }
-  };
-
-  const prioritesConfig = {
-    'Faible': { color: 'low' },
-    'Moyenne': { color: 'medium' },
-    'Élevée': { color: 'high' },
-    'Urgente': { color: 'urgent' }
-  };
-
-  const StatutIcon = statutsConfig[reclamation.statut]?.icon || AlertTriangle;
-
-  const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content">
-        {/* Header */}
-        <div className="modal-header">
-          <div className="modal-header-content">
-            <div>
-              <h2 className="modal-title">Détails de la réclamation</h2>
-              <p className="modal-subtitle">
-                ID: {reclamation._id} • Créée le {formatDateTime(reclamation.createdAt)}
-              </p>
-            </div>
-            <button onClick={onClose} className="modal-close-btn">
-              <XCircle size={24} />
-            </button>
-          </div>
-        </div>
-
-        <div className="modal-body">
-          {/* Informations principales */}
-          <div className="detail-grid">
-            {/* Étudiant */}
-            <div className="info-card">
-              <h3 className="info-card-title">
-                <Users size={20} className="info-card-icon" />
-                Étudiant concerné
-              </h3>
-              <div className="user-info">
-                {reclamation.etudiant?.image ? (
-                  <img 
-                    src={`/api${reclamation.etudiant.image}`} 
-                    alt="Étudiant" 
-                    className="user-avatar"
-                  />
-                ) : (
-                  <div className="user-avatar-placeholder">
-                    <Users size={24} />
-                  </div>
-                )}
-                <div className="user-details">
-                  <p>{reclamation.etudiant?.nomComplet || 'Étudiant supprimé'}</p>
-                  <p>{reclamation.etudiant?.email}</p>
-                  <p>{reclamation.etudiant?.telephone}</p>
-                  <p>Niveau: {reclamation.etudiant?.niveau || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Professeur */}
-            <div className="info-card">
-              <h3 className="info-card-title">
-                <Users size={20} className="info-card-icon" />
-                Professeur
-              </h3>
-              <div className="user-details">
-                <p>{reclamation.professeur?.nom || 'Professeur supprimé'}</p>
-                <p>{reclamation.professeur?.email}</p>
-                <p>{reclamation.professeur?.telephone}</p>
-              </div>
-            </div>
-
-            {/* Informations de la réclamation */}
-            <div className="info-card">
-              <h3 className="info-card-title">
-                <AlertTriangle size={20} className="info-card-icon" />
-                Informations
-              </h3>
-              <div className="info-list">
-                <div className="info-item">
-                  <span className="info-label">Type:</span>
-                  <span className="info-value">{reclamation.typeReclamation}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Cours:</span>
-                  <span className="info-value">{reclamation.cours}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Date incident:</span>
-                  <span className="info-value">
-                    {new Date(reclamation.dateIncident).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Priorité:</span>
-                  <span className={`priority-badge ${prioritesConfig[reclamation.priorite]?.color || 'low'}`}>
-                    {reclamation.priorite}
-                  </span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">Statut:</span>
-                  <span className={`status-badge ${statutsConfig[reclamation.statut]?.color || 'closed'}`}>
-                    <StatutIcon size={12} />
-                    <span>{reclamation.statut}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="section">
-            <h3 className="section-title">
-              <AlertTriangle size={20} className="section-icon" />
-              Description de l'incident
-            </h3>
-            <div className="content-box red">
-              <p className="content-text">{reclamation.description}</p>
-            </div>
-          </div>
-
-          {/* Mesures prises */}
-          {reclamation.mesuresPrises && (
-            <div className="section">
-              <h3 className="section-title">
-                <CheckCircle size={20} className="section-icon" />
-                Mesures déjà prises par le professeur
-              </h3>
-              <div className="content-box blue">
-                <p className="content-text">{reclamation.mesuresPrises}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Réponse de l'administration */}
-          {reclamation.reponseAdmin && (
-            <div className="section">
-              <h3 className="section-title">
-                <MessageSquare size={20} className="section-icon" />
-                Réponse de l'administration
-              </h3>
-              <div className="content-box green">
-                <div className="response-header">
-                  <p className="response-author">
-                    Traitée par: {reclamation.traitePar?.nom || 'Admin'}
-                  </p>
-                  <p className="response-date">
-                    {formatDateTime(reclamation.dateTraitement)}
-                  </p>
-                </div>
-                <p className="content-text">{reclamation.reponseAdmin}</p>
-                
-                {reclamation.actionsPrises && (
-                  <div className="response-actions">
-                    <p className="actions-label">Actions prises:</p>
-                    <p className="actions-text">{reclamation.actionsPrises}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Historique */}
-          {reclamation.historique && reclamation.historique.length > 0 && (
-            <div className="section">
-              <h3 className="section-title">
-                <Clock size={20} className="section-icon" />
-                Historique
-              </h3>
-              <div className="content-box gray">
-                <div className="history-list">
-                  {reclamation.historique.map((event, index) => (
-                    <div key={index} className="history-item">
-                      <div className="history-dot"></div>
-                      <div className="history-content">
-                        <div className="history-header">
-                          <p className="history-action">{event.action}</p>
-                          <p className="history-date">
-                            {formatDateTime(event.date)}
-                          </p>
-                        </div>
-                        <p className="history-user">Par: {event.utilisateur}</p>
-                        {event.details && (
-                          <p className="history-details">{event.details}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="modal-actions">
-            <button onClick={onClose} className="btn-secondary">
-              Fermer
-            </button>
-            
-            {(reclamation.statut === 'En attente' || reclamation.statut === 'En cours') && (
-              <button onClick={onTraiter} className="btn-primary">
-                <MessageSquare size={16} />
-                <span>Traiter cette réclamation</span>
+      {/* Modal de détails */}
+      {showModal && selectedReclamation && (
+        <div style={styles.modal} onClick={() => setShowModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2>Détails de la réclamation</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                style={styles.closeButton}
+              >
+                <XCircle size={24} />
               </button>
+            </div>
+
+            <div style={styles.modalBody}>
+              <div style={styles.modalGrid}>
+                <div>
+                  <strong>Type:</strong>
+                  <p>{selectedReclamation.typeReclamation}</p>
+                </div>
+                <div>
+                  <strong>Priorité:</strong>
+                  <span style={{
+                    ...styles.prioriteBadge,
+                    backgroundColor: `${getPrioriteColor(selectedReclamation.priorite)}20`,
+                    color: getPrioriteColor(selectedReclamation.priorite),
+                    border: `1px solid ${getPrioriteColor(selectedReclamation.priorite)}40`
+                  }}>
+                    {selectedReclamation.priorite}
+                  </span>
+                </div>
+                <div>
+                  <strong>Statut:</strong>
+                  <span style={{
+                    ...styles.statutBadge,
+                    backgroundColor: `${getStatutColor(selectedReclamation.statut)}20`,
+                    color: getStatutColor(selectedReclamation.statut),
+                    border: `1px solid ${getStatutColor(selectedReclamation.statut)}40`
+                  }}>
+                    {selectedReclamation.statut}
+                  </span>
+                </div>
+                <div>
+                  <strong>Professeur:</strong>
+                  <p>{selectedReclamation.professeur?.nomComplet}</p>
+                  <small>{selectedReclamation.professeur?.email}</small>
+                </div>
+                <div>
+                  <strong>Étudiant:</strong>
+                  <p>{selectedReclamation.etudiant?.nomComplet}</p>
+                  <small>{selectedReclamation.etudiant?.email} - {selectedReclamation.etudiant?.niveau}</small>
+                </div>
+                <div>
+                  <strong>Cours:</strong>
+                  <p>{selectedReclamation.cours}</p>
+                </div>
+                <div>
+                  <strong>Date incident:</strong>
+                  <p>{new Date(selectedReclamation.dateIncident).toLocaleDateString('fr-FR')}</p>
+                </div>
+                <div>
+                  <strong>Date création:</strong>
+                  <p>{new Date(selectedReclamation.createdAt).toLocaleDateString('fr-FR')} à {new Date(selectedReclamation.createdAt).toLocaleTimeString('fr-FR')}</p>
+                </div>
+              </div>
+
+              {selectedReclamation.description && (
+                <div style={styles.fullDescription}>
+                  <strong>Description:</strong>
+                  <p>{selectedReclamation.description}</p>
+                </div>
+              )}
+
+              {selectedReclamation.commentaireAdmin && (
+                <div style={styles.adminComment}>
+                  <strong>Commentaire admin:</strong>
+                  <p>{selectedReclamation.commentaireAdmin}</p>
+                  {selectedReclamation.dateTraitement && (
+                    <small>Traité le {new Date(selectedReclamation.dateTraitement).toLocaleDateString('fr-FR')}</small>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedReclamation.statut !== 'Fermée' && (
+              <div style={styles.modalActions}>
+                <div style={styles.commentaireSection}>
+                  <textarea
+                    placeholder="Commentaire (optionnel)..."
+                    style={styles.commentaireTextarea}
+                    id="commentaire"
+                  />
+                </div>
+                
+                <div style={styles.actionButtonsRow}>
+                  {selectedReclamation.statut === 'En attente' && (
+                    <button
+                      onClick={() => {
+                        const commentaire = document.getElementById('commentaire').value;
+                        traiterReclamation(selectedReclamation._id, 'En cours de traitement', commentaire);
+                      }}
+                      disabled={updating}
+                      style={styles.processModalButton}
+                    >
+                      <Clock size={16} />
+                      Prendre en charge
+                    </button>
+                  )}
+                  
+                  {(selectedReclamation.statut === 'En attente' || selectedReclamation.statut === 'En cours de traitement') && (
+                    <button
+                      onClick={() => {
+                        const commentaire = document.getElementById('commentaire').value;
+                        traiterReclamation(selectedReclamation._id, 'Résolue', commentaire);
+                      }}
+                      disabled={updating}
+                      style={styles.resolveButton}
+                    >
+                      <CheckCircle size={16} />
+                      Résoudre
+                    </button>
+                  )}
+                  
+                  {selectedReclamation.statut === 'Résolue' && (
+                    <button
+                      onClick={() => {
+                        const commentaire = document.getElementById('commentaire').value;
+                        traiterReclamation(selectedReclamation._id, 'Fermée', commentaire);
+                      }}
+                      disabled={updating}
+                      style={styles.closeModalButton}
+                    >
+                      <XCircle size={16} />
+                      Fermer
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
-// Modal pour traiter une réclamation
-const TraiterReclamationModal = ({ reclamation, onClose, onSubmit }) => {
-  const [formData, setFormData] = useState({
-    reponseAdmin: '',
-    actionsPrises: '',
-    statut: 'En cours'
-  });
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+const styles = {
+  container: {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  },
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    gap: '16px',
+  },
 
-  const validateForm = () => {
-    const newErrors = {};
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #e2e8f0',
+    borderTop: '4px solid #ef4444',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
 
-    if (!formData.reponseAdmin.trim()) {
-      newErrors.reponseAdmin = 'La réponse est obligatoire';
-    } else if (formData.reponseAdmin.trim().length < 10) {
-      newErrors.reponseAdmin = 'La réponse doit contenir au moins 10 caractères';
-    }
+  header: {
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
+    padding: '24px 0',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  },
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  headerContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 16px',
+  },
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+  titleSection: {
+    marginBottom: '24px',
+  },
 
-    setLoading(true);
-    try {
-      await onSubmit(formData);
-    } catch (err) {
-      setErrors({ submit: 'Erreur lors du traitement de la réclamation' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  title: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0 0 8px 0',
+  },
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content small">
-        {/* Header */}
-        <div className="modal-header green">
-          <div className="modal-header-content">
-            <div>
-              <h2 className="modal-title">Traiter la réclamation</h2>
-              <p className="modal-subtitle">
-                Concernant: {reclamation.etudiant?.nomComplet}
-              </p>
-            </div>
-            <button onClick={onClose} className="modal-close-btn">
-              <XCircle size={24} />
-            </button>
-          </div>
-        </div>
+  subtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    margin: 0,
+  },
 
-        <form onSubmit={handleSubmit} className="modal-body">
-          {errors.submit && (
-            <div className="error-message">
-              {errors.submit}
-            </div>
-          )}
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '16px',
+  },
 
-          {/* Résumé de la réclamation */}
-          <div className="summary-box">
-            <h3 className="summary-title">Réclamation à traiter:</h3>
-            <p className="summary-item">
-              <strong>Type:</strong> {reclamation.typeReclamation}
-            </p>
-            <p className="summary-item">
-              <strong>Description:</strong> {reclamation.description.substring(0, 150)}
-              {reclamation.description.length > 150 ? '...' : ''}
-            </p>
-            <div className="summary-badges">
-              <span className={`priority-badge ${reclamation.priorite.toLowerCase()}`}>
-                {reclamation.priorite}
-              </span>
-              <span className="summary-meta">
-                Cours: {reclamation.cours}
-              </span>
-            </div>
-          </div>
+  statCard: {
+    backgroundColor: '#ffffff',
+    padding: '16px',
+    borderRadius: '8px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    textAlign: 'center',
+  },
 
-          {/* Statut */}
-          <div className="form-group">
-            <label className="form-label">
-              Nouveau statut *
-            </label>
-            <select
-              name="statut"
-              value={formData.statut}
-              onChange={handleChange}
-              className="form-input"
-            >
-              <option value="En cours">En cours de traitement</option>
-              <option value="Résolue">Résolue</option>
-              <option value="Fermée">Fermée</option>
-            </select>
-          </div>
+  statNumber: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0 0 4px 0',
+  },
 
-          {/* Réponse */}
-          <div className="form-group">
-            <label className="form-label">
-              Réponse à donner au professeur *
-            </label>
-            <textarea
-              name="reponseAdmin"
-              value={formData.reponseAdmin}
-              onChange={handleChange}
-              rows={5}
-              placeholder="Expliquez la décision prise, les mesures qui seront appliquées, etc..."
-              className={`form-textarea ${errors.reponseAdmin ? 'error' : ''}`}
-            />
-            <div className="form-footer">
-              {errors.reponseAdmin && (
-                <p className="form-error">{errors.reponseAdmin}</p>
-              )}
-              <p className="char-count">
-                {formData.reponseAdmin.length}/1000 caractères
-              </p>
-            </div>
-          </div>
+  statLabel: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: 0,
+  },
 
-          {/* Actions prises */}
-          <div className="form-group">
-            <label className="form-label">
-              Actions concrètes prises (optionnel)
-            </label>
-            <textarea
-              name="actionsPrises"
-              value={formData.actionsPrises}
-              onChange={handleChange}
-              rows={3}
-              placeholder="Sanctions, mesures disciplinaires, rencontre avec l'étudiant, etc..."
-              className="form-textarea"
-            />
-            <p className="char-count">
-              {formData.actionsPrises.length}/500 caractères
-            </p>
-          </div>
+  filtersSection: {
+    backgroundColor: '#ffffff',
+    borderBottom: '1px solid #e2e8f0',
+    padding: '16px 0',
+  },
 
-          {/* Actions */}
-          <div className="modal-actions">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-secondary"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary"
-            >
-              {loading ? (
-                <>
-                  <div className="loading-spinner"></div>
-                  <span>Traitement...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle size={16} />
-                  <span>Traiter la réclamation</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+  filtersContainer: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '0 16px',
+  },
 
-export default ReclamationsAdmin;
+  filtersGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+    alignItems: 'center',
+  },
+
+  searchContainer: {
+    position: 'relative',
+    gridColumn: 'span 2',
+  },
+
+  searchIcon: {
+    position: 'absolute',
+    left: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#6b7280',
+  },
+
+  searchInput: {
+    width: '100%',
+    padding: '10px 12px 10px 40px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
+
+  select: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#ffffff',
+    outline: 'none',
+    cursor: 'pointer',
+  },
+
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
+
+  actionButtons: {
+    display: 'flex',
+    gap: '8px',
+    gridColumn: 'span 2',
+  },
+
+  resetButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 16px',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  exportButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 16px',
+    backgroundColor: '#22c55e',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  errorMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: '16px auto',
+    maxWidth: '1200px',
+    padding: '12px 16px',
+    backgroundColor: '#fef2f2',
+    color: '#991b1b',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+  },
+
+  mainContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '24px 16px',
+  },
+
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px 20px',
+    textAlign: 'center',
+  },
+
+  reclamationsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+    gap: '20px',
+  },
+
+  reclamationCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e2e8f0',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  cardHeaderLeft: {
+    display: 'flex',
+    gap: '8px',
+  },
+
+  prioriteBadge: {
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '500',
+  },
+
+  statutBadge: {
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: '500',
+  },
+
+  cardDate: {
+    fontSize: '12px',
+    color: '#6b7280',
+  },
+
+  cardContent: {
+    flex: 1,
+  },
+
+  reclamationType: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0 0 12px 0',
+  },
+
+  cardInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+  },
+
+  infoRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    color: '#374151',
+  },
+
+  description: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '8px',
+    marginTop: '12px',
+    padding: '12px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: '#374151',
+  },
+
+  cardActions: {
+    display: 'flex',
+    gap: '8px',
+  },
+
+  viewButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    backgroundColor: '#3b82f6',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  processButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    backgroundColor: '#f59e0b',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  pagination: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '8px',
+    marginTop: '32px',
+  },
+
+  pageButton: {
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    backgroundColor: '#ffffff',
+    color: '#374151',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'all 0.2s',
+  },
+
+  pageButtonActive: {
+    backgroundColor: '#ef4444',
+    color: '#ffffff',
+    borderColor: '#ef4444',
+  },
+
+  modal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '20px',
+  },
+
+  modalContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    width: '100%',
+    maxWidth: '800px',
+    maxHeight: '90vh',
+    overflow: 'auto',
+    boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+  },
+
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
+  },
+
+  closeButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#6b7280',
+    padding: '4px',
+  },
+
+  modalBody: {
+    padding: '24px',
+  },
+
+  modalGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: '16px',
+    marginBottom: '24px',
+  },
+
+  fullDescription: {
+    marginBottom: '24px',
+    padding: '16px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+  },
+
+  adminComment: {
+    marginBottom: '24px',
+    padding: '16px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd',
+  },
+
+  modalActions: {
+    padding: '24px',
+    borderTop: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+
+  commentaireSection: {
+    marginBottom: '16px',
+  },
+
+  commentaireTextarea: {
+    width: '100%',
+    minHeight: '80px',
+    padding: '12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    resize: 'vertical',
+    outline: 'none',
+  },
+
+  actionButtonsRow: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'flex-end',
+  },
+
+  processModalButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 20px',
+    backgroundColor: '#f59e0b',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  resolveButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 20px',
+    backgroundColor: '#22c55e',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  closeModalButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 20px',
+    backgroundColor: '#6b7280',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+}; export default AdminReclamations;

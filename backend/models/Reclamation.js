@@ -1,39 +1,44 @@
+// models/Reclamation.js
 const mongoose = require('mongoose');
 
 const reclamationSchema = new mongoose.Schema({
-  // Référence au professeur qui fait la réclamation
+  // Référence vers le professeur qui fait la réclamation
   professeur: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Professeur',
     required: true
   },
   
-  // Référence à l'étudiant concerné par la réclamation
+  // Référence vers l'étudiant concerné
   etudiant: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Etudiant',
     required: true
   },
   
-  // Type de réclamation
-  typeReclamation: {
-    type: String,
-    enum: [
-      'Comportement perturbateur',
-      'Retards répétés', 
-      'Absences non justifiées',
-      'Non respect des règles',
-      'Problème de discipline',
-      'Travail non rendu',
-      'Autre'
-    ],
-    required: true
-  },
-  
-  // Cours concerné
+  // Le cours dans lequel s'est produit l'incident
   cours: {
     type: String,
     required: true
+  },
+  
+  // Type de réclamation
+  typeReclamation: {
+    type: String,
+    required: true,
+    enum: [
+      'Étudiant absent',
+      'Mauvais comportement', 
+      'Étudiant qui dort',
+      'Retards répétés',
+      'Non respect des règles',
+      'Problème de discipline',
+      'Travail non rendu',
+      'Utilisation de téléphone',
+      'Perturbation du cours',
+      'Manque de respect',
+      'Autre'
+    ]
   },
   
   // Date de l'incident
@@ -42,192 +47,79 @@ const reclamationSchema = new mongoose.Schema({
     required: true
   },
   
-  // Niveau de priorité
+  // Priorité de la réclamation
   priorite: {
     type: String,
     enum: ['Faible', 'Moyenne', 'Élevée', 'Urgente'],
     default: 'Moyenne'
   },
   
-  // Description détaillée
+  // Description détaillée (optionnelle)
   description: {
     type: String,
-    required: true,
-    minlength: 10,
-    maxlength: 1000
-  },
-  
-  // Mesures déjà prises par le professeur (optionnel)
-  mesuresPrises: {
-    type: String,
-    maxlength: 500,
-    default: ''
+    trim: true
   },
   
   // Statut de la réclamation
   statut: {
     type: String,
-    enum: ['En attente', 'En cours', 'Résolue', 'Fermée'],
+    enum: ['En attente', 'En cours de traitement', 'Résolue', 'Fermée'],
     default: 'En attente'
   },
   
-  // Réponse de l'administration
-  reponseAdmin: {
+  // Commentaire de l'admin (optionnel)
+  commentaireAdmin: {
     type: String,
-    maxlength: 1000,
-    default: ''
+    trim: true
+  },
+  
+  // Date de traitement par l'admin
+  dateTraitement: {
+    type: Date
   },
   
   // Admin qui a traité la réclamation
-  traitePar: {
+  adminTraitant: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
-    default: null
-  },
-  
-  // Date de traitement
-  dateTraitement: {
-    type: Date,
-    default: null
-  },
-  
-  // Actions prises par l'admin
-  actionsPrises: {
-    type: String,
-    maxlength: 500,
-    default: ''
-  },
-  
-  // Pièces jointes (photos, documents)
-  pieceJointe: {
-    type: String,
-    default: ''
-  },
-  
-  // Historique des modifications
-  historique: [{
-    action: {
-      type: String,
-      required: true
-    },
-    utilisateur: {
-      type: String,
-      required: true
-    },
-    date: {
-      type: Date,
-      default: Date.now
-    },
-    details: {
-      type: String,
-      default: ''
-    }
-  }]
-  
-}, { timestamps: true });
+    ref: 'Admin'
+  }
+}, {
+  timestamps: true // Ajoute createdAt et updatedAt automatiquement
+});
 
 // Index pour optimiser les requêtes
-reclamationSchema.index({ professeur: 1, statut: 1 });
-reclamationSchema.index({ etudiant: 1 });
-reclamationSchema.index({ dateIncident: -1 });
-reclamationSchema.index({ statut: 1, priorite: 1 });
+reclamationSchema.index({ professeur: 1, createdAt: -1 });
+reclamationSchema.index({ etudiant: 1, createdAt: -1 });
+reclamationSchema.index({ statut: 1, createdAt: -1 });
+reclamationSchema.index({ priorite: 1, createdAt: -1 });
 
-// Méthode pour ajouter une entrée à l'historique
-reclamationSchema.methods.ajouterHistorique = function(action, utilisateur, details = '') {
-  this.historique.push({
-    action,
-    utilisateur,
-    details,
-    date: new Date()
-  });
-  return this.save();
+// Méthode pour obtenir le label de priorité avec couleur
+reclamationSchema.methods.getPrioriteInfo = function() {
+  const prioriteMap = {
+    'Faible': { label: 'Faible', color: '#10b981' },
+    'Moyenne': { label: 'Moyenne', color: '#f59e0b' },
+    'Élevée': { label: 'Élevée', color: '#f97316' },
+    'Urgente': { label: 'Urgente', color: '#ef4444' }
+  };
+  return prioriteMap[this.priorite] || prioriteMap['Moyenne'];
 };
 
-// Méthode pour marquer comme traitée
-reclamationSchema.methods.marquerCommeTraitee = function(adminId, reponse, actions = '') {
-  this.statut = 'Résolue';
-  this.traitePar = adminId;
-  this.dateTraitement = new Date();
-  this.reponseAdmin = reponse;
-  this.actionsPrises = actions;
-  
-  // Ajouter à l'historique
-  this.historique.push({
-    action: 'Réclamation résolue',
-    utilisateur: 'Admin',
-    details: `Réponse: ${reponse.substring(0, 50)}...`,
-    date: new Date()
-  });
-  
-  return this.save();
+// Méthode pour obtenir le statut avec couleur
+reclamationSchema.methods.getStatutInfo = function() {
+  const statutMap = {
+    'En attente': { label: 'En attente', color: '#6b7280' },
+    'En cours de traitement': { label: 'En cours', color: '#f59e0b' },
+    'Résolue': { label: 'Résolue', color: '#10b981' },
+    'Fermée': { label: 'Fermée', color: '#374151' }
+  };
+  return statutMap[this.statut] || statutMap['En attente'];
 };
 
-// Statistiques pour l'admin
-reclamationSchema.statics.getStatistiques = function() {
-  return this.aggregate([
-    {
-      $group: {
-        _id: '$statut',
-        count: { $sum: 1 }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$count' },
-        statuts: {
-          $push: {
-            statut: '$_id',
-            count: '$count'
-          }
-        }
-      }
-    }
-  ]);
-};
-
-// Statistiques par professeur
-reclamationSchema.statics.getStatistiquesParProfesseur = function() {
-  return this.aggregate([
-    {
-      $lookup: {
-        from: 'professeurs',
-        localField: 'professeur',
-        foreignField: '_id',
-        as: 'professeurInfo'
-      }
-    },
-    {
-      $unwind: '$professeurInfo'
-    },
-    {
-      $group: {
-        _id: '$professeur',
-        nomProfesseur: { $first: '$professeurInfo.nom' },
-        totalReclamations: { $sum: 1 },
-        enAttente: {
-          $sum: { $cond: [{ $eq: ['$statut', 'En attente'] }, 1, 0] }
-        },
-        resolues: {
-          $sum: { $cond: [{ $eq: ['$statut', 'Résolue'] }, 1, 0] }
-        }
-      }
-    },
-    {
-      $sort: { totalReclamations: -1 }
-    }
-  ]);
-};
-
-// Middleware pour ajouter automatiquement l'historique lors de la création
+// Middleware pré-sauvegarde pour validation
 reclamationSchema.pre('save', function(next) {
-  if (this.isNew) {
-    this.historique.push({
-      action: 'Réclamation créée',
-      utilisateur: 'Professeur',
-      details: `Type: ${this.typeReclamation}`,
-      date: new Date()
-    });
+  // Si le statut change vers "Résolue" ou "Fermée", enregistrer la date de traitement
+  if (this.isModified('statut') && (this.statut === 'Résolue' || this.statut === 'Fermée')) {
+    this.dateTraitement = new Date();
   }
   next();
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download } from 'lucide-react';
+import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download, Edit, Trash2, Save } from 'lucide-react';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 
 const ListePresences = () => {
@@ -28,6 +28,13 @@ const [dateTo, setDateTo] = useState('');
   const [professeurFilter, setProfesseurFilter] = useState(''); // 🆕 Nouveau filtre
   const [availableProfesseurs, setAvailableProfesseurs] = useState([]); // 🆕
   const [showExportModal, setShowExportModal] = useState(false);
+  const [editingPresence, setEditingPresence] = useState(null);
+  const [editForm, setEditForm] = useState({
+    present: true,
+    retardMinutes: 0,
+    remarque: ''
+  });
+  const [userRole, setUserRole] = useState('');
 
   useEffect(() => {
     const fetchPresences = async () => {
@@ -88,6 +95,11 @@ const key = `${new Date(p.dateSession).toDateString()}_${p.cours}_${p.matiere ||
     };
 
     fetchPresences();
+  }, []);
+
+  useEffect(() => {
+    const role = localStorage.getItem('role');
+    setUserRole(role);
   }, []);
 
   // Fonction de filtrage
@@ -188,7 +200,105 @@ if (dateTo) {
     localStorage.removeItem('token');
     window.location.href = '/';
   };
+// Fonctions pour gérer l'édition et suppression
+const handleDeletePresence = async (presenceId, sessionIndex, presenceIndex) => {
+  if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette présence ?')) {
+    return;
+  }
+  try {
+    const token = localStorage.getItem('token');
+    await axios.delete(`/api/presences/${presenceId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const updatedSessions = [...filteredSessions];
+    updatedSessions[sessionIndex].presences.splice(presenceIndex, 1);
+    updatedSessions[sessionIndex].totalCount--;
+    const presentCount = updatedSessions[sessionIndex].presences.filter(p => p.present).length;
+    const retardCount = updatedSessions[sessionIndex].presences.filter(p => p.present && p.retardMinutes > 0).length;
+    updatedSessions[sessionIndex].presentCount = presentCount;
+    updatedSessions[sessionIndex].retardCount = retardCount;
+    updatedSessions[sessionIndex].attendanceRate = 
+      updatedSessions[sessionIndex].totalCount > 0 ? 
+      Math.round((presentCount / updatedSessions[sessionIndex].totalCount) * 100) : 0;
+    setFilteredSessions(updatedSessions);
+    setGroupedSessions(updatedSessions);
+    if (sessionActive) {
+      setSessionActive(updatedSessions[sessionIndex]);
+    }
+    alert('Présence supprimée avec succès');
+  } catch (error) {
+    console.error('Erreur lors de la suppression:', error);
+    alert('Erreur lors de la suppression');
+  }
+};
+const handleEditPresence = (presence) => {
+  setEditingPresence(presence._id);
+  setEditForm({
+    present: presence.present,
+    retardMinutes: presence.retardMinutes || 0,
+    remarque: presence.remarque || ''
+  });
+};
+const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.put(
+      `/api/admin/presences/${presenceId}`,
+      editForm,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
 
+    const updatedSessions = [...filteredSessions];
+    
+    // ❌ PROBLÈME : Cette ligne écrase tout l'objet, y compris les données de l'étudiant
+    // updatedSessions[sessionIndex].presences[presenceIndex] = {
+    //   ...updatedSessions[sessionIndex].presences[presenceIndex],
+    //   ...response.data
+    // };
+
+    // ✅ SOLUTION : Mettre à jour seulement les champs modifiés
+    updatedSessions[sessionIndex].presences[presenceIndex] = {
+      ...updatedSessions[sessionIndex].presences[presenceIndex],
+      present: response.data.present,
+      retardMinutes: response.data.retardMinutes,
+      remarque: response.data.remarque
+      // Garder les autres propriétés intactes (etudiant, _id, etc.)
+    };
+
+    // Recalculer les statistiques
+    const presentCount = updatedSessions[sessionIndex].presences.filter(p => p.present).length;
+    const retardCount = updatedSessions[sessionIndex].presences.filter(p => p.present && p.retardMinutes > 0).length;
+    
+    updatedSessions[sessionIndex].presentCount = presentCount;
+    updatedSessions[sessionIndex].retardCount = retardCount;
+    updatedSessions[sessionIndex].attendanceRate = 
+      updatedSessions[sessionIndex].totalCount > 0 ? 
+      Math.round((presentCount / updatedSessions[sessionIndex].totalCount) * 100) : 0;
+
+    setFilteredSessions(updatedSessions);
+    setGroupedSessions(updatedSessions);
+    
+    if (sessionActive) {
+      setSessionActive(updatedSessions[sessionIndex]);
+    }
+
+    setEditingPresence(null);
+    alert('Présence modifiée avec succès');
+  } catch (error) {
+    console.error('Erreur lors de la modification:', error);
+    alert('Erreur lors de la modification');
+  }
+};
+const handleCancelEdit = () => {
+  setEditingPresence(null);
+  setEditForm({
+    present: true,
+    retardMinutes: 0,
+    remarque: ''
+  });
+};
  const clearFilters = () => {
   setSearchTerm('');
   setDateFilter('');
@@ -236,6 +346,7 @@ const exportToExcel = (data, filename, sheetName = 'Présences') => {
 // 🆕 دالة للتصدير اليومي بجدول واضح
 // ✅ تصدير يوم واحد: كل "classe" في جدول مستقل داخل نفس الورقة
 // ✅ تصدير يوم واحد: داخل كل Classe كنقسم لجداول فرعية حسب (Prof + Période + Matière + Heure)
+// Fonction corrigée pour l'export avec styles
 const exportDailyPresences = (date, professorName = null, statusFilter = 'all', periodeFilter = '') => {
   const isAllPeriode = !periodeFilter || periodeFilter === 'all';
 
@@ -281,6 +392,10 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   aoa.push(Array(colsCount).fill(''));
 
   let currentRow = aoa.length;
+  const headerRows = []; // Pour garder une trace des lignes de headers
+  const titleRows = [0]; // Ligne du titre principal
+  const classRows = []; // Lignes des titres de classes
+  const subTitleRows = []; // Lignes des sous-titres
 
   // 2) داخل كل Classe: نجمع بجداول فرعية حسب (Prof + Période + Matière + Heure)
   Object.entries(classes)
@@ -288,6 +403,7 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     .forEach(([className, sessions], classIdx, classArr) => {
       // عنوان Classe
       aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
+      classRows.push(currentRow); // Enregistrer la ligne de classe
       merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
       currentRow++;
 
@@ -311,11 +427,13 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
 
           // عنوان فرعي: Prof + Période + Matière + Heure
           aoa.push([`Prof: ${prof} — Période: ${periode} — Matière: ${mat} — Heure: ${heure}`, ...Array(colsCount - 1).fill('')]);
+          subTitleRows.push(currentRow); // Enregistrer la ligne de sous-titre
           merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
           currentRow++;
 
           // هيدر
           aoa.push([...header]);
+          headerRows.push(currentRow); // Sauvegarder la position du header
           currentRow++;
 
           // سطور البيانات
@@ -356,25 +474,106 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
       }
     });
 
-  // بناء الورقة والحفظ
+  // بناء الورقة
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+  
+  // ===== STYLES DÉFINIS =====
+  
+  // Style pour le titre principal (fond noir, texte blanc, gras, gros)
+  const titleStyle = {
+    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+
+  // Style pour les titres de classe (fond gris foncé, texte blanc, gras)
+  const classStyle = {
+    font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "333333" } },
+    alignment: { horizontal: "left", vertical: "center" }
+  };
+
+  // Style pour les sous-titres (fond gris clair, texte noir, gras)
+  const subTitleStyle = {
+    font: { bold: true, sz: 12, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "E6E6E6" } },
+    alignment: { horizontal: "left", vertical: "center" }
+  };
+
+  // ⭐ STYLE POUR LES HEADERS - FOND NOIR, TEXTE BLANC, GRAS ⭐
+  const headerStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } }, // Fond noir
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "FFFFFF" } },
+      bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+      left: { style: "thin", color: { rgb: "FFFFFF" } },
+      right: { style: "thin", color: { rgb: "FFFFFF" } }
+    }
+  };
+
+  // Style pour les données normales
+  const dataStyle = {
+    font: { sz: 10 },
+    alignment: { vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "CCCCCC" } },
+      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
+    }
+  };
+
+  // ===== APPLICATION DES STYLES =====
+  for (let rowIndex = 0; rowIndex < aoa.length; rowIndex++) {
+    for (let colIndex = 0; colIndex < colsCount; colIndex++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      
+      // S'assurer que la cellule existe
+      if (!ws[cellAddress]) {
+        ws[cellAddress] = { t: 's', v: '' };
+      }
+      
+      // Appliquer les styles selon le type de ligne
+      if (titleRows.includes(rowIndex)) {
+        ws[cellAddress].s = titleStyle;
+      }
+      else if (classRows.includes(rowIndex)) {
+        ws[cellAddress].s = classStyle;
+      }
+      else if (subTitleRows.includes(rowIndex)) {
+        ws[cellAddress].s = subTitleStyle;
+      }
+      else if (headerRows.includes(rowIndex)) {
+        // ⭐ STYLE POUR LES HEADERS ⭐
+        ws[cellAddress].s = headerStyle;
+      }
+      else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
+        ws[cellAddress].s = dataStyle;
+      }
+    }
+  }
+
+  // Configuration de la feuille
   ws['!merges'] = merges;
-  ws['!cols']   = colWidths;
-  ws['!rows']   = [{ hpx: 28 }];
-  ws['!margins']   = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+  ws['!cols'] = colWidths;
+  ws['!rows'] = [{ hpx: 28 }];
+  ws['!margins'] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
   ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
 
+  // Création du workbook et export
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Présences Jour');
 
   const statusSuffix = statusFilter !== 'all' ? `_${statusFilter}` : '';
   const filename = `presences_${formatDate(date).replace(/\//g, '-')}_classe_groupes${statusSuffix}`;
+  
+  // ⭐ IMPORTANT : Utiliser writeFile avec le support des styles ⭐
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
-
-
-
 // Export présences par mois avec toutes les classes dans une seule page
+// Export présences par mois avec toutes les classes dans une seule page - VERSION STYLÉE
 const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
   const monthSessions = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date);
@@ -396,92 +595,163 @@ const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
     sessionsByClass[session.cours].push(session);
   });
 
-  // Créer les données avec séparateurs pour chaque classe
-  const allData = [];
-  let isFirstClass = true;
+  const header = [
+    'Date', 'Matière', 'Professeur', 'Période', 'Heure', 
+    'Étudiant', 'Statut', 'Retard (min)', 'Remarque', 
+    'Total Étudiants', 'Taux Présence'
+  ];
+  const colWidths = [
+    { wch: 11 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 10 },
+    { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 40 },
+    { wch: 15 }, { wch: 15 }
+  ];
 
-  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
-    // Ajouter un séparateur de classe (sauf pour la première)
-    if (!isFirstClass) {
-      allData.push({
-        '': '',
-        ' ': '',
-        '  ': '',
-        '   ': '',
-        '    ': '',
-        '     ': '',
-        '      ': '',
-        '       ': '',
-        '        ': '',
-        '         ': '',
-        '          ': ''
-      });
-    }
-    // Ajouter l'en-tête de classe
-    allData.push({
-      '': `=== CLASSE: ${className} ===`,
-      ' ': '',
-      '  ': '',
-      '   ': '',
-      '    ': '',
-      '     ': '',
-      '      ': '',
-      '       ': '',
-      '        ': '',
-      '         ': '',
-      '          ': ''
-    });
-    // Ajouter l'en-tête des colonnes
-    allData.push({
-      '': 'Date',
-      ' ': 'Matière',
-      '  ': 'Professeur',
-      '   ': 'Période',
-      '    ': 'Heure',
-      '     ': 'Étudiant',
-      '      ': 'Statut',
-      '       ': 'Retard (min)',
-      '        ': 'Remarque',
-      '         ': 'Total Étudiants',
-      '          ': 'Taux Présence'
-    });
-    // Trier les sessions par date
-    sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
-    // Ajouter les données de la classe avec filtre de statut
-    sessions.forEach(session => {
-      session.presences.forEach(p => {
-        let includeStudent = true;
-        if (statusFilter === 'absent' && p.present) {
-          includeStudent = false;
-        } else if (statusFilter === 'retard' && (!p.present || p.retardMinutes === 0)) {
-          includeStudent = false;
-        }
-        if (includeStudent) {
-          allData.push({
-            '': formatDate(session.date),
-            ' ': session.matiere || 'N/A',
-            '  ': session.nomProfesseur || 'N/A',
-            '   ': session.presences[0]?.periode || 'N/A',
-            '    ': session.presences[0]?.heure || 'N/A',
-            '     ': p.etudiant?.nomComplet || 'N/A',
-            '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-            '       ': p.retardMinutes || 0,
-            '        ': p.remarque || '',
-            '         ': session.totalCount,
-            '          ': `${session.attendanceRate}%`
-          });
-        }
-      });
-    });
-    isFirstClass = false;
-  });
+  const aoa = [];
+  const merges = [];
+  const colsCount = header.length;
 
-  const statusSuffix = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
+  // Titre principal
   const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
-  exportToExcel(allData, `presences_${monthName}_${year}${statusSuffix}`, 'Présences par Classe');
+  const statusSuffix = statusFilter === 'absent' ? ' - ABSENTS SEULEMENT' : 
+                      statusFilter === 'retard' ? ' - RETARDS SEULEMENT' : '';
+  const bigTitle = `PRÉSENCES MENSUELLES - ${monthName.toUpperCase()} ${year}${statusSuffix}`;
+  
+  aoa.push([bigTitle, ...Array(colsCount - 1).fill('')]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
+  aoa.push(Array(colsCount).fill(''));
+
+  let currentRow = aoa.length;
+  const titleRows = [0];
+  const classRows = [];
+  const headerRows = [];
+
+  Object.entries(sessionsByClass)
+    .sort(([a],[b]) => a.localeCompare(b,'fr'))
+    .forEach(([className, sessions], classIdx, classArr) => {
+      // Ajouter un séparateur de classe (sauf pour la première)
+      if (classIdx > 0) {
+        aoa.push(Array(colsCount).fill(''));
+        currentRow++;
+      }
+
+      // Ajouter l'en-tête de classe
+      aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
+      classRows.push(currentRow);
+      merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+      currentRow++;
+
+      // Ajouter l'en-tête des colonnes
+      aoa.push([...header]);
+      headerRows.push(currentRow);
+      currentRow++;
+
+      // Trier les sessions par date
+      sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      // Ajouter les données de la classe avec filtre de statut
+      sessions.forEach(session => {
+        session.presences.forEach(p => {
+          let includeStudent = true;
+          if (statusFilter === 'absent' && p.present) {
+            includeStudent = false;
+          } else if (statusFilter === 'retard' && (!p.present || p.retardMinutes === 0)) {
+            includeStudent = false;
+          }
+          if (includeStudent) {
+            aoa.push([
+              formatDate(session.date),
+              session.matiere || 'N/A',
+              session.nomProfesseur || 'N/A',
+              session.presences[0]?.periode || 'N/A',
+              session.presences[0]?.heure || 'N/A',
+              p.etudiant?.nomComplet || 'N/A',
+              p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+              p.retardMinutes || 0,
+              p.remarque || '',
+              session.totalCount,
+              `${session.attendanceRate}%`
+            ]);
+            currentRow++;
+          }
+        });
+      });
+    });
+
+  // Création de la feuille avec styles
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Styles
+  const titleStyle = {
+    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+
+  const classStyle = {
+    font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "333333" } },
+    alignment: { horizontal: "left", vertical: "center" }
+  };
+
+  const headerStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "FFFFFF" } },
+      bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+      left: { style: "thin", color: { rgb: "FFFFFF" } },
+      right: { style: "thin", color: { rgb: "FFFFFF" } }
+    }
+  };
+
+  const dataStyle = {
+    font: { sz: 10 },
+    alignment: { vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "CCCCCC" } },
+      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
+    }
+  };
+
+  // Application des styles
+  for (let rowIndex = 0; rowIndex < aoa.length; rowIndex++) {
+    for (let colIndex = 0; colIndex < colsCount; colIndex++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      
+      if (!ws[cellAddress]) {
+        ws[cellAddress] = { t: 's', v: '' };
+      }
+      
+      if (titleRows.includes(rowIndex)) {
+        ws[cellAddress].s = titleStyle;
+      } else if (classRows.includes(rowIndex)) {
+        ws[cellAddress].s = classStyle;
+      } else if (headerRows.includes(rowIndex)) {
+        ws[cellAddress].s = headerStyle;
+      } else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
+        ws[cellAddress].s = dataStyle;
+      }
+    }
+  }
+
+  ws['!merges'] = merges;
+  ws['!cols'] = colWidths;
+  ws['!rows'] = [{ hpx: 28 }];
+  ws['!margins'] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+  ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Présences par Classe');
+
+  const statusSuffixFile = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
+  const filename = `presences_${monthName}_${year}${statusSuffixFile}`;
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
-// Export présences par mois avec résumé général et détails dans une seule page
+// Export présences par mois avec résumé général et détails - VERSION STYLÉE
 const exportMonthlyPresencesWithSummary = (month, year) => {
   const monthSessions = filteredSessions.filter(session => {
     const sessionDate = new Date(session.date);
@@ -503,51 +773,38 @@ const exportMonthlyPresencesWithSummary = (month, year) => {
     sessionsByClass[session.cours].push(session);
   });
 
-  // Créer toutes les données dans une seule page
-  const allData = [];
+  const colsCount = 9;
+  const colWidths = [
+    { wch: 18 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+    { wch: 12 }, { wch: 28 }, { wch: 12 }, { wch: 40 }
+  ];
 
-  // Ajouter le titre principal
-  allData.push({
-    '': `RAPPORT MENSUEL - ${new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' }).toUpperCase()} ${year}`,
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': ''
-  });
+  const aoa = [];
+  const merges = [];
+  
+  // Titre principal
+  const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
+  aoa.push([`RAPPORT MENSUEL - ${monthName.toUpperCase()} ${year}`, ...Array(colsCount - 1).fill('')]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
+  aoa.push(Array(colsCount).fill(''));
 
-  allData.push({
-    '': '',
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': ''
-  });
+  let currentRow = aoa.length;
+  const titleRows = [0];
+  const sectionRows = [];
+  const headerRows = [];
+  const classRows = [];
 
   // Section RÉSUMÉ GÉNÉRAL
-  allData.push({
-    '': '=== RÉSUMÉ GÉNÉRAL ===',
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': ''
-  });
+  aoa.push(['RÉSUMÉ GÉNÉRAL', ...Array(colsCount - 1).fill('')]);
+  sectionRows.push(currentRow);
+  merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+  currentRow++;
 
   // En-tête du résumé
-  allData.push({
-    '': 'Classe',
-    ' ': 'Nb Sessions',
-    '  ': 'Moy. Étudiants',
-    '   ': 'Total Présences',
-    '    ': 'Total Absences',
-    '     ': 'Total Retards',
-    '      ': 'Taux Moyen Présence'
-  });
+  const summaryHeaders = ['Classe', 'Nb Sessions', 'Moy. Étudiants', 'Total Présences', 'Total Absences', 'Total Retards', 'Taux Moyen Présence', '', ''];
+  aoa.push(summaryHeaders);
+  headerRows.push(currentRow);
+  currentRow++;
 
   // Données du résumé
   Object.entries(sessionsByClass).forEach(([className, sessions]) => {
@@ -557,106 +814,148 @@ const exportMonthlyPresencesWithSummary = (month, year) => {
     const totalRetards = sessions.reduce((sum, s) => sum + s.retardCount, 0);
     const avgAttendance = totalStudents > 0 ? Math.round((totalPresents / totalStudents) * 100) : 0;
 
-    allData.push({
-      '': className,
-      ' ': totalSessions,
-      '  ': Math.round(totalStudents / totalSessions),
-      '   ': totalPresents,
-      '    ': totalStudents - totalPresents,
-      '     ': totalRetards,
-      '      ': `${avgAttendance}%`
-    });
+    aoa.push([
+      className,
+      totalSessions,
+      Math.round(totalStudents / totalSessions),
+      totalPresents,
+      totalStudents - totalPresents,
+      totalRetards,
+      `${avgAttendance}%`,
+      '',
+      ''
+    ]);
+    currentRow++;
   });
 
   // Espaces entre résumé et détails
-  allData.push({
-    '': '',
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': '',
-    '       ': ''
-  });
+  aoa.push(Array(colsCount).fill(''));
+  currentRow++;
 
   // Section DÉTAILS PAR CLASSE
-  allData.push({
-    '': '=== DÉTAILS PAR CLASSE ===',
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': '',
-    '       ': ''
-  });
+  aoa.push(['DÉTAILS PAR CLASSE', ...Array(colsCount - 1).fill('')]);
+  sectionRows.push(currentRow);
+  merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+  currentRow++;
 
-  let isFirstClass = true;
+  const detailHeaders = ['Date', 'Matière', 'Professeur', 'Période', 'Heure', 'Étudiant', 'Statut', 'Retard (min)', 'Remarque'];
 
-  Object.entries(sessionsByClass).forEach(([className, sessions]) => {
-    // Espacement entre classes
-    if (!isFirstClass) {
-      allData.push({
-        '': '',
-        ' ': '',
-        '  ': '',
-        '   ': '',
-        '    ': '',
-        '     ': '',
-        '      ': '',
-        '       ': ''
-      });
-    }
-    // En-tête de classe
-    allData.push({
-      '': `--- CLASSE: ${className} ---`,
-      ' ': '',
-      '  ': '',
-      '   ': '',
-      '    ': '',
-      '     ': '',
-      '      ': '',
-      '       ': ''
-    });
-    // En-tête des colonnes pour les détails
-    allData.push({
-      '': 'Date',
-      ' ': 'Matière',
-      '  ': 'Professeur',
-      '   ': 'Période',
-      '    ': 'Heure',
-      '     ': 'Étudiant',
-      '      ': 'Statut',
-      '       ': 'Retard (min)',
-      '        ': 'Remarque'
-    });
-    // Trier par date
-    sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
-    // Données détaillées de la classe
-    sessions.forEach(session => {
-      session.presences.forEach(p => {
-        allData.push({
-          '': formatDate(session.date),
-          ' ': session.matiere || 'N/A',
-          '  ': session.nomProfesseur || 'N/A',
-          '   ': session.presences[0]?.periode || 'N/A',
-          '    ': session.presences[0]?.heure || 'N/A',
-          '     ': p.etudiant?.nomComplet || 'N/A',
-          '      ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-          '       ': p.retardMinutes || 0,
-          '        ': p.remarque || ''
+  Object.entries(sessionsByClass)
+    .sort(([a],[b]) => a.localeCompare(b,'fr'))
+    .forEach(([className, sessions], classIdx) => {
+      // Espacement بين classes
+      if (classIdx > 0) {
+        aoa.push(Array(colsCount).fill(''));
+        currentRow++;
+      }
+
+      // En-tête de classe
+      aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
+      classRows.push(currentRow);
+      merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
+      currentRow++;
+
+      // En-tête des colonnes pour les détails
+      aoa.push([...detailHeaders]);
+      headerRows.push(currentRow);
+      currentRow++;
+
+      // Trier par date
+      sessions.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      // Données détaillées de la classe
+      sessions.forEach(session => {
+        session.presences.forEach(p => {
+          aoa.push([
+            formatDate(session.date),
+            session.matiere || 'N/A',
+            session.nomProfesseur || 'N/A',
+            session.presences[0]?.periode || 'N/A',
+            session.presences[0]?.heure || 'N/A',
+            p.etudiant?.nomComplet || 'N/A',
+            p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+            p.retardMinutes || 0,
+            p.remarque || ''
+          ]);
+          currentRow++;
         });
       });
     });
-    isFirstClass = false;
-  });
 
-  const monthName = new Date(year, month - 1).toLocaleString('fr-FR', { month: 'long' });
-  exportToExcel(allData, `presences_${monthName}_${year}_rapport_complet`, 'Rapport Mensuel');
+  // Création de la feuille avec styles
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Styles
+  const titleStyle = {
+    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+
+  const classStyle = {
+    font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "333333" } },
+    alignment: { horizontal: "left", vertical: "center" }
+  };
+
+  const headerStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "FFFFFF" } },
+      bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+      left: { style: "thin", color: { rgb: "FFFFFF" } },
+      right: { style: "thin", color: { rgb: "FFFFFF" } }
+    }
+  };
+
+  const dataStyle = {
+    font: { sz: 10 },
+    alignment: { vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "CCCCCC" } },
+      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
+    }
+  };
+
+  // Application des styles
+  for (let rowIndex = 0; rowIndex < aoa.length; rowIndex++) {
+    for (let colIndex = 0; colIndex < colsCount; colIndex++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      
+      if (!ws[cellAddress]) {
+        ws[cellAddress] = { t: 's', v: '' };
+      }
+      
+      if (titleRows.includes(rowIndex)) {
+        ws[cellAddress].s = titleStyle;
+      } else if (classRows.includes(rowIndex)) {
+        ws[cellAddress].s = classStyle;
+      } else if (headerRows.includes(rowIndex)) {
+        ws[cellAddress].s = headerStyle;
+      } else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
+        ws[cellAddress].s = dataStyle;
+      }
+    }
+  }
+
+  ws['!merges'] = merges;
+  ws['!cols'] = colWidths;
+  ws['!rows'] = [{ hpx: 28 }];
+  ws['!margins'] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+  ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rapport Mensuel');
+
+  const filename = `presences_${monthName}_${year}_rapport_complet`;
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
-// Export par professeur
+// Export par professeur - VERSION STYLÉE
 const exportByProfessor = (professorName) => {
   const professorSessions = filteredSessions.filter(session => 
     session.nomProfesseur === professorName
@@ -667,41 +966,104 @@ const exportByProfessor = (professorName) => {
     return;
   }
 
-  const allData = [];
-  // En-tête
-  allData.push({
-    '': `=== PRÉSENCES DE ${professorName} ===`,
-    ' ': '',
-    '  ': '',
-    '   ': '',
-    '    ': '',
-    '     ': '',
-    '      ': '',
-    '       ': ''
-  });
-  allData.push({
-    '': 'Date',
-    ' ': 'Classe',
-    '  ': 'Matière',
-    '   ': 'Étudiant',
-    '    ': 'Statut',
-    '     ': 'Retard (min)',
-    '      ': 'Remarque'
-  });
+  const header = ['Date', 'Classe', 'Matière', 'Étudiant', 'Statut', 'Retard (min)', 'Remarque'];
+  const colWidths = [
+    { wch: 11 }, { wch: 18 }, { wch: 16 }, { wch: 28 }, 
+    { wch: 12 }, { wch: 12 }, { wch: 40 }
+  ];
+  const colsCount = header.length;
+
+  const aoa = [];
+  const merges = [];
+
+  // Titre
+  aoa.push([`PRÉSENCES DE ${professorName}`, ...Array(colsCount - 1).fill('')]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
+  aoa.push(Array(colsCount).fill(''));
+
+  // Header
+  aoa.push([...header]);
+
+  let currentRow = aoa.length;
+
+  // Données
   professorSessions.forEach(session => {
     session.presences.forEach(p => {
-      allData.push({
-        '': formatDate(session.date),
-        ' ': session.cours,
-        '  ': session.matiere || 'N/A',
-        '   ': p.etudiant?.nomComplet || 'N/A',
-        '    ': p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
-        '     ': p.retardMinutes || 0,
-        '      ': p.remarque || ''
-      });
+      aoa.push([
+        formatDate(session.date),
+        session.cours,
+        session.matiere || 'N/A',
+        p.etudiant?.nomComplet || 'N/A',
+        p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent',
+        p.retardMinutes || 0,
+        p.remarque || ''
+      ]);
+      currentRow++;
     });
   });
-  exportToExcel(allData, `presences_${professorName.replace(/\s+/g, '_')}`, `Présences ${professorName}`);
+
+  // Création de la feuille avec styles
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  const titleStyle = {
+    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" }
+  };
+
+  const headerStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "FFFFFF" } },
+      bottom: { style: "thin", color: { rgb: "FFFFFF" } },
+      left: { style: "thin", color: { rgb: "FFFFFF" } },
+      right: { style: "thin", color: { rgb: "FFFFFF" } }
+    }
+  };
+
+  const dataStyle = {
+    font: { sz: 10 },
+    alignment: { vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "CCCCCC" } },
+      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
+    }
+  };
+
+  // Application des styles
+  for (let rowIndex = 0; rowIndex < aoa.length; rowIndex++) {
+    for (let colIndex = 0; colIndex < colsCount; colIndex++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+      
+      if (!ws[cellAddress]) {
+        ws[cellAddress] = { t: 's', v: '' };
+      }
+      
+      if (rowIndex === 0) { // Titre
+        ws[cellAddress].s = titleStyle;
+      } else if (rowIndex === 2) { // Header
+        ws[cellAddress].s = headerStyle;
+      } else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
+        ws[cellAddress].s = dataStyle;
+      }
+    }
+  }
+
+  ws['!merges'] = merges;
+  ws['!cols'] = colWidths;
+  ws['!rows'] = [{ hpx: 28 }];
+  ws['!margins'] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
+  ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `Présences ${professorName}`);
+
+  const filename = `presences_${professorName.replace(/\s+/g, '_')}`;
+  XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
   const styles = {
@@ -1583,11 +1945,13 @@ const exportByProfessor = (professorName) => {
                         <tr>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Étudiant</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Statut</th>
+                          <th style={{ ...styles.th, padding: '12px 16px' }}>Retard</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Remarque</th>
+                          {userRole === 'admin' && <th style={{ ...styles.th, padding: '12px 16px' }}>Actions</th>}
                         </tr>
                       </thead>
                       <tbody style={{ backgroundColor: 'white' }}>
-                        {sessionActive.presences.map(p => (
+                        {sessionActive.presences.map((p, presenceIndex) => (
                           <tr key={p._id} className="table-row">
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
                               <span style={{ fontWeight: '500', color: '#111827' }}>
@@ -1595,32 +1959,139 @@ const exportByProfessor = (professorName) => {
                               </span>
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {editingPresence === p._id ? (
+                                <select
+                                  value={editForm.present}
+                                  onChange={(e) => setEditForm({...editForm, present: e.target.value === 'true'})}
+                                  style={{
+                                    padding: '4px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px'
+                                  }}
+                                >
+                                  <option value="true">Présent</option>
+                                  <option value="false">Absent</option>
+                                </select>
+                              ) : (
                                 <span style={p.present ? { ...styles.badge, ...styles.badgeGreen } : { ...styles.badge, ...styles.badgeRed }}>
                                   {p.present ? <Check size={12} /> : <X size={12} />}
                                   {p.present ? (p.retardMinutes > 0 ? 'En retard' : 'Présent') : 'Absent'}
                                 </span>
-                                {p.retardMinutes > 0 && p.present && (
-                                  <span style={{
-                                    fontSize: '10px',
-                                    backgroundColor: '#f59e0b',
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    borderRadius: '8px',
-                                    fontWeight: 'bold'
-                                  }}>
-                                    +{p.retardMinutes}min
-                                  </span>
-                                )}
-                              </div>
+                              )}
                             </td>
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
-                              <span style={{ color: '#6b7280' }}>{p.remarque || '—'}</span>
+                              {editingPresence === p._id ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="60"
+                                  value={editForm.retardMinutes}
+                                  onChange={(e) => setEditForm({...editForm, retardMinutes: parseInt(e.target.value) || 0})}
+                                  style={{
+                                    width: '80px',
+                                    padding: '4px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px'
+                                  }}
+                                />
+                              ) : (
+                                <span style={{ color: '#6b7280' }}>
+                                  {p.retardMinutes || 0} min
+                                </span>
+                              )}
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            <td style={{ ...styles.td, padding: '12px 16px' }}>
+                              {editingPresence === p._id ? (
+                                <input
+                                  type="text"
+                                  value={editForm.remarque}
+                                  onChange={(e) => setEditForm({...editForm, remarque: e.target.value})}
+                                  style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px'
+                                  }}
+                                  placeholder="Remarque..."
+                                />
+                              ) : (
+                                <span style={{ color: '#6b7280' }}>{p.remarque || '—'}</span>
+                              )}
+                            </td>
+                            {userRole === 'admin' && (
+                              <td style={{ ...styles.td, padding: '12px 16px' }}>
+                                {editingPresence === p._id ? (
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                      onClick={() => handleSaveEdit(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
+                                      style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: '#10b981',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      <Save size={12} />
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEdit}
+                                      style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: '#6b7280',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                      onClick={() => handleEditPresence(p)}
+                                      style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: '#3b82f6',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      <Edit size={12} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePresence(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
+                                      style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: '#dc2626',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '12px'
+                                      }}
+                                    >
+                                      <Trash2 size={12} />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                   </div>
 
                   {/* Mobile Students Cards */}
@@ -1974,5 +2445,7 @@ const exportByProfessor = (professorName) => {
     </div>
   );
 };
+
+
 
 export default ListePresences;

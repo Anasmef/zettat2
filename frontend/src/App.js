@@ -78,6 +78,7 @@ import ReclamationsProfesseur
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 
+import HistoriqueEtudiant from './pages/HistoriqueEtudiant';
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
 
@@ -373,7 +374,11 @@ function AppContent() {
 
 <Route path="/admin/professeursmanagement" element={<AdminProfManagement />} />
 
+<Route path="/professeur/reclamations" element={<ReclamationsProfesseur />} />
 
+
+<Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
+<Route path="/admin/reclamations" element={<ReclamationsAdmin />} />
 <Route path="/professeur/etudiants-autorises" element={<EtudiantsAutorisesProfesseur />} />
         {/* Routes Étudiant */}
         <Route path="/etudiant/messages" element={<MessageEtudiant />} />

@@ -5,6 +5,7 @@ require('dotenv').config();
 const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
 
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
@@ -2109,6 +2110,427 @@ app.delete('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async 
   }
 });
 
+// Créer une nouvelle réclamation
+app.post('/api/professeur/reclamations', authProfesseur, async (req, res) => {
+  try {
+    const { etudiantId, typeReclamation, cours, dateIncident, priorite, description } = req.body;
+    
+    // Vérifications
+    if (!etudiantId || !typeReclamation || !cours || !dateIncident) {
+      return res.status(400).json({ 
+        message: 'Veuillez remplir tous les champs obligatoires' 
+      });
+    }
+
+    // Vérifier que l'étudiant existe et est autorisé dans ce cours
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    if (!etudiant.cours.includes(cours)) {
+      return res.status(400).json({ 
+        message: 'Cet étudiant n\'est pas inscrit dans ce cours' 
+      });
+    }
+
+    // Vérifier que le professeur enseigne ce cours
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur.cours.includes(cours)) {
+      return res.status(400).json({ 
+        message: 'Vous n\'enseignez pas ce cours' 
+      });
+    }
+
+    // Créer la réclamation
+    const reclamation = new Reclamation({
+      professeur: req.professeurId,
+      etudiant: etudiantId,
+      cours,
+      typeReclamation,
+      dateIncident: new Date(dateIncident),
+      priorite: priorite || 'Moyenne',
+      description: description?.trim() || ''
+    });
+
+    await reclamation.save();
+
+    // Populer les références pour la réponse
+    await reclamation.populate([
+      { path: 'professeur', select: 'nomComplet email' },
+      { path: 'etudiant', select: 'nomComplet email niveau' }
+    ]);
+
+    res.status(201).json({
+      message: 'Réclamation créée avec succès',
+      reclamation
+    });
+
+  } catch (err) {
+    console.error('Erreur création réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Récupérer les réclamations d'un professeur
+app.get('/api/professeur/reclamations', authProfesseur, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    const { statut, priorite, cours, etudiant } = req.query;
+    
+    // Construire le filtre
+    let filter = { professeur: req.professeurId };
+    
+    if (statut) filter.statut = statut;
+    if (priorite) filter.priorite = priorite;
+    if (cours) filter.cours = cours;
+    if (etudiant) {
+      // Rechercher l'étudiant par nom
+      const etudiants = await Etudiant.find({
+        nomComplet: new RegExp(etudiant, 'i')
+      }).select('_id');
+      filter.etudiant = { $in: etudiants.map(e => e._id) };
+    }
+
+    const reclamations = await Reclamation.find(filter)
+      .populate([
+        { path: 'etudiant', select: 'nomComplet email niveau image' },
+        { path: 'adminTraitant', select: 'nomComplet email' }
+      ])
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Reclamation.countDocuments(filter);
+    
+    // Statistiques rapides
+    const stats = await Reclamation.aggregate([
+      { $match: { professeur: req.professeurId } },
+      {
+        $group: {
+          _id: '$statut',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    res.json({
+      reclamations,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total
+      },
+      stats: stats.reduce((acc, stat) => {
+        acc[stat._id] = stat.count;
+        return acc;
+      }, {})
+    });
+
+  } catch (err) {
+    console.error('Erreur récupération réclamations:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Récupérer une réclamation spécifique du professeur
+app.get('/api/professeur/reclamations/:id', authProfesseur, async (req, res) => {
+  try {
+    const reclamation = await Reclamation.findOne({
+      _id: req.params.id,
+      professeur: req.professeurId
+    }).populate([
+      { path: 'etudiant', select: 'nomComplet email niveau image' },
+      { path: 'adminTraitant', select: 'nomComplet email' }
+    ]);
+
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    res.json(reclamation);
+
+  } catch (err) {
+    console.error('Erreur récupération réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Modifier une réclamation (seulement si pas encore traitée)
+app.put('/api/professeur/reclamations/:id', authProfesseur, async (req, res) => {
+  try {
+    const reclamation = await Reclamation.findOne({
+      _id: req.params.id,
+      professeur: req.professeurId
+    });
+
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    // Ne permettre la modification que si la réclamation n'est pas encore traitée
+    if (reclamation.statut !== 'En attente') {
+      return res.status(400).json({ 
+        message: 'Cette réclamation ne peut plus être modifiée' 
+      });
+    }
+
+    const { typeReclamation, priorite, description } = req.body;
+    
+    if (typeReclamation) reclamation.typeReclamation = typeReclamation;
+    if (priorite) reclamation.priorite = priorite;
+    if (description !== undefined) reclamation.description = description.trim();
+
+    await reclamation.save();
+
+    await reclamation.populate([
+      { path: 'etudiant', select: 'nomComplet email niveau' }
+    ]);
+
+    res.json({
+      message: 'Réclamation modifiée avec succès',
+      reclamation
+    });
+
+  } catch (err) {
+    console.error('Erreur modification réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// ==================== ROUTES ADMIN ====================
+
+// Récupérer toutes les réclamations pour l'admin
+app.get('/api/admin/reclamations', authAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+    
+    const { statut, priorite, cours, professeur, etudiant } = req.query;
+    
+    // Construire le filtre
+    let filter = {};
+    
+    if (statut) filter.statut = statut;
+    if (priorite) filter.priorite = priorite;
+    if (cours) filter.cours = cours;
+    
+    if (professeur) {
+      const professeurs = await Professeur.find({
+        nomComplet: new RegExp(professeur, 'i')
+      }).select('_id');
+      filter.professeur = { $in: professeurs.map(p => p._id) };
+    }
+    
+    if (etudiant) {
+      const etudiants = await Etudiant.find({
+        nomComplet: new RegExp(etudiant, 'i')
+      }).select('_id');
+      filter.etudiant = { $in: etudiants.map(e => e._id) };
+    }
+
+    const reclamations = await Reclamation.find(filter)
+      .populate([
+        { path: 'professeur', select: 'nomComplet email' },
+        { path: 'etudiant', select: 'nomComplet email niveau image' },
+        { path: 'adminTraitant', select: 'nomComplet email' }
+      ])
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Reclamation.countDocuments(filter);
+    
+    // Statistiques globales
+    const stats = await Reclamation.aggregate([
+      {
+        $group: {
+          _id: null,
+          total: { $sum: 1 },
+          enAttente: { $sum: { $cond: [{ $eq: ['$statut', 'En attente'] }, 1, 0] } },
+          enCours: { $sum: { $cond: [{ $eq: ['$statut', 'En cours de traitement'] }, 1, 0] } },
+          resolues: { $sum: { $cond: [{ $eq: ['$statut', 'Résolue'] }, 1, 0] } },
+          fermees: { $sum: { $cond: [{ $eq: ['$statut', 'Fermée'] }, 1, 0] } },
+          urgentes: { $sum: { $cond: [{ $eq: ['$priorite', 'Urgente'] }, 1, 0] } }
+        }
+      }
+    ]);
+
+    res.json({
+      reclamations,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total
+      },
+      stats: stats[0] || {
+        total: 0, enAttente: 0, enCours: 0, 
+        resolues: 0, fermees: 0, urgentes: 0
+      }
+    });
+
+  } catch (err) {
+    console.error('Erreur récupération réclamations admin:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Récupérer une réclamation spécifique pour l'admin
+app.get('/api/admin/reclamations/:id', authAdmin, async (req, res) => {
+  try {
+    const reclamation = await Reclamation.findById(req.params.id)
+      .populate([
+        { path: 'professeur', select: 'nomComplet email telephone' },
+        { path: 'etudiant', select: 'nomComplet email niveau telephone image' },
+        { path: 'adminTraitant', select: 'nomComplet email' }
+      ]);
+
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    res.json(reclamation);
+
+  } catch (err) {
+    console.error('Erreur récupération réclamation admin:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Traiter une réclamation (changer le statut)
+app.put('/api/admin/reclamations/:id/traiter', authAdmin, async (req, res) => {
+  try {
+    const { statut, commentaireAdmin } = req.body;
+    
+    if (!statut) {
+      return res.status(400).json({ message: 'Le statut est requis' });
+    }
+
+    const reclamation = await Reclamation.findById(req.params.id);
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    reclamation.statut = statut;
+    reclamation.commentaireAdmin = commentaireAdmin?.trim() || '';
+    reclamation.adminTraitant = req.adminId;
+    
+    // La date de traitement sera mise automatiquement par le middleware pre-save
+    await reclamation.save();
+
+    await reclamation.populate([
+      { path: 'professeur', select: 'nomComplet email' },
+      { path: 'etudiant', select: 'nomComplet email niveau' },
+      { path: 'adminTraitant', select: 'nomComplet email' }
+    ]);
+
+    res.json({
+      message: 'Réclamation traitée avec succès',
+      reclamation
+    });
+
+  } catch (err) {
+    console.error('Erreur traitement réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Supprimer une réclamation (seulement admin)
+app.delete('/api/admin/reclamations/:id', authAdmin, async (req, res) => {
+  try {
+    const reclamation = await Reclamation.findById(req.params.id);
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    await Reclamation.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Réclamation supprimée avec succès' });
+
+  } catch (err) {
+    console.error('Erreur suppression réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
+
+// Statistiques détaillées pour l'admin
+app.get('/api/admin/reclamations/stats/detailed', authAdmin, async (req, res) => {
+  try {
+    const stats = await Promise.all([
+      // Stats par statut
+      Reclamation.aggregate([
+        { $group: { _id: '$statut', count: { $sum: 1 } } }
+      ]),
+      
+      // Stats par priorité
+      Reclamation.aggregate([
+        { $group: { _id: '$priorite', count: { $sum: 1 } } }
+      ]),
+      
+      // Stats par type de réclamation
+      Reclamation.aggregate([
+        { $group: { _id: '$typeReclamation', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]),
+      
+      // Stats par cours
+      Reclamation.aggregate([
+        { $group: { _id: '$cours', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 }
+      ]),
+      
+      // Réclamations récentes (7 derniers jours)
+      Reclamation.countDocuments({
+        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+      })
+    ]);
+
+    res.json({
+      parStatut: stats[0],
+      parPriorite: stats[1],
+      parType: stats[2],
+      parCours: stats[3],
+      reclamationsRecentes: stats[4]
+    });
+
+  } catch (err) {
+    console.error('Erreur stats réclamations:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur', 
+      error: err.message 
+    });
+  }
+});
 
 app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
   try {
@@ -3485,11 +3907,13 @@ app.get('/api/notifications/deleted', authAdminOrInscripteurOrPaiementManager, (
 });
 // route: POST /api/professeurs
 // accessible uniquement par Admin
+// Route POST - Créer un professeur
 app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.single('image'), async (req, res) => {
   try {
     const {
       nom,
       email,
+      cin,
       motDePasse,
       cours,
       telephone,
@@ -3503,6 +3927,10 @@ app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.sin
     const existe = await Professeur.findOne({ email });
     if (existe) return res.status(400).json({ message: '📧 Cet email est déjà utilisé' });
 
+    // 🆔 Vérification CIN unique
+    const existeCin = await Professeur.findOne({ cin });
+    if (existeCin) return res.status(400).json({ message: '🆔 Ce CIN est déjà utilisé' });
+
     // ✅ Vérification genre
     if (!['Homme', 'Femme'].includes(genre)) {
       return res.status(400).json({ message: '🚫 Genre invalide. Doit être Homme ou Femme' });
@@ -3511,6 +3939,11 @@ app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.sin
     // ✅ Matière obligatoire
     if (!matiere || matiere.trim() === '') {
       return res.status(400).json({ message: '🚫 La matière est requise' });
+    }
+
+    // ✅ CIN obligatoire
+    if (!cin || cin.trim() === '') {
+      return res.status(400).json({ message: '🚫 Le CIN est requis' });
     }
 
     // 🖼️ Image
@@ -3529,6 +3962,7 @@ app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.sin
     const professeur = new Professeur({
       nom,
       email,
+      cin,
       motDePasse: hashed,
       genre,
       telephone,
@@ -3563,6 +3997,105 @@ app.post('/api/professeurs', authAdminOrInscripteurOrPaiementManager, upload.sin
   } catch (err) {
     console.error('❌ Erreur lors de la création du professeur:', err);
     res.status(500).json({ message: '❌ Erreur serveur', error: err.message });
+  }
+});
+
+// Route PUT - Modifier un professeur
+app.put('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'), async (req, res) => {
+  try {
+    const professeurId = req.params.id;
+    const {
+      nom,
+      genre,
+      cin,
+      dateNaissance,
+      telephone,
+      email,
+      motDePasse,
+      actif,
+      matiere
+    } = req.body;
+
+    let cours = req.body.cours;
+
+    // 🧠 S'assurer que cours est un tableau
+    if (!cours) cours = [];
+    if (typeof cours === 'string') cours = [cours];
+
+    // 🔍 Récupérer les anciens cours du professeur
+    const ancienProf = await Professeur.findById(professeurId);
+    if (!ancienProf) return res.status(404).json({ message: "Professeur introuvable" });
+
+    // 🆔 Vérification CIN unique (sauf pour le professeur actuel)
+    if (cin && cin !== ancienProf.cin) {
+      const existeCin = await Professeur.findOne({ cin, _id: { $ne: professeurId } });
+      if (existeCin) return res.status(400).json({ message: '🆔 Ce CIN est déjà utilisé par un autre professeur' });
+    }
+
+    // 📧 Vérification email unique (sauf pour le professeur actuel)
+    if (email && email !== ancienProf.email) {
+      const existeEmail = await Professeur.findOne({ email, _id: { $ne: professeurId } });
+      if (existeEmail) return res.status(400).json({ message: '📧 Cet email est déjà utilisé par un autre professeur' });
+    }
+
+    const ancienCours = ancienProf.cours || [];
+
+    // ➖ Cours supprimés
+    const coursSupprimes = ancienCours.filter(c => !cours.includes(c));
+    // ➕ Cours ajoutés
+    const coursAjoutes = cours.filter(c => !ancienCours.includes(c));
+
+    // 🧼 Retirer le prof des cours supprimés
+    for (const coursNom of coursSupprimes) {
+      await Cours.updateOne(
+        { nom: coursNom },
+        { $pull: { professeur: ancienProf.nom } }
+      );
+    }
+
+    // 🧩 Ajouter le prof dans les cours ajoutés
+    for (const coursNom of coursAjoutes) {
+      await Cours.updateOne(
+        { nom: coursNom },
+        { $addToSet: { professeur: nom } }
+      );
+    }
+
+    // 🛠️ Données à mettre à jour
+    const updateData = {
+      nom,
+      genre,
+      cin,
+      dateNaissance: new Date(dateNaissance),
+      telephone,
+      email,
+      cours,
+      matiere,
+      actif: actif === 'true' || actif === true
+    };
+
+    // 📷 Gestion de l'image
+    if (req.file) {
+      updateData.image = `/uploads/${req.file.filename}`;
+    }
+
+    // 🔐 Mot de passe s'il est modifié
+    if (motDePasse && motDePasse.trim() !== '') {
+      updateData.motDePasse = await bcrypt.hash(motDePasse, 10);
+    }
+
+    // ✅ Mise à jour du professeur
+    const updatedProf = await Professeur.findByIdAndUpdate(
+      professeurId,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('');
+
+    res.json({ message: "✅ Professeur modifié avec succès", professeur: updatedProf });
+
+  } catch (err) {
+    console.error('❌ Erreur lors de la modification:', err);
+    res.status(500).json({ message: "Erreur lors de la modification", error: err.message });
   }
 });
 
@@ -3702,89 +4235,6 @@ app.post('/api/professeurs/login', async (req, res) => {
 
 
 
-app.put('/api/professeurs/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'), async (req, res) => {
-  try {
-    const professeurId = req.params.id;
-    const {
-      nom,
-      genre,
-      dateNaissance,
-      telephone,
-      email,
-      motDePasse,
-      actif,
-      matiere // ✅ nouvelle propriété
-    } = req.body;
-
-    let cours = req.body.cours;
-
-    // 🧠 S'assurer que cours est un tableau
-    if (!cours) cours = [];
-    if (typeof cours === 'string') cours = [cours];
-
-    // 🔍 Récupérer les anciens cours du professeur
-    const ancienProf = await Professeur.findById(professeurId);
-    if (!ancienProf) return res.status(404).json({ message: "Professeur introuvable" });
-
-    const ancienCours = ancienProf.cours || [];
-
-    // ➖ Cours supprimés
-    const coursSupprimes = ancienCours.filter(c => !cours.includes(c));
-    // ➕ Cours ajoutés
-    const coursAjoutes = cours.filter(c => !ancienCours.includes(c));
-
-    // 🧼 Retirer le prof des cours supprimés
-    for (const coursNom of coursSupprimes) {
-      await Cours.updateOne(
-        { nom: coursNom },
-        { $pull: { professeur: ancienProf.nom } }
-      );
-    }
-
-    // 🧩 Ajouter le prof dans les cours ajoutés
-    for (const coursNom of coursAjoutes) {
-      await Cours.updateOne(
-        { nom: coursNom },
-        { $addToSet: { professeur: nom } }
-      );
-    }
-
-    // 🛠️ Données à mettre à jour
-    const updateData = {
-      nom,
-      genre,
-      dateNaissance: new Date(dateNaissance),
-      telephone,
-      email,
-      cours,
-      matiere, // ✅ ajout ici
-      actif: actif === 'true' || actif === true
-    };
-
-    // 📷 Gestion de l'image
-    if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
-    }
-
-    // 🔐 Mot de passe s'il est modifié
-    if (motDePasse && motDePasse.trim() !== '') {
-      updateData.motDePasse = await bcrypt.hash(motDePasse, 10);
-    }
-
-    // ✅ Mise à jour du professeur
-    const updatedProf = await Professeur.findByIdAndUpdate(
-      professeurId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('');
-
-    res.json({ message: "✅ Professeur modifié avec succès", professeur: updatedProf });
-
-  } catch (err) {
-    console.error('❌ Erreur lors de la modification:', err);
-    res.status(500).json({ message: "Erreur lors de la modification", error: err.message });
-  }
-});
 
 // routes/professeurs.js
 app.patch('/api/professeurs/:id/actif',authAdminOrInscripteurOrPaiementManager, async (req, res) => {
@@ -3819,37 +4269,52 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       cours, 
       dateSession, 
       present,
-      retardMinutes, // 🆕 Minutes de retard (0-60)
+      retardMinutes,
       remarque, 
       heure, 
       periode 
     } = req.body;
 
-    // ✅ تحقق أن هذا الأستاذ يدرّس هذا الكورس
+    // Vérifier que ce professeur enseigne ce cours
     const prof = await Professeur.findById(req.professeurId);
     if (!prof.cours.includes(cours)) {
-      return res.status(403).json({ message: '❌ Vous ne pouvez pas marquer la présence pour ce cours.' });
+      return res.status(403).json({ message: 'Vous ne pouvez pas marquer la présence pour ce cours.' });
     }
 
-    // 🆕 Logique pour gérer les retards
+    // VÉRIFIER SI CET ÉTUDIANT SPÉCIFIQUE EST DÉJÀ ENREGISTRÉ POUR CETTE SESSION
+    const existingPresence = await Presence.findOne({
+      etudiant: etudiant,
+      cours: cours,
+      dateSession: new Date(dateSession),
+      heure: heure,
+      periode: periode,
+      creePar: req.professeurId
+    });
+
+    if (existingPresence) {
+      return res.status(409).json({ 
+        message: 'Cet étudiant est déjà enregistré pour cette séance.' 
+      });
+    }
+
+    // Logique pour gérer les retards
     let finalPresent = present || false;
     let finalRetardMinutes = 0;
 
-    // Si l'étudiant est en retard, il est considéré comme présent
     if (retardMinutes && retardMinutes > 0) {
       finalPresent = true;
-      finalRetardMinutes = Math.min(retardMinutes, 60); // Maximum 60 minutes
+      finalRetardMinutes = Math.min(retardMinutes, 60);
     } else if (present) {
-      finalRetardMinutes = 0; // Pas de retard si présent normalement
+      finalRetardMinutes = 0;
     }
 
-    // ✅ إنشاء كائن présence جديد
+    // Créer nouvel enregistrement de présence
     const presence = new Presence({
       etudiant,
       cours,
       dateSession: new Date(dateSession),
       present: finalPresent,
-      retardMinutes: finalRetardMinutes, // 🆕
+      retardMinutes: finalRetardMinutes,
       remarque,
       heure,
       periode,
@@ -3862,6 +4327,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
     res.status(201).json(presence);
 
   } catch (err) {
+    console.error('Erreur:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -4023,7 +4489,58 @@ app.put('/api/presences/:id', authProfesseur, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Route DELETE pour supprimer une présence (Admin seulement)
+app.delete('/api/presences/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const presence = await Presence.findById(id);
+    if (!presence) {
+      return res.status(404).json({ message: 'Présence non trouvée.' });
+    }
 
+    await Presence.findByIdAndDelete(id);
+    res.json({ message: 'Présence supprimée avec succès.' });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route PUT pour modifier une présence (Admin)
+app.put('/api/admin/presences/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { present, retardMinutes, remarque } = req.body;
+
+    const presence = await Presence.findById(id);
+    if (!presence) {
+      return res.status(404).json({ message: 'Présence non trouvée.' });
+    }
+
+    // Logique de mise à jour pour admin
+    if (retardMinutes && retardMinutes > 0) {
+      presence.present = true;
+      presence.retardMinutes = Math.min(retardMinutes, 60);
+    } else if (present) {
+      presence.present = true;
+      presence.retardMinutes = 0;
+    } else {
+      presence.present = false;
+      presence.retardMinutes = 0;
+    }
+
+    if (remarque !== undefined) {
+      presence.remarque = remarque;
+    }
+
+    await presence.save();
+    res.json(presence);
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // 🆕 API pour obtenir un résumé des présences par cours
 app.get('/api/professeur/resume/:cours', authProfesseur, async (req, res) => {
   try {
@@ -4176,6 +4693,59 @@ app.get('/api/presences/etudiant/:id', authAdminOrInscripteurOrPaiementManager, 
 });
 // ✅ Modifier un étudiant
 
+// Route pour rechercher des étudiants
+// Nouvelle route de recherche utilisant la logique existante
+// Route de recherche simple qui évite les erreurs MongoDB
+app.get('/api/etudiants/search', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { q } = req.query;
+    console.log('Recherche pour:', q); // Debug
+    
+    if (!q || q.length < 2) {
+      return res.json([]);
+    }
+
+    // Version simple sans regex qui peut causer des erreurs
+    const students = await Etudiant.find({})
+      .select('nomComplet nom email cours _id')
+      .limit(50);
+
+    console.log('Étudiants trouvés:', students.length); // Debug
+
+    // Filtrer en JavaScript plutôt qu'avec MongoDB regex
+    const filtered = students.filter(student => {
+      const nomComplet = (student.nomComplet || '').toLowerCase();
+      const nom = (student.nom || '').toLowerCase();
+      const email = (student.email || '').toLowerCase();
+      const queryLower = q.toLowerCase();
+      
+      return nomComplet.includes(queryLower) ||
+             nom.includes(queryLower) ||
+             email.includes(queryLower);
+    }).slice(0, 20);
+
+    res.json(filtered);
+  } catch (err) {
+    console.error('ERREUR COMPLÈTE:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// Route pour l'historique d'un étudiant
+app.get('/api/presences/student/:studentId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    
+    const presences = await Presence.find({ etudiant: studentId })
+      .populate('etudiant', 'nomComplet nom email cours')
+      .sort({ dateSession: -1 });
+
+    res.json(presences);
+  } catch (err) {
+    console.error('Erreur historique étudiant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Lister les cours
 // Récupérer un seul cours avec détails

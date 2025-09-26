@@ -36,6 +36,7 @@ const ListeProfesseurs = () => {
   const [showModal, setShowModal] = useState(false);
   const [formAjout, setFormAjout] = useState({
     nom: '',
+    cin: '', // ← AJOUTÉ
     genre: 'Homme',
     dateNaissance: '',
     telephone: '',
@@ -60,6 +61,7 @@ const ListeProfesseurs = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [formModifier, setFormModifier] = useState({
     nom: '',
+    cin: '', // ← AJOUTÉ
     genre: 'Homme',
     dateNaissance: '',
     telephone: '',
@@ -161,6 +163,7 @@ const ListeProfesseurs = () => {
     setShowModal(false);
     setFormAjout({
       nom: '',
+      cin: '', // AJOUTER ICI
       genre: 'Homme',
       dateNaissance: '',
       telephone: '',
@@ -204,6 +207,7 @@ const ListeProfesseurs = () => {
       formData.append('motDePasse', formAjout.motDePasse);
       formData.append('actif', formAjout.actif);
       formData.append('matiere', formAjout.matiere);
+      formData.append('cin', formAjout.cin); // AJOUTER ICI
 
       formAjout.cours.forEach(c => formData.append('cours[]', c));
       if (imageFile) formData.append('image', imageFile);
@@ -222,6 +226,7 @@ const ListeProfesseurs = () => {
       
       setFormAjout({
         nom: '',
+        cin: '', // AJOUTER ICI
         genre: 'Homme',
         dateNaissance: '',
         telephone: '',
@@ -249,6 +254,7 @@ const ListeProfesseurs = () => {
     setProfesseurAModifier(professeur);
     setFormModifier({
       nom: professeur.nom || '',
+      cin: professeur.cin || '', // AJOUTER ICI
       genre: professeur.genre || 'Homme',
       dateNaissance: professeur.dateNaissance ? professeur.dateNaissance.slice(0, 10) : '',
       telephone: professeur.telephone || '',
@@ -268,6 +274,7 @@ const ListeProfesseurs = () => {
     setProfesseurAModifier(null);
     setFormModifier({
       nom: '',
+      cin: '', // AJOUTER ICI
       genre: 'Homme',
       dateNaissance: '',
       telephone: '',
@@ -315,6 +322,7 @@ const ListeProfesseurs = () => {
       
       formData.append('actif', formModifier.actif);
       formData.append('matiere', formModifier.matiere);
+      formData.append('cin', formModifier.cin); // AJOUTER ICI
 
       formModifier.cours.forEach(c => formData.append('cours[]', c));
       if (imageFileModifier) formData.append('image', imageFileModifier);
@@ -867,6 +875,17 @@ const ListeProfesseurs = () => {
                   required
                 />
               </div>
+              <div className="form-group">
+                <label>CIN *</label>
+                <input
+                  type="text"
+                  name="cin"
+                  placeholder="Numéro CIN"
+                  value={formAjout.cin}
+                  onChange={handleChangeAjout}
+                  required
+                />
+              </div>
 
               <div className="form-group">
                 <label>Genre *</label>
@@ -1159,6 +1178,17 @@ const ListeProfesseurs = () => {
             name="nom"
             placeholder="Nom complet"
             value={formModifier.nom}
+            onChange={handleChangeModifier}
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>CIN *</label>
+          <input
+            type="text"
+            name="cin"
+            placeholder="Numéro CIN"
+            value={formModifier.cin}
             onChange={handleChangeModifier}
             required
           />

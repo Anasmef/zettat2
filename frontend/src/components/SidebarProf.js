@@ -80,6 +80,11 @@ const SidebarProf = ({ onLogout }) => {
       icon: UserCheck
     },
     {
+      path: '/professeur/reclamations',
+      label: 'Mes Réclamations',
+      icon: MessageCircle
+    },
+    {
           path: '/professeur/seances',
           label: 'Mes Séances',
           icon: Clock

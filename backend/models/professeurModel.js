@@ -32,6 +32,12 @@ const professeurSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  cin: {
+  type: String,
+  unique: true,
+  required: true,
+  trim: true
+},
   actif: {
     type: Boolean,
     default: true
@@ -77,6 +83,7 @@ const professeurSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
+    
     signalePar: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: 'retards.signaleParModel'
