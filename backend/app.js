@@ -487,7 +487,89 @@ app.get('/api/etudiant/notifications', authEtudiant, async (req, res) => {
   }
 });
 
+const axios = require('axios');
+const qs = require('qs');
+// Ajoutez cette fonction après la fonction genererLienLive
+const envoyerWhatsApp = async (numeroTelephone, message) => {
+  try {
+    const data = qs.stringify({
+      "token": "heovkzcdq0xxek2g", // Votre token UltraMsg
+      "to": numeroTelephone,
+      "body": message
+    });
 
+    const config = {
+      method: 'post',
+      url: 'https://api.ultramsg.com/instance144119/messages/chat',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: data
+    };
+
+    const response = await axios(config);
+    console.log('Message WhatsApp envoyé:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Erreur envoi WhatsApp:', error);
+    throw error;
+  }
+};
+
+// Route pour valider une réclamation et envoyer le WhatsApp
+app.put('/api/admin/reclamations/:id/valider', authAdmin, async (req, res) => {
+  try {
+    const reclamationId = req.params.id;
+    
+    // Récupérer la réclamation avec toutes les informations
+    const reclamation = await Reclamation.findById(reclamationId)
+      .populate([
+        { path: 'professeur', select: 'nomComplet email' },
+        { path: 'etudiant', select: 'nomComplet email niveau telephoneEtudiant telephonePere telephoneMere' }
+      ]);
+
+    if (!reclamation) {
+      return res.status(404).json({ message: 'Réclamation non trouvée' });
+    }
+
+    // Mettre à jour le statut de la réclamation
+    reclamation.statut = 'Validée';
+    reclamation.dateTraitement = new Date();
+    reclamation.adminTraitant = req.adminId;
+    await reclamation.save();
+
+    // Préparer le message WhatsApp
+    const message = `🔔 RÉCLAMATION VALIDÉE
+
+📚 École: Réclamation d'étudiant
+👨‍🏫 Professeur: ${reclamation.professeur.nomComplet}
+👤 Étudiant: ${reclamation.etudiant.nomComplet}
+📖 Cours: ${reclamation.cours}
+⚠️ Type: ${reclamation.typeReclamation}
+🔥 Priorité: ${reclamation.priorite}
+📅 Date incident: ${new Date(reclamation.dateIncident).toLocaleDateString('fr-FR')}
+
+${reclamation.description ? `📝 Description: ${reclamation.description}` : ''}
+
+✅ Cette réclamation a été validée par l'administration.`;
+
+    // Envoyer le message WhatsApp au numéro spécifié
+    const numeroDestination = '+212661079060';
+    await envoyerWhatsApp(numeroDestination, message);
+
+    res.json({
+      message: 'Réclamation validée et notification WhatsApp envoyée avec succès',
+      reclamation
+    });
+
+  } catch (err) {
+    console.error('Erreur validation réclamation:', err);
+    res.status(500).json({ 
+      message: 'Erreur lors de la validation', 
+      error: err.message 
+    });
+  }
+});
 
 // ✅ Route protégée : Dashboard admin
 app.get('/api/admin/dashboard', authAdminOrInscripteurOrPaiementManager, async (req, res) => {

@@ -124,6 +124,32 @@ const AdminReclamations = () => {
     }
   };
 
+  const validerReclamation = async (id) => {
+    try {
+      setUpdating(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/admin/reclamations/${id}/valider`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (!res.ok) throw new Error('Erreur lors de la validation');
+      const data = await res.json();
+      setReclamations(prev => prev.map(r => r._id === id ? data.reclamation : r));
+      setSelectedReclamation(data.reclamation);
+      alert('Réclamation validée avec succès ! Message WhatsApp envoyé.');
+      fetchStats();
+    } catch (err) {
+      setError('Erreur lors de la validation de la réclamation');
+      console.error(err);
+      alert('Erreur lors de l\'envoi du message WhatsApp');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const exportExcel = () => {
     const data = reclamations.map(r => ({
       'Date création': new Date(r.createdAt).toLocaleDateString('fr-FR'),
@@ -382,14 +408,24 @@ const AdminReclamations = () => {
                   </button>
                   
                   {reclamation.statut === 'En attente' && (
-                    <button
-                      onClick={() => traiterReclamation(reclamation._id, 'En cours de traitement')}
-                      disabled={updating}
-                      style={styles.processButton}
-                    >
-                      <Clock size={16} />
-                      Traiter
-                    </button>
+                    <>
+                      <button
+                        onClick={() => traiterReclamation(reclamation._id, 'En cours de traitement')}
+                        disabled={updating}
+                        style={styles.processButton}
+                      >
+                        <Clock size={16} />
+                        Traiter
+                      </button>
+                      <button
+                        onClick={() => validerReclamation(reclamation._id)}
+                        disabled={updating}
+                        style={styles.validateButton}
+                      >
+                        <CheckCircle size={16} />
+                        Valider
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -512,19 +548,28 @@ const AdminReclamations = () => {
                 
                 <div style={styles.actionButtonsRow}>
                   {selectedReclamation.statut === 'En attente' && (
-                    <button
-                      onClick={() => {
-                        const commentaire = document.getElementById('commentaire').value;
-                        traiterReclamation(selectedReclamation._id, 'En cours de traitement', commentaire);
-                      }}
-                      disabled={updating}
-                      style={styles.processModalButton}
-                    >
-                      <Clock size={16} />
-                      Prendre en charge
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          const commentaire = document.getElementById('commentaire').value;
+                          traiterReclamation(selectedReclamation._id, 'En cours de traitement', commentaire);
+                        }}
+                        disabled={updating}
+                        style={styles.processModalButton}
+                      >
+                        <Clock size={16} />
+                        Prendre en charge
+                      </button>
+                      <button
+                        onClick={() => validerReclamation(selectedReclamation._id)}
+                        disabled={updating}
+                        style={styles.validateModalButton}
+                      >
+                        <CheckCircle size={16} />
+                        Valider & Notifier
+                      </button>
+                    </>
                   )}
-                  
                   {(selectedReclamation.statut === 'En attente' || selectedReclamation.statut === 'En cours de traitement') && (
                     <button
                       onClick={() => {
@@ -538,7 +583,6 @@ const AdminReclamations = () => {
                       Résoudre
                     </button>
                   )}
-                  
                   {selectedReclamation.statut === 'Résolue' && (
                     <button
                       onClick={() => {
@@ -1012,6 +1056,35 @@ const styles = {
     gap: '6px',
     padding: '10px 20px',
     backgroundColor: '#f59e0b',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  validateButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    backgroundColor: '#10b981',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+
+  validateModalButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '10px 20px',
+    backgroundColor: '#10b981',
     color: '#ffffff',
     border: 'none',
     borderRadius: '8px',

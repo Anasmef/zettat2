@@ -60,10 +60,10 @@ const reclamationSchema = new mongoose.Schema({
     trim: true
   },
   
-  // Statut de la réclamation
+  // Statut de la réclamation - AJOUT du statut "Validée"
   statut: {
     type: String,
-    enum: ['En attente', 'En cours de traitement', 'Résolue', 'Fermée'],
+    enum: ['En attente', 'En cours de traitement', 'Validée', 'Résolue', 'Fermée'],
     default: 'En attente'
   },
   
@@ -82,6 +82,17 @@ const reclamationSchema = new mongoose.Schema({
   adminTraitant: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin'
+  },
+  
+  // NOUVEAU: Champ pour marquer si le WhatsApp a été envoyé
+  whatsappEnvoye: {
+    type: Boolean,
+    default: false
+  },
+  
+  // NOUVEAU: Date d'envoi du WhatsApp
+  dateWhatsapp: {
+    type: Date
   }
 }, {
   timestamps: true // Ajoute createdAt et updatedAt automatiquement
@@ -104,23 +115,31 @@ reclamationSchema.methods.getPrioriteInfo = function() {
   return prioriteMap[this.priorite] || prioriteMap['Moyenne'];
 };
 
-// Méthode pour obtenir le statut avec couleur
+// Méthode pour obtenir le statut avec couleur - MISE À JOUR avec "Validée"
 reclamationSchema.methods.getStatutInfo = function() {
   const statutMap = {
     'En attente': { label: 'En attente', color: '#6b7280' },
     'En cours de traitement': { label: 'En cours', color: '#f59e0b' },
-    'Résolue': { label: 'Résolue', color: '#10b981' },
+    'Validée': { label: 'Validée', color: '#10b981' },
+    'Résolue': { label: 'Résolue', color: '#22c55e' },
     'Fermée': { label: 'Fermée', color: '#374151' }
   };
   return statutMap[this.statut] || statutMap['En attente'];
 };
 
-// Middleware pré-sauvegarde pour validation
+// Middleware pré-sauvegarde pour validation - MISE À JOUR
 reclamationSchema.pre('save', function(next) {
-  // Si le statut change vers "Résolue" ou "Fermée", enregistrer la date de traitement
-  if (this.isModified('statut') && (this.statut === 'Résolue' || this.statut === 'Fermée')) {
+  // Si le statut change vers "Validée", "Résolue" ou "Fermée", enregistrer la date de traitement
+  if (this.isModified('statut') && ['Validée', 'Résolue', 'Fermée'].includes(this.statut)) {
     this.dateTraitement = new Date();
   }
+  
+  // Si le statut change vers "Validée", marquer que le WhatsApp sera envoyé
+  if (this.isModified('statut') && this.statut === 'Validée') {
+    this.whatsappEnvoye = true;
+    this.dateWhatsapp = new Date();
+  }
+  
   next();
 });
 
