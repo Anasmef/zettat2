@@ -35,7 +35,7 @@ const professeurSchema = new mongoose.Schema({
   cin: {
   type: String,
   unique: true,
-  required: true,
+  required: false,
   trim: true
 },
   actif: {
