@@ -376,7 +376,7 @@ const ProfesseurScanner = () => {
       return;
     }
 
-    console.log('📷 Upload d\'image:', file.name, file.size);
+    console.log('📷 Upload d\'image:', file.name, file.size, 'bytes');
 
     setLoading(true);
     setMessage({ type: '', text: 'Analyse de l\'image en cours...' });
@@ -397,46 +397,123 @@ const ProfesseurScanner = () => {
             ctx.drawImage(img, 0, 0);
             
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            console.log('🔍 Analyse des données image...');
+            console.log('🔍 Analyse des données image...', imageData.data.length, 'pixels');
             
-            // Utiliser jsQR avec options optimisées
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "dontInvert",
-              locateOptions: {
-                tryHarder: true,
-                maxTargets: 1
-              }
+            // Essayer plusieurs configurations de jsQR
+            let code = null;
+            
+            console.log('🔍 Tentative 1: Configuration standard');
+            code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert"
             });
+            
+            if (!code) {
+              console.log('🔍 Tentative 2: Avec inversion');
+              code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "onlyInvert"
+              });
+            }
+            
+            if (!code) {
+              console.log('🔍 Tentative 3: Essayer les deux');
+              code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "attemptBoth"
+              });
+            }
+            
+            if (!code) {
+              console.log('🔍 Tentative 4: Mode agressif');
+              code = jsQR(imageData.data, imageData.width, imageData.height);
+            }
             
             if (code && code.data) {
               console.log('✅ QR détecté depuis image:', code.data);
+              console.log('📍 Position:', code.location);
               
               let detectedQrId = code.data;
+              console.log('🔗 QR brut:', detectedQrId);
               
               // Extraire l'ID si c'est une URL complète
               if (detectedQrId.includes('/scan-qr/')) {
                 detectedQrId = detectedQrId.split('/scan-qr/')[1];
+                console.log('🎯 ID extrait (après /scan-qr/):', detectedQrId);
               }
               
               if (detectedQrId.includes('?')) {
                 detectedQrId = detectedQrId.split('?')[0];
+                console.log('🎯 ID extrait (après ?):', detectedQrId);
               }
               
-              console.log('🎯 QR ID extrait:', detectedQrId);
-              setQrId(detectedQrId);
-              await scannerQRCode(detectedQrId);
+              // Nettoyer l'ID
+              detectedQrId = detectedQrId.trim();
+              console.log('🧹 ID final nettoyé:', detectedQrId);
+              
+              if (detectedQrId) {
+                setQrId(detectedQrId);
+                await scannerQRCode(detectedQrId);
+              } else {
+                console.error('❌ ID vide après extraction');
+                setMessage({ 
+                  type: 'error', 
+                  text: 'QR code détecté mais ID invalide' 
+                });
+                setLoading(false);
+              }
             } else {
-              console.log('❌ Aucun QR code détecté');
+              console.log('❌ Aucun QR code détecté dans l\'image');
+              
+              // Essayer avec une image redimensionnée
+              console.log('🔍 Tentative avec redimensionnement...');
+              const maxSize = 800;
+              let newWidth = img.width;
+              let newHeight = img.height;
+              
+              if (img.width > maxSize || img.height > maxSize) {
+                const ratio = Math.min(maxSize / img.width, maxSize / img.height);
+                newWidth = Math.floor(img.width * ratio);
+                newHeight = Math.floor(img.height * ratio);
+                
+                console.log('📏 Redimensionnement:', img.width + 'x' + img.height, '->', newWidth + 'x' + newHeight);
+                
+                const resizedCanvas = document.createElement('canvas');
+                const resizedCtx = resizedCanvas.getContext('2d');
+                resizedCanvas.width = newWidth;
+                resizedCanvas.height = newHeight;
+                resizedCtx.drawImage(img, 0, 0, newWidth, newHeight);
+                
+                const resizedImageData = resizedCtx.getImageData(0, 0, newWidth, newHeight);
+                
+                const resizedCode = jsQR(resizedImageData.data, resizedImageData.width, resizedImageData.height, {
+                  inversionAttempts: "attemptBoth"
+                });
+                
+                if (resizedCode && resizedCode.data) {
+                  console.log('✅ QR détecté depuis image redimensionnée:', resizedCode.data);
+                  let detectedQrId = resizedCode.data.trim();
+                  
+                  if (detectedQrId.includes('/scan-qr/')) {
+                    detectedQrId = detectedQrId.split('/scan-qr/')[1];
+                  }
+                  if (detectedQrId.includes('?')) {
+                    detectedQrId = detectedQrId.split('?')[0];
+                  }
+                  
+                  setQrId(detectedQrId);
+                  await scannerQRCode(detectedQrId);
+                  return;
+                }
+              }
+              
               setMessage({ 
                 type: 'error', 
-                text: 'Aucun QR code détecté. Vérifiez que l\'image contient un QR code visible et net.' 
+                text: 'Aucun QR code détecté. Assurez-vous que l\'image contient un QR code net et bien contrasté.' 
               });
               setLoading(false);
             }
             
           } catch (error) {
             console.error('❌ Erreur traitement image:', error);
-            setMessage({ type: 'error', text: 'Erreur lors du traitement de l\'image' });
+            setMessage({ type: 'error', text: 'Erreur lors du traitement de l\'image: ' + error.message });
             setLoading(false);
           }
         };
@@ -460,27 +537,13 @@ const ProfesseurScanner = () => {
       
     } catch (error) {
       console.error('❌ Erreur upload générale:', error);
-      setMessage({ type: 'error', text: 'Erreur lors de l\'upload' });
+      setMessage({ type: 'error', text: 'Erreur lors de l\'upload: ' + error.message });
       setLoading(false);
     }
   };
 
   const scanQRFromCamera = () => {
-    if (!scanningRef.current || !videoRef.current || !canvasRef.current || !showCamera || !cameraReady) {
-      console.log('🔍 Conditions scan non remplies:', {
-        scanning: scanningRef.current,
-        video: !!videoRef.current,
-        canvas: !!canvasRef.current,
-        showCamera,
-        cameraReady
-      });
-      return;
-    }
-    
-    // Timeout de sécurité (30 secondes)
-    if (scanStartTime && Date.now() - scanStartTime > 30000) {
-      stopCamera();
-      setMessage({ type: 'error', text: 'Timeout - aucun QR détecté en 30 secondes' });
+    if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
       return;
     }
     
@@ -494,49 +557,34 @@ const ProfesseurScanner = () => {
     
     try {
       const context = canvas.getContext('2d');
-      if (!context) {
-        requestAnimationFrame(scanQRFromCamera);
-        return;
-      }
       
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0);
       
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       
-      // Utiliser jsQR avec options optimisées
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert",
-        locateOptions: {
-          tryHarder: true,
-          maxTargets: 1
-        }
-      });
+      // SIMPLE - juste utiliser jsQR sans options complexes
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
       
       if (code && code.data) {
-        console.log('✅ QR code détecté depuis caméra:', code.data);
+        console.log('QR détecté:', code.data);
         
-        let detectedQrId = code.data;
+        scanningRef.current = false;
+        stopCamera();
         
-        // Extraire l'ID du QR code de l'URL
-        if (detectedQrId.includes('/scan-qr/')) {
-          detectedQrId = detectedQrId.split('/scan-qr/')[1];
+        // Utiliser directement la donnée du QR
+        let qrData = code.data.trim();
+        
+        // Si c'est une URL, extraire juste l'ID final
+        if (qrData.includes('/')) {
+          const parts = qrData.split('/');
+          qrData = parts[parts.length - 1];
         }
         
-        if (detectedQrId.includes('?')) {
-          detectedQrId = detectedQrId.split('?')[0];
-        }
-        
-        if (detectedQrId && detectedQrId !== qrId) {
-          console.log('🎯 Nouveau QR détecté, arrêt du scan');
-          
-          scanningRef.current = false;
-          setQrId(detectedQrId);
-          stopCamera();
-          scannerQRCode(detectedQrId);
-          return;
-        }
+        setQrId(qrData);
+        scannerQRCode(qrData);
+        return;
       }
       
       // Continuer le scan
@@ -545,8 +593,7 @@ const ProfesseurScanner = () => {
       }
       
     } catch (error) {
-      console.warn('⚠️ Erreur scan caméra:', error.message);
-      
+      console.error('Erreur scan:', error);
       if (scanningRef.current) {
         requestAnimationFrame(scanQRFromCamera);
       }
