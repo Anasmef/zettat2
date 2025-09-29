@@ -3,13 +3,11 @@ import { Camera, Upload, QrCode, CheckCircle, AlertTriangle, User, Clock, Refres
 import jsQR from 'jsqr';
 import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeur
 
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/';
+};
 
-
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
 const ProfesseurScanner = () => {
   const [qrId, setQrId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,6 +15,8 @@ const ProfesseurScanner = () => {
   const [professeur, setProfesseur] = useState(null);
   const [pointageReussi, setPointageReussi] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [scanStartTime, setScanStartTime] = useState(null);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -52,7 +52,7 @@ const ProfesseurScanner = () => {
       console.log('🔄 Récupération du profil professeur...');
       console.log('🔑 Token:', token.substring(0, 50) + '...');
       
-      // ✅ ESSAYER D'ABORD LA ROUTE PROFILE SIMPLE
+      // Essayer d'abord la route profile simple
       let res = await fetch('/api/professeur/profile', {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -66,29 +66,25 @@ const ProfesseurScanner = () => {
         const data = await res.json();
         console.log('✅ Données professeur reçues (profile):', data);
         
-        // ✅ ADAPTER SELON LA STRUCTURE DE RÉPONSE DE VOTRE BACKEND
+        // Adapter selon la structure de réponse du backend
         let professeurData = null;
         
         if (data.professeur) {
-          // Structure: { professeur: {...} }
           professeurData = data.professeur;
         } else if (data.nom && data.email) {
-          // Structure: { nom, email, matiere, ... } - données directement
           professeurData = data;
         } else {
           console.warn('⚠️ Structure de réponse inattendue:', data);
-          // Essayer de prendre data tel quel
           professeurData = data;
         }
         
         console.log('📝 Professeur final à sauvegarder:', professeurData);
         setProfesseur(professeurData);
         
-        // ✅ VÉRIFIER LE POINTAGE DU JOUR SÉPARÉMENT SI NÉCESSAIRE
+        // Vérifier le pointage du jour
         checkPointageAujourdhui(token);
         
       } else if (res.status === 404) {
-        // ✅ SI PROFILE N'EXISTE PAS, ESSAYER STATUT-AUJOURD-HUI
         console.log('⚠️ Route profile non trouvée, essai statut-aujourd-hui...');
         
         res = await fetch('/api/professeur/statut-aujourd-hui', {
@@ -133,7 +129,6 @@ const ProfesseurScanner = () => {
     }
   };
 
-  // ✅ FONCTION POUR VÉRIFIER LE POINTAGE SÉPARÉMENT
   const checkPointageAujourdhui = async (token) => {
     try {
       const res = await fetch('/api/professeur/statut-aujourd-hui', {
@@ -174,7 +169,6 @@ const ProfesseurScanner = () => {
       console.warn('⚠️ Pas de données professeur, tentative de récupération...');
       await fetchProfesseurInfo();
       
-      // Attendre un peu que les données se chargent
       setTimeout(() => {
         if (professeur) {
           scannerQRCode(currentQrId);
@@ -225,6 +219,12 @@ const ProfesseurScanner = () => {
         setPointageReussi(true);
         setQrId(currentQrId);
         stopCamera();
+        
+        // Vibration sur mobile
+        if (navigator.vibrate) {
+          navigator.vibrate(200);
+        }
+        
         setMessage({ 
           type: 'success', 
           text: data.message,
@@ -249,46 +249,100 @@ const ProfesseurScanner = () => {
   };
 
   const startCamera = async () => {
+    console.log('🚀 startCamera appelée');
+    
+    // Réinitialiser les états
     setMessage({ type: '', text: '' });
+    setCameraReady(false);
+    setScanStartTime(Date.now());
     
     try {
       console.log('📷 Démarrage caméra...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      // Vérifier support navigateur
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Votre navigateur ne supporte pas l\'accès caméra');
+      }
+
+      // Afficher d'abord l'interface caméra
+      setShowCamera(true);
+      setMessage({ type: '', text: 'Demande d\'accès à la caméra...' });
+
+      const constraints = {
         video: { 
           facingMode: { ideal: 'environment' },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 }
         } 
-      });
+      };
+      
+      console.log('🎥 Demande de stream avec contraintes:', constraints);
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('✅ Stream obtenu:', stream);
       
       streamRef.current = stream;
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setShowCamera(true);
+      // Attendre que l'élément vidéo soit monté
+      await new Promise((resolve) => {
+        const checkVideo = () => {
+          if (videoRef.current) {
+            console.log('📹 Élément vidéo trouvé');
+            videoRef.current.srcObject = stream;
+            
+            videoRef.current.onloadedmetadata = () => {
+              console.log('📹 Métadonnées vidéo chargées');
+              setCameraReady(true);
+              setMessage({ type: '', text: 'Caméra prête - pointez vers un QR code' });
+              resolve();
+            };
+            
+            videoRef.current.onplay = () => {
+              console.log('▶️ Lecture vidéo démarrée');
+              setTimeout(() => {
+                scanningRef.current = true;
+                scanQRFromCamera();
+              }, 500);
+            };
+            
+            videoRef.current.onerror = (error) => {
+              console.error('❌ Erreur vidéo:', error);
+              throw new Error('Erreur lors du chargement de la vidéo');
+            };
+            
+            videoRef.current.play().catch(error => {
+              console.error('❌ Erreur play:', error);
+              throw new Error('Impossible de démarrer la vidéo');
+            });
+          } else {
+            console.log('⏳ Attente de l\'élément vidéo...');
+            setTimeout(checkVideo, 100);
+          }
+        };
         
-        console.log('✅ Caméra démarrée, début du scan...');
-        
-        // ✅ Utiliser requestAnimationFrame au lieu de setInterval
-        scanningRef.current = true;
-        scanQRFromCamera();
-      }
+        // Démarrer la vérification après un petit délai pour laisser React monter le composant
+        setTimeout(checkVideo, 100);
+      });
+      
     } catch (error) {
       console.error('❌ Erreur caméra:', error);
       
       let errorMessage = 'Erreur d\'accès à la caméra';
       
       if (error.name === 'NotAllowedError') {
-        errorMessage = 'Permission caméra refusée. Veuillez autoriser l\'accès.';
+        errorMessage = 'Permission caméra refusée. Autorisez l\'accès et rechargez.';
       } else if (error.name === 'NotFoundError') {
         errorMessage = 'Aucune caméra trouvée sur cet appareil.';
       } else if (error.name === 'NotSupportedError') {
         errorMessage = 'Caméra non supportée sur ce navigateur.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage = 'Caméra utilisée par une autre application.';
+      } else {
+        errorMessage = error.message;
       }
       
       setMessage({ type: 'error', text: errorMessage });
+      stopCamera();
     }
   };
 
@@ -296,21 +350,27 @@ const ProfesseurScanner = () => {
     console.log('🛑 Arrêt de la caméra...');
     
     scanningRef.current = false;
+    setCameraReady(false);
     
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log('⏹️ Piste arrêtée:', track.kind);
+      });
       streamRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     
     setShowCamera(false);
   };
 
-  // ✅ Upload image avec jsQR importé
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Vérifier le type de fichier
     if (!file.type.startsWith('image/')) {
       setMessage({ type: 'error', text: 'Veuillez sélectionner une image valide' });
       return;
@@ -329,7 +389,6 @@ const ProfesseurScanner = () => {
           try {
             console.log('🖼️ Image chargée:', img.width, 'x', img.height);
             
-            // Créer canvas pour traiter l'image
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
@@ -337,13 +396,16 @@ const ProfesseurScanner = () => {
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
             
-            // Obtenir les données de l'image
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             console.log('🔍 Analyse des données image...');
             
-            // ✅ Utiliser jsQR importé directement
+            // Utiliser jsQR avec options optimisées
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "dontInvert"
+              inversionAttempts: "dontInvert",
+              locateOptions: {
+                tryHarder: true,
+                maxTargets: 1
+              }
             });
             
             if (code && code.data) {
@@ -403,9 +465,22 @@ const ProfesseurScanner = () => {
     }
   };
 
-  // ✅ Scan caméra avec requestAnimationFrame
   const scanQRFromCamera = () => {
-    if (!scanningRef.current || !videoRef.current || !canvasRef.current || !showCamera) {
+    if (!scanningRef.current || !videoRef.current || !canvasRef.current || !showCamera || !cameraReady) {
+      console.log('🔍 Conditions scan non remplies:', {
+        scanning: scanningRef.current,
+        video: !!videoRef.current,
+        canvas: !!canvasRef.current,
+        showCamera,
+        cameraReady
+      });
+      return;
+    }
+    
+    // Timeout de sécurité (30 secondes)
+    if (scanStartTime && Date.now() - scanStartTime > 30000) {
+      stopCamera();
+      setMessage({ type: 'error', text: 'Timeout - aucun QR détecté en 30 secondes' });
       return;
     }
     
@@ -413,7 +488,6 @@ const ProfesseurScanner = () => {
     const canvas = canvasRef.current;
     
     if (video.videoWidth === 0 || video.videoHeight === 0) {
-      // Réessayer dans la prochaine frame
       requestAnimationFrame(scanQRFromCamera);
       return;
     }
@@ -431,9 +505,13 @@ const ProfesseurScanner = () => {
       
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       
-      // ✅ Utiliser jsQR importé directement
+      // Utiliser jsQR avec options optimisées
       const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert"
+        inversionAttempts: "dontInvert",
+        locateOptions: {
+          tryHarder: true,
+          maxTargets: 1
+        }
       });
       
       if (code && code.data) {
@@ -453,17 +531,15 @@ const ProfesseurScanner = () => {
         if (detectedQrId && detectedQrId !== qrId) {
           console.log('🎯 Nouveau QR détecté, arrêt du scan');
           
-          // ✅ Arrêter la boucle de scan immédiatement
           scanningRef.current = false;
-          
           setQrId(detectedQrId);
           stopCamera();
           scannerQRCode(detectedQrId);
-          return; // ✅ Sortir de la boucle
+          return;
         }
       }
       
-      // ✅ Continuer le scan seulement si pas de QR détecté
+      // Continuer le scan
       if (scanningRef.current) {
         requestAnimationFrame(scanQRFromCamera);
       }
@@ -471,7 +547,6 @@ const ProfesseurScanner = () => {
     } catch (error) {
       console.warn('⚠️ Erreur scan caméra:', error.message);
       
-      // Continuer le scan même en cas d'erreur mineure
       if (scanningRef.current) {
         requestAnimationFrame(scanQRFromCamera);
       }
@@ -490,6 +565,14 @@ const ProfesseurScanner = () => {
     }
   }, [qrId, professeur, showCamera]);
 
+  const resetScanner = () => {
+    setMessage({ type: '', text: '' });
+    setPointageReussi(false);
+    setQrId('');
+    setLoading(false);
+    stopCamera();
+  };
+
   const getCurrentDateTime = () => {
     const now = new Date();
     return {
@@ -500,7 +583,7 @@ const ProfesseurScanner = () => {
 
   const datetime = getCurrentDateTime();
 
-  // Styles professionnels
+  // Styles
   const cardStyle = {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(10px)',
@@ -547,7 +630,7 @@ const ProfesseurScanner = () => {
       padding: '20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     }}>
-                      <Sidebar onLogout={handleLogout} />
+      <Sidebar onLogout={handleLogout} />
         
       <div style={{ 
         maxWidth: '480px', 
@@ -601,7 +684,7 @@ const ProfesseurScanner = () => {
         {/* Canvas caché */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-        {/* Caméra */}
+        {/* Interface caméra */}
         {showCamera && (
           <div style={{ marginBottom: '32px', textAlign: 'center' }}>
             <div style={{
@@ -609,7 +692,8 @@ const ProfesseurScanner = () => {
               display: 'inline-block',
               borderRadius: '20px',
               overflow: 'hidden',
-              boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)'
+              boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
+              border: cameraReady ? '3px solid #10b981' : '3px solid #6b7280'
             }}>
               <video
                 ref={videoRef}
@@ -625,19 +709,37 @@ const ProfesseurScanner = () => {
                 autoPlay
               />
               
-              {/* Overlay de scan */}
+              {/* Overlay de visée */}
+              {cameraReady && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: '200px',
+                  height: '200px',
+                  border: '3px solid rgba(16, 185, 129, 0.8)',
+                  borderRadius: '16px',
+                  boxShadow: '0 0 0 4px rgba(16, 185, 129, 0.2)',
+                  animation: 'pulse 2s infinite'
+                }} />
+              )}
+              
+              {/* Indicateur de statut */}
               <div style={{
                 position: 'absolute',
-                top: '50%',
+                bottom: '16px',
                 left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '200px',
-                height: '200px',
-                border: '3px solid rgba(102, 126, 234, 0.8)',
-                borderRadius: '16px',
-                boxShadow: '0 0 0 4px rgba(102, 126, 234, 0.2)',
-                animation: 'pulse 2s infinite'
-              }} />
+                transform: 'translateX(-50%)',
+                background: 'rgba(0, 0, 0, 0.7)',
+                color: 'white',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}>
+                {cameraReady ? '🔍 Recherche QR Code...' : '⏳ Initialisation...'}
+              </div>
             </div>
             
             <div style={{ marginTop: '20px' }}>
@@ -660,7 +762,7 @@ const ProfesseurScanner = () => {
             </div>
             
             <p style={{ fontSize: '14px', color: '#64748b', marginTop: '12px', fontWeight: '500' }}>
-              Pointez la caméra vers le QR code
+              Pointez la caméra vers le QR code pour le scanner automatiquement
             </p>
           </div>
         )}
@@ -692,7 +794,7 @@ const ProfesseurScanner = () => {
               </span>
             </div>
             
-            <div style={{ fontSize: '14px', color: '#64748b', space: '8px' }}>
+            <div style={{ fontSize: '14px', color: '#64748b' }}>
               <p style={{ margin: '8px 0', fontWeight: '500' }}>
                 <strong>Email:</strong> {professeur.email}
               </p>
@@ -875,6 +977,35 @@ const ProfesseurScanner = () => {
             </>
           )}
 
+          {/* Bouton nouveau scan après succès */}
+          {pointageReussi && (
+            <button
+              onClick={resetScanner}
+              style={{
+                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '16px 24px',
+                fontSize: '16px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 8px 25px rgba(6, 182, 212, 0.3)',
+                transition: 'all 0.3s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <RefreshCw size={20} />
+              Nouveau Scan
+            </button>
+          )}
+
+          {/* Bouton réessayer en cas d'erreur */}
           {!pointageReussi && !loading && message.type === 'error' && (
             <button
               onClick={() => {
@@ -909,8 +1040,6 @@ const ProfesseurScanner = () => {
             </button>
           )}
         </div>
-
-    
       </div>
       
       <style>
@@ -920,9 +1049,9 @@ const ProfesseurScanner = () => {
             100% { transform: rotate(360deg); }
           }
           @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(102, 126, 234, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
           }
         `}
       </style>
