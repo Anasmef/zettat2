@@ -6,6 +6,9 @@ const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
+const QRCodeGen = require('qrcode');
+const { v4: uuidv4 } = require('uuid');
+const { Pointage, QRCode } = require('./models/pointage'); // ou le bon chemin
 
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
@@ -87,6 +90,23 @@ app.get('/api/evenements/public', async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
+
+
+
+const activeQRCodes = new Map();
+
+// Fonction pour nettoyer les QR codes expirés
+const cleanExpiredQRCodes = () => {
+  const now = new Date();
+  for (const [id, qrData] of activeQRCodes.entries()) {
+    if (now > qrData.expiresAt) {
+      activeQRCodes.delete(id);
+    }
+  }
+};
+
+// Nettoyer les QR codes expirés toutes les 5 minutes
+setInterval(cleanExpiredQRCodes, 5 * 60 * 1000);
 const genererToken = (admin) => {
     return jwt.sign({ id: admin._id }, 'jwt_secret_key', { expiresIn: '7d' });
 };
@@ -1466,7 +1486,148 @@ app.get('/api/bulletins/etudiant/me', authEtudiant, async (req, res) => {
     });
   }
 });
+// ✅ ROUTE CORRECTE - Pointages sans paramètre (défaut aujourd'hui)
+app.get('/api/admin/pointages', authAdmin, async (req, res) => {
+  try {
+    console.log('=== ROUTE ADMIN POINTAGES (sans date) ===');
+    
+    const { date } = req.query;
+    
+    // Date par défaut = aujourd'hui
+    let dateRecherche = date ? new Date(date) : new Date();
+    dateRecherche.setHours(0, 0, 0, 0);
+    
+    const finJour = new Date(dateRecherche);
+    finJour.setHours(23, 59, 59, 999);
+    
+    console.log('Date recherchée:', dateRecherche.toLocaleDateString('fr-FR'));
+    
+    // Récupérer tous les pointages du jour avec populate
+    const pointages = await Pointage.find({
+      date: {
+        $gte: dateRecherche,
+        $lte: finJour
+      }
+    }).populate('professeur', 'nom email matiere').sort({ createdAt: -1 });
+    
+    console.log('Pointages trouvés:', pointages.length);
+    
+    // Récupérer tous les professeurs actifs
+    const tousProfesseurs = await Professeur.find({ actif: true });
+    console.log('Total professeurs actifs:', tousProfesseurs.length);
+    
+    // Identifier les professeurs qui ont pointé
+    const professeursPointes = pointages.map(p => p.professeur?._id?.toString()).filter(Boolean);
+    
+    // Identifier les professeurs absents
+    const professeursAbsents = tousProfesseurs.filter(p => 
+      !professeursPointes.includes(p._id.toString())
+    );
+    
+    console.log('Professeurs absents:', professeursAbsents.length);
+    
+    // Calculer les statistiques
+    const stats = {
+      date: dateRecherche.toLocaleDateString('fr-FR'),
+      totalProfesseurs: tousProfesseurs.length,
+      presents: pointages.filter(p => p.statut === 'présent').length,
+      retards: pointages.filter(p => p.statut === 'retard').length,
+      absents: professeursAbsents.length,
+      tauxPresence: tousProfesseurs.length > 0 ? 
+        Math.round((pointages.length / tousProfesseurs.length) * 100) : 0
+    };
+    
+    console.log('Statistiques:', stats);
+    
+    res.json({
+      success: true,
+      stats: stats,
+      pointages: pointages.map(p => ({
+        _id: p._id,
+        nomProfesseur: p.nomProfesseur,
+        emailProfesseur: p.emailProfesseur,
+        date: p.date,
+        heure: p.heure,
+        statut: p.statut,
+        codeQRId: p.codeQRId,
+        professeur: p.professeur ? {
+          nom: p.professeur.nom,
+          email: p.professeur.email,
+          matiere: p.professeur.matiere
+        } : null
+      })),
+      professeursAbsents: professeursAbsents.map(p => ({
+        _id: p._id,
+        nom: p.nom,
+        email: p.email,
+        matiere: p.matiere
+      }))
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur récupération pointages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des pointages',
+      error: error.message
+    });
+  }
+});
 
+// ✅ ROUTE CORRECTE - Pointages avec date spécifique
+app.get('/api/admin/pointages/:date', authAdmin, async (req, res) => {
+  try {
+    console.log('=== ROUTE ADMIN POINTAGES (avec date) ===');
+    
+    const { date } = req.params;
+    
+    let dateRecherche = new Date(date);
+    dateRecherche.setHours(0, 0, 0, 0);
+    
+    const finJour = new Date(dateRecherche);
+    finJour.setHours(23, 59, 59, 999);
+    
+    console.log('Date recherchée:', dateRecherche.toLocaleDateString('fr-FR'));
+    
+    const pointages = await Pointage.find({
+      date: {
+        $gte: dateRecherche,
+        $lte: finJour
+      }
+    }).populate('professeur', 'nom email matiere').sort({ createdAt: -1 });
+    
+    const tousProfesseurs = await Professeur.find({ actif: true });
+    const professeursPointes = pointages.map(p => p.professeur?._id?.toString()).filter(Boolean);
+    const professeursAbsents = tousProfesseurs.filter(p => 
+      !professeursPointes.includes(p._id.toString())
+    );
+    
+    const stats = {
+      date: dateRecherche.toLocaleDateString('fr-FR'),
+      totalProfesseurs: tousProfesseurs.length,
+      presents: pointages.filter(p => p.statut === 'présent').length,
+      retards: pointages.filter(p => p.statut === 'retard').length,
+      absents: professeursAbsents.length,
+      tauxPresence: tousProfesseurs.length > 0 ? 
+        Math.round((pointages.length / tousProfesseurs.length) * 100) : 0
+    };
+    
+    res.json({
+      success: true,
+      stats: stats,
+      pointages: pointages,
+      professeursAbsents: professeursAbsents
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur récupération pointages avec date:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des pointages',
+      error: error.message
+    });
+  }
+});
 app.get('/api/bulletins/professeur', authProfesseur, async (req, res) => {
   try {
     const bulletins = await Bulletin.find({ professeur: req.professeurId })
@@ -4253,6 +4414,7 @@ app.put('/api/seances/:id', authAdminOrInscripteurOrPaiementManager, async (req,
   }
 });
 
+
 // Route pour récupérer toutes les séances (pour admin) - INCHANGÉE
 app.get('/api/seances', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
@@ -4863,6 +5025,404 @@ app.get('/api/professeur/profile', authProfesseur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
+
+// ROUTE: Statut aujourd'hui - ÉGALEMENT ADAPTÉE
+app.get('/api/professeur/statut-aujourd-hui', authProfesseur, async (req, res) => {
+  try {
+    console.log('=== ROUTE STATUT AUJOURD\'HUI ===');
+    
+    // ✅ Le professeur est déjà récupéré par le middleware
+    const professeur = req.professeur;
+    
+    console.log('Professeur récupéré:', professeur.nom);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const pointageAujourdhui = await Pointage.findOne({
+      professeur: professeur._id,
+      date: { $gte: today, $lt: tomorrow }
+    });
+    
+    res.json({
+      success: true,
+      professeur: {
+        nom: professeur.nom,
+        email: professeur.email,
+        matiere: professeur.matiere
+      },
+      pointageAujourdhui: pointageAujourdhui ? {
+        heure: pointageAujourdhui.heure,
+        statut: pointageAujourdhui.statut,
+        date: pointageAujourdhui.date.toLocaleDateString('fr-FR')
+      } : null,
+      aPointe: !!pointageAujourdhui
+    });
+    
+  } catch (error) {
+    console.error('❌ ERREUR ROUTE STATUT:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération du statut',
+      error: error.message
+    });
+  }
+});
+
+// ROUTE: Scanner QR - ÉGALEMENT ADAPTÉE
+app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
+  try {
+    console.log('=== SCAN QR DEBUG ===');
+    
+    const { qrId } = req.params;
+    // ✅ Le professeur est déjà récupéré par le middleware
+    const professeur = req.professeur;
+    
+    console.log('QR ID reçu:', qrId);
+    console.log('Professeur:', professeur.nom);
+    
+    // POUR TEST: Si c'est un fake QR ID, on l'accepte automatiquement
+    if (qrId.startsWith('test-qr-')) {
+      console.log('🧪 QR ID de test détecté, simulation de pointage');
+      
+      // Vérifier si déjà pointé aujourd'hui
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      const pointageExistant = await Pointage.findOne({
+        professeur: professeur._id,
+        date: { $gte: today, $lt: tomorrow }
+      });
+      
+      if (pointageExistant) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous avez déjà pointé aujourd\'hui',
+          pointageExistant: {
+            heure: pointageExistant.heure,
+            statut: pointageExistant.statut
+          }
+        });
+      }
+      
+      // Créer le pointage de test
+      const maintenant = new Date();
+      const heure = maintenant.toLocaleTimeString('fr-FR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      const heureArrivee = maintenant.getHours() * 60 + maintenant.getMinutes();
+      const heureDebutCours = 8 * 60; // 8h00
+      const statut = heureArrivee > heureDebutCours + 15 ? 'retard' : 'présent';
+      
+      const nouveauPointage = new Pointage({
+        professeur: professeur._id,
+        nomProfesseur: professeur.nom,
+        emailProfesseur: professeur.email,
+        date: maintenant,
+        heure: heure,
+        codeQRId: qrId,
+        statut: statut,
+        ipAddress: req.ip || 'test'
+      });
+      
+      await nouveauPointage.save();
+      
+      console.log('✅ Pointage test créé:', professeur.nom, heure, statut);
+      
+      return res.json({
+        success: true,
+        message: `Pointage TEST enregistré ! Statut: ${statut}`,
+        pointage: {
+          professeur: professeur.nom,
+          heure: heure,
+          statut: statut,
+          date: maintenant.toLocaleDateString('fr-FR')
+        }
+      });
+    }
+    
+    // Logique normale pour les vrais QR codes
+    const qrCode = await QRCode.findOne({ qrId: qrId, isActive: true });
+    
+    if (!qrCode) {
+      return res.status(404).json({
+        success: false,
+        message: 'QR code invalide ou introuvable'
+      });
+    }
+    
+    // Vérifier l'expiration
+    if (!qrCode.isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: 'QR code expiré'
+      });
+    }
+    
+    // Vérifier si déjà pointé aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const pointageExistant = await Pointage.findOne({
+      professeur: professeur._id,
+      date: { $gte: today, $lt: tomorrow }
+    });
+    
+    if (pointageExistant) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vous avez déjà pointé aujourd\'hui',
+        pointageExistant: {
+          heure: pointageExistant.heure,
+          statut: pointageExistant.statut
+        }
+      });
+    }
+    
+    // Créer le pointage
+    const maintenant = new Date();
+    const heure = maintenant.toLocaleTimeString('fr-FR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    const heureArrivee = maintenant.getHours() * 60 + maintenant.getMinutes();
+    const heureDebutCours = 8 * 60;
+    const statut = heureArrivee > heureDebutCours + 15 ? 'retard' : 'présent';
+    
+    const nouveauPointage = new Pointage({
+      professeur: professeur._id,
+      nomProfesseur: professeur.nom,
+      emailProfesseur: professeur.email,
+      date: maintenant,
+      heure: heure,
+      codeQRId: qrId,
+      statut: statut,
+      ipAddress: req.ip
+    });
+    
+    await nouveauPointage.save();
+    
+    // Incrémenter le compteur de scans
+    qrCode.scansCount += 1;
+    await qrCode.save();
+    
+    console.log(`✅ Pointage enregistré: ${professeur.nom} à ${heure} - Statut: ${statut}`);
+    
+    res.json({
+      success: true,
+      message: `Pointage enregistré avec succès ! Statut: ${statut}`,
+      pointage: {
+        professeur: professeur.nom,
+        heure: heure,
+        statut: statut,
+        date: maintenant.toLocaleDateString('fr-FR')
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ ERREUR SCAN QR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors du scan',
+      error: error.message
+    });
+  }
+});
+
+// 1. ADMIN - Générer un QR code
+app.post('/api/admin/generate-qr', authAdmin, async (req, res) => {
+  try {
+    const { validiteMinutes = 60, description = 'Pointage du jour' } = req.body;
+    
+    // Générer un ID unique
+    const qrId = uuidv4();
+    const expirationTime = new Date(Date.now() + validiteMinutes * 60 * 1000);
+    
+    // Créer l'URL de scan
+    const scanUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/scan-qr/${qrId}`;
+    
+    // Générer le QR code
+    const qrCodeDataURL = await QRCodeGen.toDataURL(scanUrl, {
+      errorCorrectionLevel: 'M',
+      type: 'image/png',
+      quality: 0.92,
+      margin: 1,
+      width: 256,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+    
+    // Sauvegarder en base de données
+    const newQRCode = new QRCode({
+      qrId: qrId,
+      description: description,
+      createdBy: req.adminId,
+      expiresAt: expirationTime,
+      validiteMinutes: validiteMinutes,
+      dataURL: qrCodeDataURL,
+      scanUrl: scanUrl
+    });
+    
+    await newQRCode.save();
+    
+    console.log(`QR Code généré: ${qrId} - Expire à: ${expirationTime}`);
+    
+    res.json({
+      success: true,
+      qrCode: {
+        id: qrId,
+        dataURL: qrCodeDataURL,
+        scanUrl: scanUrl,
+        expiresAt: expirationTime,
+        description: description,
+        validiteMinutes: validiteMinutes
+      }
+    });
+    
+  } catch (error) {
+    console.error('Erreur génération QR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la génération du QR code'
+    });
+  }
+});
+
+
+// 3. ADMIN - Voir tous les pointages du jour
+app.get('/api/admin/pointages', authAdmin, async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    // Date par défaut = aujourd'hui
+    let dateRecherche = date ? new Date(date) : new Date();
+    dateRecherche.setHours(0, 0, 0, 0);
+    
+    const finJour = new Date(dateRecherche);
+    finJour.setHours(23, 59, 59, 999);
+    
+    // Récupérer tous les pointages du jour
+    const pointages = await Pointage.find({
+      date: {
+        $gte: dateRecherche,
+        $lte: finJour
+      }
+    }).populate('professeur', 'nom email matiere').sort({ createdAt: -1 });
+    
+    // Récupérer tous les professeurs pour voir qui n'a pas pointé
+    const tousProfesseurs = await Professeur.find({ actif: true });
+    const professeursPointes = pointages.map(p => p.professeur._id.toString());
+    const professeursAbsents = tousProfesseurs.filter(p => 
+      !professeursPointes.includes(p._id.toString())
+    );
+    
+    // Statistiques
+    const stats = {
+      date: dateRecherche.toLocaleDateString('fr-FR'),
+      totalProfesseurs: tousProfesseurs.length,
+      presents: pointages.filter(p => p.statut === 'présent').length,
+      retards: pointages.filter(p => p.statut === 'retard').length,
+      absents: professeursAbsents.length,
+      tauxPresence: tousProfesseurs.length > 0 ? 
+        Math.round((pointages.length / tousProfesseurs.length) * 100) : 0
+    };
+    
+    res.json({
+      success: true,
+      stats: stats,
+      pointages: pointages,
+      professeursAbsents: professeursAbsents.map(p => ({
+        nom: p.nom,
+        email: p.email,
+        matiere: p.matiere
+      }))
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération pointages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des pointages'
+    });
+  }
+});
+
+// 4. ADMIN - Voir les QR codes actifs
+app.get('/api/admin/qr-codes-actifs', authAdmin, async (req, res) => {
+  try {
+    const qrCodesActifs = await QRCode.find({
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    }).sort({ createdAt: -1 });
+    
+    const qrCodesFormates = qrCodesActifs.map(qr => ({
+      id: qr.qrId,
+      description: qr.description,
+      createdAt: qr.createdAt,
+      expiresAt: qr.expiresAt,
+      scansCount: qr.scansCount,
+      tempsRestant: qr.getTimeRemaining(),
+      dataURL: qr.dataURL
+    }));
+    
+    res.json({
+      success: true,
+      qrCodesActifs: qrCodesFormates,
+      total: qrCodesFormates.length
+    });
+    
+  } catch (error) {
+    console.error('Erreur récupération QR codes actifs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des QR codes'
+    });
+  }
+});
+
+// 5. ADMIN - Supprimer un QR code
+app.delete('/api/admin/qr-code/:qrId', authAdmin, async (req, res) => {
+  try {
+    const { qrId } = req.params;
+    
+    const qrCode = await QRCode.findOneAndUpdate(
+      { qrId: qrId },
+      { isActive: false },
+      { new: true }
+    );
+    
+    if (!qrCode) {
+      return res.status(404).json({
+        success: false,
+        message: 'QR code non trouvé'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'QR code désactivé avec succès'
+    });
+    
+  } catch (error) {
+    console.error('Erreur suppression QR code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la suppression du QR code'
+    });
+  }
+});
+
 
 
 app.get('/api/cours/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {

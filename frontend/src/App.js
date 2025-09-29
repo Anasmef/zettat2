@@ -81,7 +81,12 @@ import AdminProfManagement from './pages/AdminProfManagement';
 import HistoriqueEtudiant from './pages/HistoriqueEtudiant';
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
+import AdminQRGenerator
+ from './pages/AdminQRGenerator';
 
+
+ import AdminPointagesView from './pages/AdminPointagesView';
+import ProfQRScanner from './pages/ProfQRScanner';
 // Dans vos routes
 function AppContent() {
   const location = useLocation();
@@ -322,10 +327,11 @@ function AppContent() {
         <Route path="/actualites" element={<ActualitesPage />} />
         <Route path="/Vie-Scolaire" element={<VieScolairePage />} />
 <Route path="/admin/gestionnaire-paiement" element={<GestionPaiementManagers />} />
-
+        <Route path="/admin/pointages" element={<AdminPointagesView />} />
         {/* Auth public */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/prof/qr-scanner" element={<ProfQRScanner />} />
 
         {/* Routes Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
@@ -376,6 +382,7 @@ function AppContent() {
 
 <Route path="/professeur/reclamations" element={<ReclamationsProfesseur />} />
 
+<Route path="/admin/qr-generator" element={<AdminQRGenerator />} />
 
 <Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
 <Route path="/admin/reclamations" element={<ReclamationsAdmin />} />

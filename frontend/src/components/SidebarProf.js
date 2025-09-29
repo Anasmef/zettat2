@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Users,
   Clock,
+   QrCode,
   UserX,
   UserCheck,
   ClipboardList,
@@ -73,6 +74,11 @@ const SidebarProf = ({ onLogout }) => {
       path: '/professeur/profile',
       label: 'Mon Profil',
       icon: User
+    },
+    {
+      path: '/prof/qr-scanner',
+      label: 'QR Code Scanner',
+      icon: QrCode
     },
     {
       path: '/professeur/etudiants-autorises',
