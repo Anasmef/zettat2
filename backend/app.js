@@ -8,7 +8,7 @@ const nodemailer = require('nodemailer');
 const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
 const QRCodeGen = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
-const { Pointage, QRCode } = require('./models/pointage'); // ou le bon chemin
+const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
 
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
