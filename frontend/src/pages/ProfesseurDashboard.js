@@ -364,13 +364,7 @@ useEffect(() => {
         <div className="dashboard-content">
           {/* Cartes de statistiques principales */}
           <div className="stats-grid">
-            <StatCard
-              title="Total Étudiants"
-              value={totalEtudiants}
-              icon={Users}
-              colorClass="blue"
-              subtitle="Sous ma responsabilité"
-            />
+        
             <StatCard
               title="Classe Actifs"
               value={totalCours}

@@ -112,11 +112,7 @@ const SidebarProf = ({ onLogout }) => {
       label: 'Présences',
       icon: ClipboardList
     },
-    {
-      path: '/professeur/etudiants',
-      label: 'Liste de mes étudiants',
-      icon: Users
-    },
+
     {
       path: '/evenements-prof',
       label: 'Événements',
