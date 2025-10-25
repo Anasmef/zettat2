@@ -95,7 +95,7 @@ const Sidebar = ({ onLogout }) => {
       icon: Newspaper
 
     },
- 
+
  
   ];
 

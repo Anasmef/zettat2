@@ -172,6 +172,11 @@ const Sidebar = ({ onLogout }) => {
       icon: FileText
     },
     {
+      path: '/badge-generator',
+      label: 'Badge Generator',
+      icon: QrCode
+    },
+    {
       path: '/admin/gestionnaire-paiement',
       label: 'Manager',
       icon: Wallet

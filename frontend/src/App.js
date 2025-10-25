@@ -75,6 +75,9 @@ import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
 import ReclamationsProfesseur
  from './pages/ReclamationsProfesseur';
 
+ import  BadgeGenerator
+ from './pages/BadgeGenerator';
+
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 
@@ -332,6 +335,8 @@ function AppContent() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/prof/qr-scanner" element={<ProfQRScanner />} />
+
+        <Route path="/badge-generator" element={<BadgeGenerator />} />
 
         {/* Routes Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
