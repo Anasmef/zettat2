@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { 
   BookOpen, 
   Calendar, 
@@ -8,29 +8,25 @@ import {
   XCircle, 
   MessageSquare, 
   Clock,
-  GraduationCap,
   Sun,
   Moon,
   UserCheck,
-  UserX
+  Loader
 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeur
+import Sidebar from '../components/SidebarProf';
 
 const AjouterPresence = () => {
   const [cours, setCours] = useState([]);
-  const [etudiants, setEtudiants] = useState([]);
   const [selectedCours, setSelectedCours] = useState('');
-  // Mettre la date du jour par défaut
-const [dateSession, setDateSession] = useState(() => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-});
-  // Utiliser un select pour les horaires prédéfinis
+  const [dateSession, setDateSession] = useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [selectedHoraire, setSelectedHoraire] = useState('');
   const [heureDebut, setHeureDebut] = useState('');
   const [heureFin, setHeureFin] = useState('');
@@ -38,371 +34,109 @@ const [dateSession, setDateSession] = useState(() => {
   const [presences, setPresences] = useState([]);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const navigate = useNavigate();
 
+  // Charger les cours au montage
   useEffect(() => {
     const fetchCours = async () => {
       try {
         const token = localStorage.getItem('token');
         const role = localStorage.getItem('role');
 
-        // 🔒 التحقق من الصلاحيات
         if (!token || role !== 'prof') {
           navigate('/');
           return;
         }
 
         const res = await axios.get('/api/professeur/mes-cours', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 15000
         });
 
         setCours(res.data);
       } catch (error) {
-        console.error('❌ Erreur lors du chargement des cours:', error);
+        console.error('❌ Erreur chargement cours:', error);
+        setMessage('error');
       }
     };
 
     fetchCours();
-  }, []);
+  }, [navigate]);
 
-  // Move the CSS class addition useEffect inside the component
+  // Configuration responsive
   useEffect(() => {
-    // Add viewport meta tag for mobile responsiveness
-    const existingViewport = document.querySelector('meta[name="viewport"]');
-    if (!existingViewport) {
-      const viewport = document.createElement('meta');
-      viewport.name = 'viewport';
-      viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-      document.getElementsByTagName('head')[0].appendChild(viewport);
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) {
+      const meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+      document.head.appendChild(meta);
     }
-    
-    const configGrid = document.querySelector('[data-config-grid]');
-    if (configGrid) {
-      configGrid.classList.add('configuration-grid');
-    }
-    
-    const leftCol = document.querySelector('[data-left-column]');
-    if (leftCol) {
-      leftCol.classList.add('left-column');
-    }
-    
-    const rightCol = document.querySelector('[data-right-column]');  
-    if (rightCol) {
-      rightCol.classList.add('right-column');
-    }
-  }, []);
 
-  // Ajouter les styles CSS
-  useEffect(() => {
-    const additionalStyles = `
-      .form-select:focus, .form-input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-      }
+    const styles = document.createElement('style');
+    styles.textContent = `
+      * { box-sizing: border-box !important; }
+      html, body { overflow-x: hidden !important; width: 100% !important; }
       
-      .table-row:hover {
-        background-color: #f8fafc !important;
-      }
+      /* Affichage par défaut - Desktop */
+      .desktop-view { display: block !important; }
+      .mobile-view { display: none !important; }
       
-      .remarque-input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-      }
-      
-      /* Animation de rotation pour l'icône de chargement */
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
       
-      /* Style pour bouton désactivé */
-      button:disabled {
-        pointer-events: none;
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
       }
       
-      /* Mobile-first responsive design */
-      html, body {
-        overflow-x: hidden !important;
-        width: 100% !important;
+      .form-select:focus, .form-input:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        outline: none !important;
       }
       
-      * {
-        box-sizing: border-box !important;
-      }
-      
-      /* Responsive Design */
       @media (max-width: 968px) {
-        .configuration-grid {
-          grid-template-columns: 1fr !important;
-          gap: 16px !important;
-        }
-        
-        .left-column, .right-column {
-          padding: 20px !important;
-        }
+        .config-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
       }
       
       @media (max-width: 768px) {
-        .main-content {
-          padding: 16px !important;
-        }
+        /* Cacher desktop, afficher mobile */
+        .desktop-view { display: none !important; }
+        .mobile-view { display: block !important; }
         
-        .form-content {
-          padding: 20px !important;
-        }
-        
-        .configuration-grid {
-          grid-template-columns: 1fr !important;
-          gap: 16px !important;
-          margin-bottom: 16px !important;
-        }
-        
-        .left-column {
-          background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
-          margin-bottom: 0 !important;
-        }
-        
-        .right-column {
-          background: linear-gradient(135deg, #fefcbf, #fef3c7) !important;
-        }
-        
-        .title {
-          font-size: 24px !important;
-        }
-        
-        .table-container {
-          font-size: 14px !important;
-          overflow-x: auto !important;
-        }
-        
-        .th, .td {
-          padding: 12px 8px !important;
-        }
-        
-        .remarque-container {
-          flex-direction: column !important;
-          align-items: stretch !important;
-          gap: 6px !important;
-        }
-        
-        .submit-button {
-          width: 100% !important;
-          justify-content: center !important;
-        }
-        
-        .student-info {
-          flex-direction: column !important;
-          align-items: center !important;
-          text-align: center !important;
-          gap: 8px !important;
-        }
-        
-        .student-name {
-          font-size: 14px !important;
-        }
-        
-        .avatar {
-          width: 35px !important;
-          height: 35px !important;
-        }
-        
-        .avatar-text {
-          font-size: 14px !important;
-        }
-        
-        .status-select {
-          min-width: 100px !important;
-          font-size: 13px !important;
-          padding: 6px 12px !important;
-        }
-        
-        .form-group {
-          margin-bottom: 16px !important;
-        }
-        
-        .card-header {
-          padding: 20px 24px !important;
-        }
-        
-        .card-title-text {
-          font-size: 18px !important;
-        }
+        .main-content { padding: 12px !important; }
+        .form-content { padding: 16px !important; }
+        .card-header { padding: 16px 20px !important; }
+        .card-title-text { font-size: 17px !important; }
+        .config-grid { gap: 12px !important; }
+        .left-column, .right-column { padding: 16px !important; }
       }
       
       @media (max-width: 480px) {
-        .main-content {
-          padding: 8px !important;
-          margin: 0 !important;
-        }
+        /* Forcer mobile view sur petits écrans */
+        .desktop-view { display: none !important; }
+        .mobile-view { display: block !important; }
         
-        .form-content {
-          padding: 16px !important;
-        }
-        
-        .left-column, .right-column {
-          padding: 16px !important;
-          gap: 16px !important;
-          margin: 0 !important;
-        }
-        
-        .header-content {
-          padding: 0 16px !important;
-        }
-        
-        .title {
-          font-size: 20px !important;
-          text-align: center !important;
-        }
-        
-        .title-section {
-          flex-direction: column !important;
-          gap: 8px !important;
-          padding: 16px 0 !important;
-        }
-        
-        .card-header {
-          padding: 16px 20px !important;
-        }
-        
-        .table-container {
-          border-radius: 8px !important;
-          margin: 0 -8px !important;
-          width: calc(100% + 16px) !important;
-        }
-        
-        .submit-container {
-          padding-top: 16px !important;
-          margin: 0 -8px !important;
-        }
-        
-        .submit-button {
-          padding: 14px 24px !important;
-          font-size: 15px !important;
-          width: calc(100% + 16px) !important;
-          margin: 0 8px !important;
-          border-radius: 8px !important;
-        }
-        
-        /* Media queries pour mobile */
-        @media (max-width: 768px) {
-          .desktop-view {
-            display: none !important;
-          }
-          .mobile-view {
-            display: block !important;
-          }
-        }
-        @media (max-width: 480px) {
-          .desktop-view {
-            display: none !important;
-          }
-          .mobile-view {
-            display: block !important;
-          }
-          .mobile-student-card {
-            margin-bottom: 16px !important;
-          }
-          .mobile-card-content {
-            padding: 16px !important;
-            gap: 14px !important;
-          }
-          .mobile-field-label {
-            font-size: 13px !important;
-          }
-          .mobile-status-select,
-          .mobile-retard-input,
-          .mobile-remarque-input {
-            font-size: 15px !important;
-            padding: 10px 14px !important;
-          }
-        }
-      }
-      
-      /* Extra small phones */
-      @media (max-width: 360px) {
-        .main-content {
-          padding: 4px !important;
-        }
-        
-        .form-content {
-          padding: 12px !important;
-        }
-        
-        .left-column, .right-column {
-          padding: 12px !important;
-        }
-        
-        .title {
-          font-size: 18px !important;
-        }
-        
-        .card-title-text {
-          font-size: 16px !important;
-        }
-        
-        .table-container {
-          margin: 0 -4px !important;
-          width: calc(100% + 8px) !important;
-        }
-        
-        .table-row {
-          padding: 10px !important;
-          margin-bottom: 10px !important;
-        }
-        
-        .table-row td {
-          padding: 6px 0 !important;
-          padding-left: 45% !important;
-        }
-        
-        .table-row td:before {
-          width: 40% !important;
-          font-size: 11px !important;
-        }
-        
-        .student-name {
-          font-size: 13px !important;
-        }
-        
-        .avatar {
-          width: 30px !important;
-          height: 30px !important;
-        }
-        
-        .avatar-text {
-          font-size: 12px !important;
-        }
-        
-        .status-select {
-          font-size: 12px !important;
-          padding: 5px 8px !important;
-        }
-        
-        .remarque-input {
-          font-size: 12px !important;
-          padding: 6px 8px !important;
-        }
-        
-        .submit-button {
-          font-size: 14px !important;
-          padding: 12px 20px !important;
-        }
+        .main-content { padding: 8px !important; }
+        .form-content { padding: 12px !important; }
+        .title { font-size: 20px !important; }
+        .submit-button { width: 100% !important; font-size: 15px !important; }
       }
     `;
-
-    const styleSheet = document.createElement("style");
-    styleSheet.innerText = additionalStyles;
-    document.head.appendChild(styleSheet);
+    document.head.appendChild(styles);
     
     return () => {
-      // Cleanup
-      if (document.head.contains(styleSheet)) {
-        document.head.removeChild(styleSheet);
+      if (document.head.contains(styles)) {
+        document.head.removeChild(styles);
       }
     };
   }, []);
 
-  // Mettre à jour heureDebut, heureFin et période selon le select
+  // Mettre à jour l'horaire automatiquement
   useEffect(() => {
     if (selectedHoraire === 'matin') {
       setHeureDebut('08:45');
@@ -418,29 +152,33 @@ const [dateSession, setDateSession] = useState(() => {
     }
   }, [selectedHoraire]);
 
-  // 🆕 Fonction pour vérifier si tous les champs requis sont remplis
-  const areAllFieldsFilled = () => {
-    return selectedCours && dateSession && heureDebut && heureFin;
-  };
+  // Vérifier si tous les champs sont remplis
+  const areAllFieldsFilled = useCallback(() => {
+    return Boolean(selectedCours && dateSession && heureDebut && heureFin);
+  }, [selectedCours, dateSession, heureDebut, heureFin]);
 
-  // 🆕 useEffect pour charger les étudiants uniquement quand tous les champs sont remplis
+  // Charger les étudiants avec debounce (optimisation mobile)
   useEffect(() => {
-    const loadStudents = async () => {
-      if (!areAllFieldsFilled()) {
-        setPresences([]);
-        return;
-      }
+    if (!areAllFieldsFilled()) {
+      setPresences([]);
+      setIsLoadingStudents(false);
+      return;
+    }
 
+    setIsLoadingStudents(true);
+    setMessage('');
+
+    // Debounce: attendre 800ms avant de charger
+    const timeoutId = setTimeout(async () => {
       try {
         const token = localStorage.getItem('token');
         
         const res = await axios.get('/api/professeur/etudiants', {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 15000 // 15 secondes pour connexion lente
         });
 
-        // Filtrer par le cours sélectionné
         const filtered = res.data.filter(et => et.cours.includes(selectedCours));
-
         const initialPresences = filtered.map(et => ({
           etudiant: et._id,
           nom: et.nomComplet,
@@ -448,25 +186,32 @@ const [dateSession, setDateSession] = useState(() => {
           remarque: '',
           retardMinutes: 0
         }));
+        
         setPresences(initialPresences);
+        setIsLoadingStudents(false);
       } catch (error) {
-        console.error('Erreur lors du chargement des étudiants:', error);
-        setMessage('error');
+        console.error('Erreur chargement étudiants:', error);
+        setIsLoadingStudents(false);
+        if (error.code === 'ECONNABORTED') {
+          setMessage('timeout');
+        } else {
+          setMessage('error');
+        }
       }
-    };
+    }, 800);
 
-    loadStudents();
-  }, [selectedCours, dateSession, heureDebut, heureFin]); // 🆕 Déclencher quand un de ces champs change
+    return () => clearTimeout(timeoutId);
+  }, [selectedCours, dateSession, heureDebut, heureFin, areAllFieldsFilled]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/';
   };
 
-  // 🔄 Fonction simplifiée pour la sélection du cours
   const handleCoursChange = (e) => {
     setSelectedCours(e.target.value);
-    setMessage(''); // Reset message
+    setMessage('');
+    setPresences([]);
   };
 
   const handlePresenceChange = (index, field, value) => {
@@ -475,75 +220,71 @@ const [dateSession, setDateSession] = useState(() => {
     setPresences(updated);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  if (isSubmitting) return;
-
-  const token = localStorage.getItem('token');
-
-  if (!selectedCours || !dateSession || !heureDebut || !heureFin) {
-    setMessage('error');
-    return;
-  }
-
-  if (heureFin <= heureDebut) {
-    setMessage('error');
-    return;
-  }
-
-  setIsSubmitting(true);
-  setMessage('loading');
-
-  const heure = `${heureDebut}-${heureFin}`;
-
-  try {
-    const promises = presences.map((pres, index) => {
-      const dataToSend = {
-        etudiant: pres.etudiant,
-        cours: selectedCours,
-        dateSession,
-        present: pres.present,
-        remarque: pres.remarque,
-        retardMinutes: Number(pres.retardMinutes) || 0,
-        heure,
-        periode
-      };
-
-      return axios.post('/api/presences', dataToSend, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    });
-
-    const results = await Promise.all(promises);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
-    setMessage('success');
-    setTimeout(() => {
-      window.location.reload();
-    }, 2000);
-    
-  } catch (err) {
-    console.error('Erreur:', err);
-    
-    // GESTION SPÉCIFIQUE DES ERREURS
-    if (err.response && err.response.status === 409) {
-      // Erreur 409 = Session en double
-      setMessage('duplicate');
-    } else if (err.response && err.response.status === 403) {
-      // Erreur 403 = Pas autorisé pour ce cours
-      setMessage('unauthorized');
-    } else {
-      // Autres erreurs
+    if (isSubmitting || isLoadingStudents) return;
+
+    const token = localStorage.getItem('token');
+
+    if (!selectedCours || !dateSession || !heureDebut || !heureFin) {
       setMessage('error');
+      return;
     }
-    
-    setIsSubmitting(false);
-  }
-};
 
+    if (heureFin <= heureDebut) {
+      setMessage('error');
+      return;
+    }
 
+    setIsSubmitting(true);
+    setMessage('loading');
 
-  // Fonction pour convertir l'heure en format 12h avec AM/PM
+    const heure = `${heureDebut}-${heureFin}`;
+
+    try {
+      const promises = presences.map(pres => {
+        const dataToSend = {
+          etudiant: pres.etudiant,
+          cours: selectedCours,
+          dateSession,
+          present: pres.present,
+          remarque: pres.remarque,
+          retardMinutes: Number(pres.retardMinutes) || 0,
+          heure,
+          periode
+        };
+
+        return axios.post('/api/presences', dataToSend, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 20000
+        });
+      });
+
+      await Promise.all(promises);
+      
+      setMessage('success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+      
+    } catch (err) {
+      console.error('Erreur:', err);
+      
+      if (err.response?.status === 409) {
+        setMessage('duplicate');
+      } else if (err.response?.status === 403) {
+        setMessage('unauthorized');
+      } else if (err.code === 'ECONNABORTED') {
+        setMessage('timeout');
+      } else {
+        setMessage('error');
+      }
+      
+      setIsSubmitting(false);
+    }
+  };
+
   const formatTimeToAMPM = (time24) => {
     if (!time24) return '';
     const [hours, minutes] = time24.split(':');
@@ -552,70 +293,60 @@ const handleSubmit = async (e) => {
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  // Fonction pour obtenir le texte de la période
+  const getPeriodeIcon = () => {
+    if (!heureDebut) return <Clock style={s.labelIcon} />;
+    const hour = parseInt(heureDebut.split(':')[0]);
+    return hour < 12 ? <Sun style={s.labelIcon} /> : <Moon style={s.labelIcon} />;
+  };
+
   const getPeriodeText = () => {
     if (!heureDebut) return '';
     const hour = parseInt(heureDebut.split(':')[0]);
     return hour < 12 ? 'Matin' : 'Soir';
   };
 
-  // Fonction pour obtenir l'icône selon la période
-  const getPeriodeIcon = () => {
-    if (!heureDebut) return <Clock style={styles.labelIcon} />;
-    const hour = parseInt(heureDebut.split(':')[0]);
-    return hour < 12 ? <Sun style={styles.labelIcon} /> : <Moon style={styles.labelIcon} />;
-  };
-
   return (
-    <div style={styles.container}>
-      {/* Header moderne */}
+    <div style={s.container}>
       <Sidebar onLogout={handleLogout} />
 
-      <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <div style={styles.titleSection}>
-            <div style={styles.iconContainer}>
-            </div>
-            <h1 style={styles.title}>Enregistrement de Présence</h1>
+      <div style={s.header}>
+        <div style={s.headerContent}>
+          <div style={s.titleSection}>
+            <h1 style={s.title}>Enregistrement de Présence</h1>
           </div>
         </div>
       </div>
 
-      {/* Contenu principal */}
-      <div style={styles.mainContent}>
-        <div style={styles.formCard}>
-          {/* En-tête de la carte */}
-          <div style={styles.cardHeader}>
-            <div style={styles.cardTitle}>
-              <BookOpen style={styles.cardIcon} />
-              <h2 style={styles.cardTitleText}>Configuration de la session</h2>
+      <div style={s.mainContent} className="main-content">
+        <div style={s.formCard}>
+          <div style={s.cardHeader} className="card-header">
+            <div style={s.cardTitle}>
+              <BookOpen style={s.cardIcon} />
+              <h2 style={s.cardTitleText} className="card-title-text">Configuration de la session</h2>
             </div>
           </div>
 
-          {/* Formulaire */}
-          <div style={styles.formContent}>
-            {/* Configuration en deux colonnes */}
-            <div style={styles.configurationGrid} data-config-grid>
+          <div style={s.formContent} className="form-content">
+            <div style={s.configurationGrid} className="config-grid">
               {/* Colonne gauche */}
-              <div style={styles.leftColumn} data-left-column>
-                {/* En-tête colonne gauche */}
-                <div style={styles.columnHeader}>
-                  <BookOpen style={styles.columnIcon} />
-                  <h3 style={styles.columnTitle}>Informations du classe</h3>
+              <div style={s.leftColumn} className="left-column">
+                <div style={s.columnHeader}>
+                  <BookOpen style={s.columnIcon} />
+                  <h3 style={s.columnTitle}>Informations du classe</h3>
                 </div>
                 
-                {/* Sélection du cours */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <BookOpen style={styles.labelIcon} />
+                <div style={s.formGroup}>
+                  <label style={s.label}>
+                    <BookOpen style={s.labelIcon} />
                     Sélectionner un classe
                   </label>
                   <select 
-                    style={styles.select} 
+                    style={s.select} 
                     value={selectedCours} 
                     onChange={handleCoursChange} 
                     required
                     className="form-select"
+                    disabled={isLoadingStudents}
                   >
                     <option value="">Choisir un classe...</option>
                     {cours.map(c => (
@@ -624,115 +355,115 @@ const handleSubmit = async (e) => {
                   </select>
                 </div>
 
-                {/* Date de session */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Calendar style={styles.labelIcon} />
+                <div style={s.formGroup}>
+                  <label style={s.label}>
+                    <Calendar style={s.labelIcon} />
                     Date de session
                   </label>
                   <input 
                     type="date" 
-                    style={styles.input}
+                    style={s.input}
                     value={dateSession} 
                     onChange={e => setDateSession(e.target.value)} 
                     required 
                     className="form-input"
+                    disabled={isLoadingStudents}
                   />
                 </div>
               </div>
 
               {/* Colonne droite */}
-              <div style={styles.rightColumn} data-right-column>
-                {/* En-tête colonne droite */}
-                <div style={styles.columnHeader}>
-                  <Clock style={styles.columnIcon} />
-                  <h3 style={styles.columnTitle}>Horaire de session</h3>
+              <div style={s.rightColumn} className="right-column">
+                <div style={s.columnHeader}>
+                  <Clock style={s.columnIcon} />
+                  <h3 style={s.columnTitle}>Horaire de session</h3>
                 </div>
-                {/* Select horaires prédéfinis */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Clock style={styles.labelIcon} />
+
+                <div style={s.formGroup}>
+                  <label style={s.label}>
+                    <Clock style={s.labelIcon} />
                     Sélectionner l'horaire
                   </label>
                   <select
-                    style={styles.select}
+                    style={s.select}
                     value={selectedHoraire}
                     onChange={e => setSelectedHoraire(e.target.value)}
                     required
                     className="form-select"
+                    disabled={isLoadingStudents}
                   >
                     <option value="">Choisir un horaire...</option>
                     <option value="matin">08:45 AM à 13:00 PM</option>
                     <option value="apresmidi">14:00 PM à 16:00 PM</option>
                   </select>
                 </div>
-                {/* Heure de début (readonly) */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Clock style={styles.labelIcon} />
+
+                <div style={s.formGroup}>
+                  <label style={s.label}>
+                    <Clock style={s.labelIcon} />
                     Heure de début
                   </label>
                   <input
                     type="time"
                     value={heureDebut}
                     readOnly
-                    style={styles.input}
+                    style={s.input}
                     required
                     className="form-input"
                   />
                   {heureDebut && (
-                    <div style={styles.timeDisplay}>
-                      <span style={styles.timeDisplayText}>
+                    <div style={s.timeDisplay}>
+                      <span style={s.timeDisplayText}>
                         {formatTimeToAMPM(heureDebut)}
                       </span>
                     </div>
                   )}
                 </div>
-                {/* Heure de fin (readonly) */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    <Clock style={styles.labelIcon} />
+
+                <div style={s.formGroup}>
+                  <label style={s.label}>
+                    <Clock style={s.labelIcon} />
                     Heure de fin
                   </label>
                   <input
                     type="time"
                     value={heureFin}
                     readOnly
-                    style={styles.input}
+                    style={s.input}
                     required
                     className="form-input"
                   />
                   {heureFin && (
-                    <div style={styles.timeDisplay}>
-                      <span style={styles.timeDisplayText}>
+                    <div style={s.timeDisplay}>
+                      <span style={s.timeDisplayText}>
                         {formatTimeToAMPM(heureFin)}
                       </span>
                     </div>
                   )}
                 </div>
-                {/* Période (automatique) */}
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
+
+                <div style={s.formGroup}>
+                  <label style={s.label}>
                     {getPeriodeIcon()}
                     Période (automatique)
                   </label>
-                  <div style={styles.periodeDisplay}>
+                  <div style={s.periodeDisplay}>
                     {heureDebut ? (
                       <div style={{
-                        ...styles.periodeTag,
+                        ...s.periodeTag,
                         backgroundColor: periode === 'matin' ? '#dbeafe' : '#fef3c7',
                         color: periode === 'matin' ? '#1e40af' : '#d97706',
                         borderColor: periode === 'matin' ? '#93c5fd' : '#fcd34d'
                       }}>
                         {periode === 'matin' ? 
-                          <Sun style={styles.periodeIcon} /> : 
-                          <Moon style={styles.periodeIcon} />
+                          <Sun style={s.periodeIcon} /> : 
+                          <Moon style={s.periodeIcon} />
                         }
                         {getPeriodeText()}
                       </div>
                     ) : (
-                      <div style={{...styles.periodeTag, backgroundColor: '#f3f4f6', color: '#6b7280', borderColor: '#d1d5db'}}>
-                        <Clock style={styles.periodeIcon} />
+                      <div style={{...s.periodeTag, backgroundColor: '#f3f4f6', color: '#6b7280', borderColor: '#d1d5db'}}>
+                        <Clock style={s.periodeIcon} />
                         Sélectionnez une heure
                       </div>
                     )}
@@ -741,160 +472,93 @@ const handleSubmit = async (e) => {
               </div>
             </div>
 
-            {/* 🆕 Message d'instruction si tous les champs ne sont pas remplis */}
-            {!areAllFieldsFilled() && (
-              <div style={styles.instructionMessage}>
-                <div style={styles.instructionContent}>
-                  <Clock style={styles.instructionIcon} />
+            {/* Message instruction */}
+            {!areAllFieldsFilled() && !isLoadingStudents && (
+              <div style={s.instructionMessage}>
+                <div style={s.instructionContent}>
+                  <Clock style={s.instructionIcon} />
                   <div>
-                    <h4 style={styles.instructionTitle}>Complétez la configuration</h4>
-                    <p style={styles.instructionText}>
-                      Veuillez remplir tous les champs ci-dessus pour voir la liste des étudiants et enregistrer la présence.
+                    <h4 style={s.instructionTitle}>Complétez la configuration</h4>
+                    <p style={s.instructionText}>
+                      Veuillez remplir tous les champs ci-dessus pour voir la liste des étudiants.
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Liste des présences - 🆕 Affichée seulement si tous les champs sont remplis */}
-            {areAllFieldsFilled() && presences.length > 0 && (
-              <>
-                {/* Section des étudiants */}
-                <div style={styles.presenceSection}>
-                  <div style={styles.presenceHeader}>
-                    <h3 style={styles.presenceTitle}>
-                      <Users style={styles.presenceIcon} />
-                      Liste des étudiants ({presences.length})
-                    </h3>
+            {/* Message chargement */}
+            {isLoadingStudents && (
+              <div style={s.loadingMessage}>
+                <div style={s.loadingContent}>
+                  <div style={s.spinner} />
+                  <div>
+                    <h4 style={s.loadingTitle}>Chargement en cours...</h4>
+                    <p style={s.loadingText}>
+                      Récupération de la liste des étudiants, veuillez patienter.
+                    </p>
                   </div>
+                </div>
+              </div>
+            )}
 
-                  {/* Desktop/Tablet Table View */}
-                  <div className="desktop-view" style={styles.desktopView}>
-                    <div style={styles.tableContainer}>
-                      <table style={styles.table}>
-                        <thead>
-                          <tr style={styles.tableHeader}>
-                            <th style={styles.th}>Étudiant</th>
-                            <th style={styles.th}>Statut</th>
-                            <th style={styles.th}>Retard (min)</th>
-                            <th style={styles.th}>Remarque</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {presences.map((p, i) => (
-                            <tr key={p.etudiant} style={styles.tableRow} className="table-row">
-                              <td style={styles.td}>
-                                <div style={styles.studentInfo}>
-                                  <div style={styles.avatar}>
-                                    <span style={styles.avatarText}>
-                                      {p.nom.charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <div style={styles.studentName}>{p.nom}</div>
-                                </div>
-                              </td>
-                              <td style={styles.td}>
-                                <select 
-                                  style={{
-                                    ...styles.statusSelect,
-                                    backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
-                                    color: p.present ? '#166534' : '#991b1b',
-                                    borderColor: p.present ? '#bbf7d0' : '#fecaca'
-                                  }}
-                                  value={p.present} 
-                                  onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
-                                >
-                                  <option value="true">✓ Présent</option>
-                                  <option value="false">✗ Absent</option>
-                                </select>
-                              </td>
-                              <td style={styles.td}>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="60"
-                                  style={{
-                                    ...styles.retardInput,
-                                    opacity: p.present ? 1 : 0.5
-                                  }}
-                                  value={p.retardMinutes}
-                                  onChange={(e) => handlePresenceChange(i, 'retardMinutes', parseInt(e.target.value) || 0)}
-                                  disabled={!p.present}
-                                  placeholder="0"
-                                />
-                              </td>
-                              <td style={styles.td}>
-                                <div style={styles.remarqueContainer}>
-                                  <MessageSquare style={styles.remarqueIcon} />
-                                  <input 
-                                    type="text" 
-                                    style={styles.remarqueInput}
-                                    value={p.remarque} 
-                                    onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
-                                    placeholder="Ajouter une remarque..."
-                                    className="remarque-input"
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+            {/* Liste des étudiants */}
+            {areAllFieldsFilled() && !isLoadingStudents && presences.length > 0 && (
+              <div style={s.presenceSection}>
+                <div style={s.presenceHeader}>
+                  <h3 style={s.presenceTitle}>
+                    <Users style={s.presenceIcon} />
+                    Liste des étudiants ({presences.length})
+                  </h3>
+                </div>
 
-                  {/* Mobile Cards View */}
-                  <div className="mobile-view" style={styles.mobileView}>
-                    <div style={styles.mobileCardsContainer}>
-                      {presences.map((p, i) => (
-                        <div key={p.etudiant} style={styles.mobileStudentCard}>
-                          {/* En-tête de la carte avec info étudiant */}
-                          <div style={styles.mobileCardHeader}>
-                            <div style={styles.mobileStudentInfo}>
-                              <div style={styles.mobileAvatar}>
-                                <span style={styles.mobileAvatarText}>
-                                  {p.nom.charAt(0).toUpperCase()}
-                                </span>
+                {/* Desktop */}
+                <div className="desktop-view">
+                  <div style={s.tableContainer}>
+                    <table style={s.table}>
+                      <thead>
+                        <tr style={s.tableHeader}>
+                          <th style={s.th}>Étudiant</th>
+                          <th style={s.th}>Statut</th>
+                          <th style={s.th}>Retard (min)</th>
+                          <th style={s.th}>Remarque</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {presences.map((p, i) => (
+                          <tr key={p.etudiant} style={s.tableRow}>
+                            <td style={s.td}>
+                              <div style={s.studentInfo}>
+                                <div style={s.avatar}>
+                                  <span style={s.avatarText}>
+                                    {p.nom.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div style={s.studentName}>{p.nom}</div>
                               </div>
-                              <div style={styles.mobileStudentName}>{p.nom}</div>
-                            </div>
-                          </div>
-
-                          {/* Contenu de la carte */}
-                          <div style={styles.mobileCardContent}>
-                            {/* Statut */}
-                            <div style={styles.mobileField}>
-                              <label style={styles.mobileFieldLabel}>
-                                <UserCheck style={styles.mobileFieldIcon} />
-                                Statut de présence
-                              </label>
-                              <select
+                            </td>
+                            <td style={s.td}>
+                              <select 
                                 style={{
-                                  ...styles.mobileStatusSelect,
+                                  ...s.statusSelect,
                                   backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
                                   color: p.present ? '#166534' : '#991b1b',
                                   borderColor: p.present ? '#bbf7d0' : '#fecaca'
                                 }}
-                                value={p.present}
+                                value={p.present} 
                                 onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
                               >
                                 <option value="true">✓ Présent</option>
                                 <option value="false">✗ Absent</option>
                               </select>
-                            </div>
-
-                            {/* Retard */}
-                            <div style={styles.mobileField}>
-                              <label style={styles.mobileFieldLabel}>
-                                <Clock style={styles.mobileFieldIcon} />
-                                Retard (minutes)
-                              </label>
+                            </td>
+                            <td style={s.td}>
                               <input
                                 type="number"
                                 min="0"
                                 max="60"
                                 style={{
-                                  ...styles.mobileRetardInput,
+                                  ...s.retardInput,
                                   opacity: p.present ? 1 : 0.5
                                 }}
                                 value={p.retardMinutes}
@@ -902,136 +566,208 @@ const handleSubmit = async (e) => {
                                 disabled={!p.present}
                                 placeholder="0"
                               />
-                            </div>
-
-                            {/* Remarque */}
-                            <div style={styles.mobileField}>
-                              <label style={styles.mobileFieldLabel}>
-                                <MessageSquare style={styles.mobileFieldIcon} />
-                                Remarque
-                              </label>
-                              <input
-                                type="text"
-                                style={styles.mobileRemarqueInput}
-                                value={p.remarque}
-                                onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
-                                placeholder="Ajouter une remarque..."
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Bouton de soumission */}
-                  <div style={styles.submitContainer}>
-                    <button
-                      type="submit"
-                      style={{
-                        ...styles.submitButton,
-                        opacity: isSubmitting ? 0.6 : 1,
-                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                        background: isSubmitting
-                          ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
-                          : 'linear-gradient(135deg, #3b82f6, #4f46e5)'
-                      }}
-                      onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="submit-button"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <div style={{
-                            width: '20px',
-                            height: '20px',
-                            border: '2px solid #ffffff',
-                            borderTop: '2px solid transparent',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite'
-                          }} />
-                          Enregistrement en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Save style={styles.buttonIcon} />
-                          Enregistrer la présence
-                        </>
-                      )}
-                    </button>
+                            </td>
+                            <td style={s.td}>
+                              <div style={s.remarqueContainer}>
+                                <MessageSquare style={s.remarqueIcon} />
+                                <input 
+                                  type="text" 
+                                  style={s.remarqueInput}
+                                  value={p.remarque} 
+                                  onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
+                                  placeholder="Remarque..."
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </>
+
+                {/* Mobile */}
+                <div className="mobile-view">
+                  {presences.map((p, i) => (
+                    <div key={p.etudiant} style={s.mobileCard}>
+                      <div style={s.mobileCardHeader}>
+                        <div style={s.mobileAvatar}>
+                          <span style={s.mobileAvatarText}>
+                            {p.nom.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={s.mobileStudentName}>{p.nom}</div>
+                      </div>
+
+                      <div style={s.mobileCardContent}>
+                        <div style={s.mobileField}>
+                          <label style={s.mobileLabel}>
+                            <UserCheck style={s.mobileLabelIcon} />
+                            Statut
+                          </label>
+                          <select
+                            style={{
+                              ...s.mobileSelect,
+                              backgroundColor: p.present ? '#dcfce7' : '#fee2e2',
+                              color: p.present ? '#166534' : '#991b1b',
+                              borderColor: p.present ? '#bbf7d0' : '#fecaca'
+                            }}
+                            value={p.present}
+                            onChange={(e) => handlePresenceChange(i, 'present', e.target.value === 'true')}
+                          >
+                            <option value="true">✓ Présent</option>
+                            <option value="false">✗ Absent</option>
+                          </select>
+                        </div>
+
+                        <div style={s.mobileField}>
+                          <label style={s.mobileLabel}>
+                            <Clock style={s.mobileLabelIcon} />
+                            Retard (min)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="60"
+                            style={{
+                              ...s.mobileInput,
+                              opacity: p.present ? 1 : 0.5
+                            }}
+                            value={p.retardMinutes}
+                            onChange={(e) => handlePresenceChange(i, 'retardMinutes', parseInt(e.target.value) || 0)}
+                            disabled={!p.present}
+                            placeholder="0"
+                          />
+                        </div>
+
+                        <div style={s.mobileField}>
+                          <label style={s.mobileLabel}>
+                            <MessageSquare style={s.mobileLabelIcon} />
+                            Remarque
+                          </label>
+                          <input
+                            type="text"
+                            style={s.mobileInput}
+                            value={p.remarque}
+                            onChange={(e) => handlePresenceChange(i, 'remarque', e.target.value)}
+                            placeholder="Remarque..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={s.submitContainer}>
+                  <button
+                    type="button"
+                    style={{
+                      ...s.submitButton,
+                      opacity: (isSubmitting || isLoadingStudents) ? 0.6 : 1,
+                      cursor: (isSubmitting || isLoadingStudents) ? 'not-allowed' : 'pointer',
+                      background: (isSubmitting || isLoadingStudents)
+                        ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                        : 'linear-gradient(135deg, #3b82f6, #4f46e5)'
+                    }}
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || isLoadingStudents}
+                    className="submit-button"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div style={s.spinner} />
+                        Enregistrement...
+                      </>
+                    ) : (
+                      <>
+                        <Save style={s.buttonIcon} />
+                        Enregistrer la présence
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             )}
 
-           {/* Message de statut */}
-{message && (
-  <div style={{
-    ...styles.messageContainer,
-    backgroundColor: 
-      message === 'success' ? '#dcfce7' : 
-      message === 'loading' ? '#eff6ff' : 
-      message === 'duplicate' ? '#fef3c7' :
-      message === 'unauthorized' ? '#fed7e2' :
-      '#fee2e2',
-    borderColor: 
-      message === 'success' ? '#16a34a' : 
-      message === 'loading' ? '#3b82f6' : 
-      message === 'duplicate' ? '#d97706' :
-      message === 'unauthorized' ? '#e53e3e' :
-      '#dc2626',
-    color: 
-      message === 'success' ? '#166534' : 
-      message === 'loading' ? '#1e40af' : 
-      message === 'duplicate' ? '#92400e' :
-      message === 'unauthorized' ? '#9b2c2c' :
-      '#991b1b'
-  }}>
-    {message === 'success' ? (
-      <>
-        <CheckCircle style={styles.messageIcon} />
-        Présence enregistrée avec succès ! Redirection en cours...
-      </>
-    ) : message === 'loading' ? (
-      <>
-        <div style={{
-          width: '20px',
-          height: '20px',
-          border: '2px solid #3b82f6',
-          borderTop: '2px solid transparent',
-          borderRadius: '50%',
-          animation: 'spin 1s linear infinite'
-        }} />
-        Enregistrement en cours, veuillez patienter...
-      </>
-    ) : message === 'duplicate' ? (
-      <>
-        <XCircle style={styles.messageIcon} />
-        <div>
-          <strong>⚠️ Cette séance est déjà enregistrée</strong>
-          <div style={{fontSize: '14px', marginTop: '4px'}}>
-            Vous ne pouvez pas enregistrer la même séance deux fois.
-          </div>
-        </div>
-      </>
-    ) : message === 'unauthorized' ? (
-      <>
-        <XCircle style={styles.messageIcon} />
-        <div>
-          <strong>🔒 Accès refusé</strong>
-          <div style={{fontSize: '14px', marginTop: '4px'}}>
-            Vous n'êtes pas autorisé à enregistrer la présence pour ce cours.
-          </div>
-        </div>
-      </>
-    ) : (
-      <>
-        <XCircle style={styles.messageIcon} />
-        Erreur: Veuillez vérifier tous les champs requis et que l'heure de fin soit après l'heure de début.
-      </>
-    )}
-  </div>
-)}
+            {/* Messages */}
+            {message && (
+              <div style={{
+                ...s.messageContainer,
+                backgroundColor: 
+                  message === 'success' ? '#dcfce7' : 
+                  message === 'loading' ? '#eff6ff' : 
+                  message === 'duplicate' ? '#fef3c7' :
+                  message === 'unauthorized' ? '#fed7e2' :
+                  message === 'timeout' ? '#fef3c7' :
+                  '#fee2e2',
+                borderColor: 
+                  message === 'success' ? '#16a34a' : 
+                  message === 'loading' ? '#3b82f6' : 
+                  message === 'duplicate' ? '#d97706' :
+                  message === 'unauthorized' ? '#e53e3e' :
+                  message === 'timeout' ? '#d97706' :
+                  '#dc2626',
+                color: 
+                  message === 'success' ? '#166534' : 
+                  message === 'loading' ? '#1e40af' : 
+                  message === 'duplicate' ? '#92400e' :
+                  message === 'unauthorized' ? '#9b2c2c' :
+                  message === 'timeout' ? '#92400e' :
+                  '#991b1b'
+              }}>
+                {message === 'success' ? (
+                  <>
+                    <CheckCircle style={s.messageIcon} />
+                    <div>
+                      <strong>✓ Succès!</strong>
+                      <div style={{fontSize: '14px', marginTop: '4px'}}>
+                        Présence enregistrée avec succès.
+                      </div>
+                    </div>
+                  </>
+                ) : message === 'loading' ? (
+                  <>
+                    <div style={s.spinner} />
+                    Enregistrement en cours...
+                  </>
+                ) : message === 'duplicate' ? (
+                  <>
+                    <XCircle style={s.messageIcon} />
+                    <div>
+                      <strong>⚠️ Session déjà enregistrée</strong>
+                      <div style={{fontSize: '14px', marginTop: '4px'}}>
+                        Cette séance existe déjà dans le système.
+                      </div>
+                    </div>
+                  </>
+                ) : message === 'unauthorized' ? (
+                  <>
+                    <XCircle style={s.messageIcon} />
+                    <div>
+                      <strong>🔒 Accès refusé</strong>
+                      <div style={{fontSize: '14px', marginTop: '4px'}}>
+                        Vous n'êtes pas autorisé pour ce cours.
+                      </div>
+                    </div>
+                  </>
+                ) : message === 'timeout' ? (
+                  <>
+                    <XCircle style={s.messageIcon} />
+                    <div>
+                      <strong>⏱️ Connexion lente</strong>
+                      <div style={{fontSize: '14px', marginTop: '4px'}}>
+                        Vérifiez votre connexion Internet et réessayez.
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <XCircle style={s.messageIcon} />
+                    Erreur: Vérifiez tous les champs.
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1039,16 +775,16 @@ const handleSubmit = async (e) => {
   );
 };
 
-const styles = {
+const s = {
   container: {
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     width: '100%',
-    overflow: 'hidden'
+    overflowX: 'hidden'
   },
   header: {
-    background: 'rgba(255, 255, 255, 0.9)',
+    background: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(10px)',
     borderBottom: '1px solid rgba(229, 231, 235, 0.6)',
     position: 'sticky',
@@ -1059,41 +795,37 @@ const styles = {
   headerContent: {
     maxWidth: '1200px',
     margin: '0 auto',
-    padding: '0 24px'
+    padding: '0 20px'
   },
   titleSection: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px',
-    padding: '24px 0'
+    padding: '20px 0'
   },
- 
- 
   title: {
-    fontSize: '32px',
+    fontSize: '28px',
     fontWeight: '700',
     background: 'linear-gradient(135deg, #1f2937, #374151)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
-    margin: '0'
+    margin: 0
   },
   mainContent: {
     maxWidth: '1000px',
     margin: '0 auto',
-    padding: '24px'
+    padding: '20px'
   },
   formCard: {
     background: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(10px)',
     borderRadius: '16px',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
     border: '1px solid rgba(229, 231, 235, 0.5)',
     overflow: 'hidden'
   },
   cardHeader: {
-    padding: '24px 32px'
+    padding: '24px 32px',
+    borderBottom: '1px solid #e5e7eb'
   },
   cardTitle: {
     display: 'flex',
@@ -1103,51 +835,46 @@ const styles = {
   cardIcon: {
     width: '20px',
     height: '20px',
-    color: 'black'
+    color: '#1f2937'
   },
   cardTitleText: {
     fontSize: '20px',
     fontWeight: '600',
-    color: 'black',
-    margin: '0'
+    color: '#1f2937',
+    margin: 0
   },
   formContent: {
-    padding: '32px'
+    padding: '28px'
   },
   configurationGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '32px',
-    marginBottom: '24px'
+    gap: '24px',
+    marginBottom: '20px'
   },
   leftColumn: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px',
-    padding: '24px',
+    gap: '20px',
+    padding: '20px',
     background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-    borderRadius: '16px',
-    border: '1px solid rgba(229, 231, 235, 0.6)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-    position: 'relative'
+    borderRadius: '12px',
+    border: '1px solid rgba(229, 231, 235, 0.6)'
   },
   rightColumn: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px',
-    padding: '24px',
-    background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-    borderRadius: '16px',
-    border: '1px solid rgba(217, 119, 6, 0.2)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-    position: 'relative'
+    gap: '20px',
+    padding: '20px',
+    background: 'linear-gradient(135deg, #fefcbf, #fef3c7)',
+    borderRadius: '12px',
+    border: '1px solid rgba(217, 119, 6, 0.2)'
   },
   columnHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    marginBottom: '8px',
-    paddingBottom: '12px',
+    paddingBottom: '10px',
     borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
   },
   columnIcon: {
@@ -1159,10 +886,10 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     color: '#1f2937',
-    margin: '0'
+    margin: 0
   },
   formGroup: {
-    marginBottom: '24px'
+    marginBottom: '16px'
   },
   label: {
     display: 'flex',
@@ -1187,9 +914,8 @@ const styles = {
     backgroundColor: '#ffffff',
     color: '#374151',
     outline: 'none',
-    transition: 'all 0.2s ease',
     cursor: 'pointer',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    transition: 'border-color 0.2s'
   },
   input: {
     width: '100%',
@@ -1200,9 +926,7 @@ const styles = {
     backgroundColor: '#ffffff',
     color: '#374151',
     outline: 'none',
-    transition: 'all 0.2s ease',
-    boxSizing: 'border-box',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    transition: 'border-color 0.2s'
   },
   timeDisplay: {
     marginTop: '8px',
@@ -1225,10 +949,8 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '12px 16px',
-    backgroundColor: '#dbeafe',
-    color: '#1e40af',
     borderRadius: '8px',
-    border: '2px solid #93c5fd',
+    border: '2px solid',
     fontSize: '16px',
     fontWeight: '500'
   },
@@ -1236,13 +958,12 @@ const styles = {
     width: '18px',
     height: '18px'
   },
-  // 🆕 Styles pour le message d'instruction
   instructionMessage: {
     background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
     border: '2px solid #93c5fd',
     borderRadius: '12px',
     padding: '20px',
-    marginBottom: '24px'
+    marginTop: '20px'
   },
   instructionContent: {
     display: 'flex',
@@ -1253,7 +974,6 @@ const styles = {
     width: '24px',
     height: '24px',
     color: '#3b82f6',
-    marginTop: '2px',
     flexShrink: 0
   },
   instructionTitle: {
@@ -1265,13 +985,46 @@ const styles = {
   instructionText: {
     fontSize: '14px',
     color: '#1e3a8a',
-    margin: '0',
+    margin: 0,
     lineHeight: '1.5'
   },
+  loadingMessage: {
+    background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+    border: '2px solid #fbbf24',
+    borderRadius: '12px',
+    padding: '20px',
+    marginTop: '20px'
+  },
+  loadingContent: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px'
+  },
+  loadingTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#92400e',
+    margin: '0 0 8px 0'
+  },
+  loadingText: {
+    fontSize: '14px',
+    color: '#78350f',
+    margin: 0,
+    lineHeight: '1.5'
+  },
+  spinner: {
+    width: '20px',
+    height: '20px',
+    border: '3px solid rgba(59, 130, 246, 0.3)',
+    borderTop: '3px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+    flexShrink: 0
+  },
   presenceSection: {
-    marginTop: '32px',
+    marginTop: '24px',
     borderTop: '1px solid #e5e7eb',
-    paddingTop: '24px'
+    paddingTop: '20px'
   },
   presenceHeader: {
     marginBottom: '16px'
@@ -1283,7 +1036,7 @@ const styles = {
     fontSize: '18px',
     fontWeight: '600',
     color: '#1f2937',
-    margin: '0'
+    margin: 0
   },
   presenceIcon: {
     width: '20px',
@@ -1294,8 +1047,7 @@ const styles = {
     overflowX: 'auto',
     borderRadius: '12px',
     border: '1px solid #e5e7eb',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-    marginBottom: '24px'
+    marginBottom: '20px'
   },
   table: {
     width: '100%',
@@ -1306,21 +1058,20 @@ const styles = {
     background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
   },
   th: {
-    padding: '16px 20px',
+    padding: '14px 16px',
     textAlign: 'left',
     fontSize: '12px',
     fontWeight: '600',
     color: '#4b5563',
     textTransform: 'uppercase',
-    letterSpacing: '0.05em',
     borderBottom: '2px solid #e5e7eb'
   },
   tableRow: {
     borderBottom: '1px solid #f3f4f6',
-    transition: 'background-color 0.2s ease'
+    transition: 'background-color 0.2s'
   },
   td: {
-    padding: '16px 20px',
+    padding: '14px 16px',
     verticalAlign: 'middle'
   },
   studentInfo: {
@@ -1336,8 +1087,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
-    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+    flexShrink: 0
   },
   avatarText: {
     color: '#ffffff',
@@ -1345,20 +1095,19 @@ const styles = {
     fontWeight: '600'
   },
   studentName: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '500',
     color: '#1f2937'
   },
   statusSelect: {
-    padding: '8px 16px',
+    padding: '8px 14px',
     border: '2px solid',
     borderRadius: '20px',
     fontSize: '14px',
     fontWeight: '500',
     outline: 'none',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    minWidth: '120px'
+    minWidth: '110px'
   },
   retardInput: {
     width: '80px',
@@ -1367,8 +1116,7 @@ const styles = {
     borderRadius: '6px',
     fontSize: '14px',
     textAlign: 'center',
-    outline: 'none',
-    transition: 'all 0.2s ease'
+    outline: 'none'
   },
   remarqueContainer: {
     display: 'flex',
@@ -1388,77 +1136,23 @@ const styles = {
     border: '2px solid #e5e7eb',
     borderRadius: '6px',
     fontSize: '14px',
-    outline: 'none',
-    transition: 'all 0.2s ease'
+    outline: 'none'
   },
-  submitContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    paddingTop: '24px'
-  },
-  submitButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px 32px',
-    background: 'linear-gradient(135deg, #3b82f6, #4f46e5)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '12px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
-  },
-  buttonIcon: {
-    width: '20px',
-    height: '20px'
-  },
-  messageContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
-    borderRadius: '12px',
-    border: '2px solid',
-    marginTop: '24px',
-    fontSize: '16px',
-    fontWeight: '500'
-  },
-  messageIcon: {
-    width: '20px',
-    height: '20px'
-  },
-  // Ajout des nouveaux styles pour mobile
-  desktopView: {
-    display: 'block'
-  },
-  mobileView: {
-    display: 'none'
-  },
-  mobileCardsContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px'
-  },
-  mobileStudentCard: {
+  mobileCard: {
     background: '#ffffff',
     borderRadius: '12px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.08)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
     border: '1px solid #e5e7eb',
-    overflow: 'hidden',
-    transition: 'box-shadow 0.2s ease'
+    marginBottom: '16px',
+    overflow: 'hidden'
   },
   mobileCardHeader: {
     background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
     padding: '16px',
-    borderBottom: '1px solid #e5e7eb'
-  },
-  mobileStudentInfo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: '12px',
+    borderBottom: '1px solid #e5e7eb'
   },
   mobileAvatar: {
     width: '44px',
@@ -1467,8 +1161,7 @@ const styles = {
     background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+    justifyContent: 'center'
   },
   mobileAvatarText: {
     color: '#ffffff',
@@ -1476,7 +1169,7 @@ const styles = {
     fontWeight: '600'
   },
   mobileStudentName: {
-    fontSize: '18px',
+    fontSize: '17px',
     fontWeight: '600',
     color: '#1f2937'
   },
@@ -1484,52 +1177,83 @@ const styles = {
     padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px'
+    gap: '14px'
   },
   mobileField: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px'
   },
-  mobileFieldLabel: {
+  mobileLabel: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '600',
     color: '#374151'
   },
-  mobileFieldIcon: {
+  mobileLabelIcon: {
     width: '16px',
     height: '16px',
     color: '#3b82f6'
   },
-  mobileStatusSelect: {
-    padding: '12px 16px',
+  mobileSelect: {
+    padding: '11px 14px',
     border: '2px solid',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '500',
     outline: 'none',
+    cursor: 'pointer'
+  },
+  mobileInput: {
+    padding: '11px 14px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '15px',
+    outline: 'none'
+  },
+  submitContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    paddingTop: '20px'
+  },
+  submitButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '14px 28px',
+    background: 'linear-gradient(135deg, #3b82f6, #4f46e5)',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.2s ease'
+    transition: 'all 0.2s',
+    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
   },
-  mobileRetardInput: {
-    padding: '12px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '16px',
-    textAlign: 'center',
-    outline: 'none',
-    transition: 'all 0.2s ease'
+  buttonIcon: {
+    width: '20px',
+    height: '20px'
   },
-  mobileRemarqueInput: {
-    padding: '12px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '16px',
-    outline: 'none',
-    transition: 'all 0.2s ease'
+  messageContainer: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    padding: '16px 20px',
+    borderRadius: '12px',
+    border: '2px solid',
+    marginTop: '20px',
+    fontSize: '15px',
+    fontWeight: '500'
+  },
+  messageIcon: {
+    width: '20px',
+    height: '20px',
+    flexShrink: 0,
+    marginTop: '2px'
   }
 };
 
