@@ -75,7 +75,7 @@ const CarteID = ({ etudiant, isSelected, onSelect, logoUrl }) => {
       {/* Carte ID - Dimensions: 85.6mm x 54mm (323px x 204px à 96 DPI) */}
       <div style={{
         ...cardStyles.container,
-        border: isSelected ? '3px solid #6366f1' : '1px solid #e5e7eb'
+        border: isSelected ? '3px solid #6366f1' : '2px solid #000000'
       }}>
         {/* RECTO */}
         <div style={cardStyles.card} className="print-card">
@@ -120,7 +120,7 @@ const CarteID = ({ etudiant, isSelected, onSelect, logoUrl }) => {
             <div style={cardStyles.infoSection}>
               <div style={cardStyles.infoRow}>
                 <span style={cardStyles.label}>NOM COMPLET:</span>
-                <span style={cardStyles.value}>{etudiant.nomComplet}</span>
+                <span style={cardStyles.value}>{etudiant.nomComplet?.toUpperCase()}</span>
               </div>
               
               <div style={cardStyles.infoRow}>
@@ -319,13 +319,14 @@ const cardStyles = {
   },
 
   yearBadge: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: '700',
-    color: '#6366f1',
-    backgroundColor: '#ede9fe',
-    padding: '6px 14px',
+    color: '#ffffff',
+    background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)',
+    padding: '8px 16px',
     borderRadius: '14px',
     letterSpacing: '0.8px',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
   },
 };
 
@@ -530,8 +531,6 @@ const CartesEtudiants = () => {
       />
       
       <div style={styles.mainContent}>
-        {/* En-tête caché */}
-
         {/* Barre d'outils */}
         <div style={styles.toolbar} className="no-print">
           <div style={styles.toolbarContent}>
@@ -720,9 +719,11 @@ const CartesEtudiants = () => {
           }
 
           .print-badge {
-            color: #6366f1 !important;
-            background-color: #ede9fe !important;
+            color: #ffffff !important;
+            background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%) !important;
+            border: 2px solid rgba(255, 255, 255, 0.3) !important;
             -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
           .print-gradient {
