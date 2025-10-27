@@ -606,6 +606,43 @@ app.get('/api/admin/dashboard', authAdminOrInscripteurOrPaiementManager, async (
 app.post('/api/admin/logout', (req, res) => {
     res.json({ message: 'Déconnexion réussie' });
 });
+
+
+
+// ✅ ROUTE PUBLIQUE pour QR Code (SANS authentification)
+app.get('/api/etudiants/public/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validation de l'ID
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({ message: 'ID étudiant invalide' });
+    }
+    
+    // Récupérer l'étudiant
+    const etudiant = await Etudiant.findById(id).select(
+      'nomComplet genre email dateNaissance lieuNaissance nationalite ' +
+      'niveau codeMassar telephoneEtudiant adresse transport cours ' +
+      'image autorise paye nomCompletPere nomCompletMere telephonePere ' +
+      'telephoneMere travailPere travailMere prixTotal pourcentageBourse ' +
+      'anneeScolaire actif'
+    );
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
+    res.json(etudiant);
+    
+  } catch (error) {
+    console.error('Erreur:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+console.log('✅ Route publique QR code ajoutée');
+
+
 // Ajouter un étudiant
 app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'),checkFieldPermissions, async (req, res) => {
   try {

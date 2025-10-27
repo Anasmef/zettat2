@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, 
   Book, Users, CheckCircle, XCircle, Truck, School, 
-  Award, DollarSign, Home, Briefcase, Loader
+  Award, Home, Briefcase, Loader
 } from 'lucide-react';
 
 const EtudiantPublic = () => {
@@ -113,11 +113,27 @@ const EtudiantPublic = () => {
 
   return (
     <div style={styles.container}>
-      {/* En-tête */}
+      {/* En-tête avec logo de l'école */}
       <div style={styles.header}>
         <div style={styles.headerContent}>
-          <School size={32} color="white" />
-          <h1 style={styles.headerTitle}>Information Étudiant</h1>
+          <div style={styles.schoolLogo}>
+            <img 
+              src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Alfred_Kastler.jpg/220px-Alfred_Kastler.jpg" 
+              alt="Alfred Kastler" 
+              style={styles.logoImage}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div style={styles.logoFallback}>
+              <School size={32} color="white" />
+            </div>
+          </div>
+          <div style={styles.headerText}>
+            <h1 style={styles.headerTitle}>École Alfred Kastler</h1>
+            <p style={styles.headerSubtitle}>Fiche Étudiant</p>
+          </div>
         </div>
       </div>
 
@@ -148,7 +164,7 @@ const EtudiantPublic = () => {
           {/* Statuts */}
           <div style={styles.statusSection}>
             <StatusBadge active={etudiant.autorise} label="Autorisé" />
-            <StatusBadge active={etudiant.paye} label="Payé" />
+            <StatusBadge active={etudiant.actif} label="Actif" />
             {etudiant.transport && (
               <div style={styles.transportBadge}>
                 <Truck size={16} />
@@ -236,23 +252,10 @@ const EtudiantPublic = () => {
             </div>
           )}
 
-          {/* Paiement */}
-          {etudiant.prixTotal > 0 && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>
-                <DollarSign size={20} /> Informations de Paiement
-              </h3>
-              <div style={styles.infoGrid}>
-                <InfoItem icon={DollarSign} label="Montant total" value={`${etudiant.prixTotal} DH`} />
-                <InfoItem icon={Award} label="Bourse accordée" value={`${etudiant.pourcentageBourse || 0}%`} />
-              </div>
-            </div>
-          )}
-
           {/* Footer */}
           <div style={styles.footer}>
-            <Calendar size={14} />
-            <span>Informations à jour le {formatDate(new Date())}</span>
+            <School size={14} />
+            <span>École Alfred Kastler - Informations à jour le {formatDate(new Date())}</span>
           </div>
         </div>
       </div>
@@ -269,7 +272,7 @@ const styles = {
 
   header: {
     background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)',
-    padding: '20px',
+    padding: '24px 20px',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
   },
 
@@ -278,13 +281,52 @@ const styles = {
     margin: '0 auto',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '16px',
+  },
+
+  schoolLogo: {
+    width: '60px',
+    height: '60px',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    border: '3px solid rgba(255, 255, 255, 0.4)',
+    overflow: 'hidden',
+    flexShrink: 0,
+    position: 'relative',
+  },
+
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+
+  logoFallback: {
+    display: 'none',
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+
+  headerText: {
+    flex: 1,
   },
 
   headerTitle: {
-    fontSize: '22px',
+    fontSize: '24px',
     fontWeight: '700',
     color: '#ffffff',
+    margin: '0 0 4px 0',
+  },
+
+  headerSubtitle: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.9)',
     margin: 0,
   },
 

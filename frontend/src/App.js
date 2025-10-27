@@ -80,6 +80,7 @@ import ReclamationsProfesseur
 
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
+import EtudiantPublic from './pages/EtudiantPublic';
 
 import HistoriqueEtudiant from './pages/HistoriqueEtudiant';
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
@@ -406,6 +407,7 @@ function AppContent() {
         <Route path="/etudiant/exercices/upload" element={<TeleverserExerciceEtudiant />} />
         <Route path="/etudiant/live" element={<LiveCoursEtudiant />} />
         <Route path="/etudiant/live/:cours" element={<EtudiantLiveCours />} />
+<Route path="/etudiant/:id" element={<EtudiantPublic />} />
 
         <Route path="/dashboard/manager" element={<DashboardPaiementManager />} />
 
