@@ -4,7 +4,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './ListeEtudiants.css';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
-
+import ExportEtudiants from '../components/ExportEtudiants';
+import { Download } from 'lucide-react'; // Si pas déjà importé
 import { 
   User, 
   CheckCircle, 
@@ -37,7 +38,13 @@ const ListeEtudiants = () => {
   const [pageActuelle, setPageActuelle] = useState(1);
   const [etudiantsParPage] = useState(10);
   const [loading, setLoading] = useState(true);
-  
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Nouveaux états pour l'authentification avant export
+  const [showExportAuthModal, setShowExportAuthModal] = useState(false);
+  const [exportPassword, setExportPassword] = useState('');
+  const [exportAuthError, setExportAuthError] = useState('');
+
   // Role-based permission state
   const [userRole, setUserRole] = useState('');
   
@@ -730,6 +737,25 @@ const closeEditModal = () => {
     );
   };
 
+  // --- Ajout : handlers pour l'authentification avant export ---
+  const openExportAuth = () => {
+    setExportPassword('');
+    setExportAuthError('');
+    setShowExportAuthModal(true);
+  };
+
+  const handleSubmitExportAuth = (e) => {
+    e.preventDefault();
+    if (exportPassword === 'abdoraki2001') {
+      setShowExportAuthModal(false);
+      setShowExportModal(true);
+      setExportPassword('');
+      setExportAuthError('');
+    } else {
+      setExportAuthError('Mot de passe incorrect. Veuillez réessayer.');
+    }
+  };
+ 
   return (
     <div className="liste-etudiants-container" style={{
           background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
@@ -764,9 +790,32 @@ const closeEditModal = () => {
             </button>
           </div>
           
+          {/* ✅ NOUVEAU: Bouton d'export Excel (ouvre modal d'authentification) */}
+          <button 
+            onClick={openExportAuth} 
+            className="btn-export-excel"
+            title="Exporter vers Excel"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#0369a1',
+              color: '#fff',
+              border: 'none',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '13px'
+            }}
+          >
+            <Download size={18} />
+            Exporter Excel
+          </button>
+          
           <button onClick={openModal} className="btn-ajouter-etudiant">
              Ajouter un étudiant
           </button>
+          
         </div>
       </div>
 
@@ -1929,6 +1978,7 @@ const closeEditModal = () => {
             <div className="info-label">Téléphone Père</div>
             <div className="info-value">
               <Phone size={16} className="inline mr-1" /> 
+              
               {etudiantSelectionne.telephonePere || 'Non spécifié'}
             </div>
           </div>
@@ -2014,8 +2064,50 @@ const closeEditModal = () => {
     </div>
   </div>
 )}
+
+      {/* Modal d'authentification avant export */}
+      {showExportAuthModal && (
+        <div className="modal-overlay" onClick={() => setShowExportAuthModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Authentification requise</h3>
+              <button className="btn-fermer-modal" onClick={() => setShowExportAuthModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleSubmitExportAuth} className="form-export-auth">
+              <div className="form-group">
+                <label>Mot de passe</label>
+                <input
+                  type="password"
+                  value={exportPassword}
+                  onChange={(e) => setExportPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {exportAuthError && <div className="message-ajout error" style={{marginTop: '8px'}}>{exportAuthError}</div>}
+              <div className="modal-actions" style={{marginTop: '12px', display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                <button type="button" onClick={() => setShowExportAuthModal(false)} className="btn-annuler">Annuler</button>
+                <button type="submit" className="btn-enregistrer">Valider</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'export Excel */}
+      {showExportModal && (
+        <ExportEtudiants 
+          etudiants={etudiantsFiltres}
+          onClose={() => {
+            setShowExportModal(false);
+            setExportPassword('');
+            setExportAuthError('');
+          }}
+        />
+      )}
+ 
     </div>
   );
 };
-
-export default ListeEtudiants;
+ 
+ export default ListeEtudiants;

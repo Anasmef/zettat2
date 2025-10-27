@@ -20,7 +20,7 @@ import ListeProfesseurs from './pages/ListeProfesseurs';
 import ProfesseurDashboard from './pages/ProfesseurDashboard';
 import ListePresenceProf from './pages/ListePresenceProf';
 import EtudiantsProfesseur from './pages/EtudiantsProfesseur';
-import DashboardEtudiant from './pages/DashboardEtudiant';
+import EtudiantPhotoUpload from './pages/EtudiantPhotoUpload';
 import Profile from './pages/Profile';
 import EtudiantPresences from './pages/EtudiantPresences';
 import EvenementsProf from './pages/EvenementsProf';
@@ -75,8 +75,8 @@ import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
 import ReclamationsProfesseur
  from './pages/ReclamationsProfesseur';
 
- import  BadgeGenerator
- from './pages/BadgeGenerator';
+ import  BadgeGeneratorModern
+ from './pages/BadgeGeneratorModern';
 
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
@@ -336,7 +336,7 @@ function AppContent() {
         <Route path="/register" element={<Register />} />
         <Route path="/prof/qr-scanner" element={<ProfQRScanner />} />
 
-        <Route path="/badge-generator" element={<BadgeGenerator />} />
+        <Route path="/badge-generator" element={<BadgeGeneratorModern />} />
 
         {/* Routes Admin */}
         <Route path="/admin" element={<AdminDashboard />} />
@@ -396,7 +396,7 @@ function AppContent() {
         <Route path="/etudiant/messages" element={<MessageEtudiant />} />
         <Route path="/professeur/profil" element={<ProfesseurProfil />} />
         <Route path="/etudiant/profil" element={<EtudiantProfil />} />
-        <Route path="/etudiant" element={<DashboardEtudiant />} />
+        <Route path="/etudiant" element={<EtudiantPhotoUpload />} />
         <Route path="/etudiant/profile" element={<Profile />} />
         <Route path="/etudiant/presences" element={<EtudiantPresences />} />
         <Route path="/etudiant/paiements" element={<EtudiantPaiements />} />

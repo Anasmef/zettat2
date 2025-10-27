@@ -1,0 +1,21 @@
+/* BadgeGeneratorModern.css */
+/* Les styles principaux sont définis inline dans le composant */
+/* Ce fichier peut être utilisé pour des styles additionnels si nécessaire */
+
+.screen-grid {
+  display: grid !important;
+}
+
+.print-grid {
+  display: none;
+}
+
+@media print {
+  .screen-grid {
+    display: none !important;
+  }
+  
+  .print-grid {
+    display: flex !important;
+  }
+}

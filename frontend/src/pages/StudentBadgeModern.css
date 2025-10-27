@@ -1,0 +1,397 @@
+/* StudentBadgeModern.css */
+
+.badge-modern-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+/* Carte unique */
+.badge-modern-card {
+  width: 450px;
+  height: 280px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid #000000;
+  transition: all 0.3s ease;
+}
+
+.badge-modern-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* En-tête avec dégradé */
+.badge-modern-header {
+  height: 115px;
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Logo */
+.badge-modern-logo-container {
+  width: 85px;
+  height: 85px;
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.badge-modern-logo {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 12px;
+}
+
+.badge-modern-logo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Texte de l'en-tête */
+.badge-modern-header-text {
+  flex: 1;
+  color: #ffffff;
+  text-align: center;
+}
+
+.badge-modern-card-type-main {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.badge-modern-card-subtype-year {
+  font-size: 10px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.8px;
+  opacity: 0.9;
+  text-transform: uppercase;
+}
+
+.badge-modern-card-type {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 3px 0;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.badge-modern-card-subtype {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 5px 0;
+  letter-spacing: 0.8px;
+  opacity: 0.95;
+}
+
+.badge-modern-card-year {
+  font-size: 11px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: 0.8px;
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+/* Photo étudiant */
+.badge-modern-photo-container {
+  width: 70px;
+  height: 70px;
+  border-radius: 14px;
+  background-color: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.badge-modern-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.badge-modern-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Corps de la carte avec grille */
+.badge-modern-body {
+  flex: 1;
+  padding: 22px 24px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-modern-content-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  height: 100%;
+}
+
+.badge-modern-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.badge-modern-info-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.badge-modern-info-row-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.badge-modern-info-row-massar {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  padding: 8px 10px;
+  margin: 0 -10px;
+  border-radius: 8px;
+  border-left: 3px solid #6366f1;
+}
+
+.badge-modern-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  min-width: 110px;
+}
+
+.badge-modern-value {
+  font-size: 16px;
+  font-weight: 800;
+  color: #000000;
+  text-align: center;
+  width: 100%;
+}
+
+.badge-modern-value-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #000000;
+  line-height: 1.3;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-align: center;
+  width: 100%;
+}
+
+.badge-modern-value-highlight {
+  font-size: 16px;
+  font-weight: 800;
+  color: #000000;
+  text-align: center;
+  width: 100%;
+}
+
+.badge-modern-value-massar {
+  font-size: 15px;
+  font-weight: 800;
+  color: #6366f1;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+}
+
+/* QR Code compact */
+.badge-modern-qr-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.badge-modern-qr-small {
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.badge-modern-qr-placeholder-small {
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 12px;
+  border: 2px solid #e5e7eb;
+}
+
+.badge-modern-qr-label-small {
+  margin: 0;
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Texte AUTORISATION DE SORTIE en rouge */
+.badge-modern-autorisation-text {
+  margin: 0;
+  font-size: 8px;
+  color: #dc2626;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  padding: 3px 6px;
+  background-color: #fee2e2;
+  border-radius: 4px;
+  border: 1.5px solid #dc2626;
+}
+
+/* Styles d'impression */
+@media print {
+  .badge-modern-wrapper {
+    page-break-inside: avoid;
+    margin-bottom: 20mm;
+  }
+
+  .badge-modern-card {
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+  }
+
+  .print-header {
+    background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-photo {
+    background-color: rgba(255, 255, 255, 0.25) !important;
+    border: 2px solid rgba(255, 255, 255, 0.5) !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .print-gradient {
+    color: #000000 !important;
+  }
+  
+  .badge-modern-info-row-massar {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%) !important;
+    border-left: 3px solid #6366f1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .badge-modern-card-year {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .badge-modern-autorisation-text {
+    color: #dc2626 !important;
+    background-color: #fee2e2 !important;
+    border: 2px solid #dc2626 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .badge-modern-card {
+    width: 100%;
+    max-width: 450px;
+  }
+}
+
+@media (max-width: 480px) {
+  .badge-modern-card {
+    width: 100%;
+    height: auto;
+    min-height: 280px;
+  }
+
+  .badge-modern-header {
+    height: auto;
+    min-height: 115px;
+    padding: 16px;
+  }
+
+  .badge-modern-logo-container {
+    width: 70px;
+    height: 70px;
+  }
+
+  .badge-modern-logo {
+    width: 65px;
+    height: 65px;
+  }
+
+  .badge-modern-photo-container {
+    width: 60px;
+    height: 60px;
+  }
+
+  .badge-modern-content-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .badge-modern-qr-compact {
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .badge-modern-value {
+    font-size: 14px;
+  }
+}

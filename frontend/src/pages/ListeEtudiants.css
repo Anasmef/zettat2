@@ -1022,6 +1022,71 @@ body {
   margin: 0;
   flex: 1;
 }
+
+.btn-export-excel {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(39, 174, 96, 0.2);
+}
+
+.btn-export-excel:hover {
+  background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(39, 174, 96, 0.3);
+}
+
+.btn-export-excel:active {
+  transform: translateY(0);
+}
+
+/* Ajustement de la section header-actions pour bien positionner les boutons */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.vue-toggle {
+  display: flex;
+  gap: 4px;
+  background: #f0f0f0;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.btn-vue {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: #666;
+}
+
+.btn-vue.active {
+  background: white;
+  color: #3498db;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-vue:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.5);
+}
 .btn-export-excel {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;

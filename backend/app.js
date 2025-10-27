@@ -4927,6 +4927,23 @@ app.get('/api/presences/:etudiantId', authAdminOrInscripteurOrPaiementManager, a
     res.status(500).json({ error: err.message });
   }
 });
+// Route publique pour afficher les infos d'un étudiant via QR code
+app.get('/etudiant/:id', async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id)
+      .select('-motDePasse -__v'); // Exclure le mot de passe
+
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // Retourner les informations de l'étudiant
+    res.json(etudiant);
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'étudiant:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
 app.get('/api/presences/etudiant/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const presences = await Presence.find({ etudiant: req.params.id }).sort({ dateSession: -1 });
@@ -5758,6 +5775,22 @@ app.post('/api/paiements', authAdminOrInscripteurOrPaiementManager, async (req, 
         message: err.errors[key].message
       })) : null
     });
+  }
+});
+app.get('/public/:id', async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id)
+      .select('-motDePasse -__v'); // Exclure le mot de passe
+
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // Retourner les informations de l'étudiant
+    res.json(etudiant);
+  } catch (error) {
+    console.error('Erreur lors de la récupération de l\'étudiant:', error);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 app.put('/api/etudiant/profil', authEtudiant, async (req, res) => {
@@ -8007,6 +8040,7 @@ app.post('/api/messages/upload-prof', authProfesseur, uploadMessageFile.single('
     res.status(500).json({ message: 'حدث خطأ في الخادم' });
   }
 });
+
 // ✅ Route pour obtenir les informations du professeur connecté
 app.get('/api/professeur/me', authProfesseur, async (req, res) => {
   try {
@@ -8039,7 +8073,183 @@ app.get('/api/admin/profile', authAdminOrInscripteurOrPaiementManager, async (re
     res.status(500).json({ error: err.message });
   }
 });
+// ====================================================================
+// 📸 ROUTES UPLOAD PHOTO ÉTUDIANT - À COPIER DIRECTEMENT DANS APP.JS
+// ====================================================================
+// ⚠️ Ajouter APRÈS la ligne 80: app.use('/uploads', express.static('uploads'));
+// ====================================================================
 
+// Configuration multer pour les photos étudiants (3MB max)
+const photoEtudiantStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/etudiants/';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'etudiant-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const uploadPhotoEtudiant = multer({
+  storage: photoEtudiantStorage,
+  limits: {
+    fileSize: 3 * 1024 * 1024 // 3MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Format de fichier non autorisé'), false);
+    }
+  }
+});
+
+// ====================================================================
+// 📍 ROUTE 1: GET - Récupérer les informations de l'étudiant
+// ====================================================================
+app.get('/api/etudiant/photo/info', authEtudiant, async (req, res) => {
+  try {
+    const etudiantId = req.etudiantId; // Vient de votre middleware authEtudiant
+    
+    const etudiant = await Etudiant.findById(etudiantId).select(
+      'nomComplet email image codeMassar niveau'
+    );
+    
+    if (!etudiant) {
+      return res.status(404).json({
+        success: false,
+        message: {
+          ar: 'الطالب غير موجود',
+          fr: 'Étudiant non trouvé'
+        }
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        nomComplet: etudiant.nomComplet,
+        email: etudiant.email,
+        image: etudiant.image,
+        codeMassar: etudiant.codeMassar,
+        niveau: etudiant.niveau,
+        photoDejaEnvoyee: !!etudiant.image
+      }
+    });
+  } catch (error) {
+    console.error('Erreur récupération infos étudiant:', error);
+    res.status(500).json({
+      success: false,
+      message: {
+        ar: 'حدث خطأ في الخادم',
+        fr: 'Erreur serveur'
+      }
+    });
+  }
+});
+
+// ====================================================================
+// 📍 ROUTE 2: POST - Upload photo (UNE SEULE FOIS)
+// ====================================================================
+app.post('/api/etudiant/photo/upload-photo', authEtudiant, uploadPhotoEtudiant.single('photo'), async (req, res) => {
+  try {
+    const etudiantId = req.etudiantId;
+    
+    // Vérifier si l'étudiant existe
+    const etudiant = await Etudiant.findById(etudiantId);
+    
+    if (!etudiant) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(404).json({
+        success: false,
+        message: {
+          ar: 'الطالب غير موجود',
+          fr: 'Étudiant non trouvé'
+        }
+      });
+    }
+    
+    // ✅ VÉRIFIER SI PHOTO DÉJÀ ENVOYÉE (BLOQUAGE)
+    if (etudiant.image) {
+      if (req.file) {
+        fs.unlinkSync(req.file.path);
+      }
+      return res.status(403).json({
+        success: false,
+        photoDejaEnvoyee: true,
+        message: {
+          ar: 'لقد قمت بإرسال صورتك بالفعل. إذا كنت بحاجة إلى تعديلها، يرجى التواصل مع الإدارة المدرسية',
+          fr: 'Vous avez déjà envoyé votre photo. Si vous devez la modifier, veuillez contacter la scolarité'
+        }
+      });
+    }
+    
+    // Vérifier si un fichier a été uploadé
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: {
+          ar: 'الرجاء اختيار صورة',
+          fr: 'Veuillez sélectionner une photo'
+        }
+      });
+    }
+    
+    // ✅ SAUVEGARDER LE CHEMIN DE LA PHOTO
+    etudiant.image = req.file.path;
+    await etudiant.save();
+    
+    res.status(200).json({
+      success: true,
+      message: {
+        ar: 'تم إرسال الصورة بنجاح!',
+        fr: 'Photo envoyée avec succès !'
+      },
+      data: {
+        imagePath: etudiant.image
+      }
+    });
+  } catch (error) {
+    console.error('Erreur upload photo:', error);
+    
+    // Supprimer le fichier en cas d'erreur
+    if (req.file) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    // Gestion erreur taille fichier
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: {
+          ar: 'حجم الملف كبير جداً. الحد الأقصى هو 3 ميغابايت',
+          fr: 'Fichier trop volumineux. Taille maximale : 3MB'
+        }
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: {
+        ar: 'حدث خطأ أثناء رفع الصورة',
+        fr: 'Erreur lors de l\'envoi de la photo'
+      }
+    });
+  }
+});
+
+// ====================================================================
+// ✅ TERMINÉ! Les routes sont prêtes:
+// GET  http://localhost:5004/api/etudiant/photo/info
+// POST http://localhost:5004/api/etudiant/photo/upload-photo
+// ====================================================================
 app.put('/api/admin/profile', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     console.log('📝 Route profile PUT appelée - Admin ID:', req.adminId);
