@@ -440,24 +440,25 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
           groupSessions
             .sort((a,b) => new Date(a.date) - new Date(b.date))
             .forEach(session => {
-              session.presences.forEach(p => {
-                if (statusFilter === 'absent' && p.present) return;
-                if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) return;
+           session.presences.forEach(p => {
+  if (statusFilter === 'absent' && p.present) return;
+  if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) return;
+  if (statusFilter === 'absent_retard' && (p.present && (p.retardMinutes || 0) === 0)) return;  // ← AJOUTER CETTE LIGNE
 
-                aoa.push([
-                  formatDate(session.date),
-                  session.cours,
-                  session.matiere || 'N/A',
-                  session.nomProfesseur || 'N/A',
-                  session.presences[0]?.periode || 'N/A',
-                  session.presences[0]?.heure || 'N/A',
-                  p.etudiant?.nomComplet || 'N/A',
-                  p.present ? ((p.retardMinutes || 0) > 0 ? 'En retard' : 'Présent') : 'Absent',
-                  p.retardMinutes || 0,
-                  p.remarque || ''
-                ]);
-                currentRow++;
-              });
+  aoa.push([
+    formatDate(session.date),
+    session.cours,
+    session.matiere || 'N/A',
+    session.nomProfesseur || 'N/A',
+    session.presences[0]?.periode || 'N/A',
+    session.presences[0]?.heure || 'N/A',
+    p.etudiant?.nomComplet || 'N/A',
+    p.present ? ((p.retardMinutes || 0) > 0 ? 'En retard' : 'Présent') : 'Absent',
+    p.retardMinutes || 0,
+    p.remarque || ''
+  ]);
+  currentRow++;
+});
             });
 
           // سطر فارغ بين الجداول الفرعية
@@ -746,9 +747,11 @@ const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Présences par Classe');
 
-  const statusSuffixFile = statusFilter === 'absent' ? '_absents' : statusFilter === 'retard' ? '_retards' : '';
-  const filename = `presences_${monthName}_${year}${statusSuffixFile}`;
-  XLSX.writeFile(wb, `${filename}.xlsx`);
+  const statusSuffixFile = statusFilter === 'absent' ? '_absents' : 
+                        statusFilter === 'retard' ? '_retards' : 
+                        statusFilter === 'absent_retard' ? '_absents_retards' : '';  // ← AJOUTER CETTE PARTIE
+const filename = `presences_${monthName}_${year}${statusSuffixFile}`;
+XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 
 // Export présences par mois avec résumé général et détails - VERSION STYLÉE
@@ -2194,14 +2197,15 @@ const exportByProfessor = (professorName) => {
                           <option value="soir">Soir</option>
                         </select>
                       </div>
-                      <div>
-                        <label style={styles.filterLabel}>Étudiants à inclure</label>
-                        <select id="exportDailyStatus" style={styles.filterSelect}>
-                          <option value="all">Tous les étudiants</option>
-                          <option value="absent">Seulement les absents</option>
-                          <option value="retard">Seulement les retards</option>
-                        </select>
-                      </div>
+                     <div>
+  <label style={styles.filterLabel}>Étudiants à inclure</label>
+  <select id="exportDailyStatus" style={styles.filterSelect}>
+    <option value="all">Tous les étudiants</option>
+    <option value="absent">Seulement les absents</option>
+    <option value="retard">Seulement les retards</option>
+    <option value="absent_retard">Absents et retards</option>  {/* ← AJOUTER CETTE LIGNE */}
+  </select>
+</div>
                     </div>
                     <button
                       onClick={() => {
@@ -2245,14 +2249,16 @@ const exportByProfessor = (professorName) => {
                           })}
                         </select>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={styles.filterLabel}>Étudiants à inclure</label>
-                        <select id="exportMonthlyStatus" style={styles.filterSelect}>
-                          <option value="all">Tous les étudiants</option>
-                          <option value="absent">Seulement les absents</option>
-                          <option value="retard">Seulement les retards</option>
-                        </select>
-                      </div>
+               <div style={{ flex: 1 }}>
+  <label style={styles.filterLabel}>Étudiants à inclure</label>
+  <select id="exportMonthlyStatus" style={styles.filterSelect}>
+    <option value="all">Tous les étudiants</option>
+    <option value="absent">Seulement les absents</option>
+    <option value="retard">Seulement les retards</option>
+    <option value="absent_retard">Absents et retards</option>  {/* ← AJOUTER CETTE LIGNE */}
+  </select>
+</div>
+
                     </div>
                     
                     <div style={{ display: 'flex', gap: '12px' }}>
