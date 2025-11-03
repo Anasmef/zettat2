@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, Clock, UserCheck, UserX, AlertTriangle, Eye, ChevronLeft, ChevronRight, RefreshCw, BarChart3, TrendingUp } from 'lucide-react';
+import { Calendar, Users, Clock, UserCheck, UserX, AlertTriangle, ChevronLeft, ChevronRight, RefreshCw, BarChart3, TrendingUp, LogOut as LogOutIcon2, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
 
 const AdminPointagesView = () => {
   const [dateSelectionnee, setDateSelectionnee] = useState(new Date().toISOString().split('T')[0]);
@@ -29,9 +26,6 @@ const AdminPointagesView = () => {
     }
     
     try {
-      console.log('Récupération pointages pour date:', dateSelectionnee);
-      
-      // ✅ Utiliser la route avec query parameter
       const res = await fetch(`/api/admin/pointages?date=${dateSelectionnee}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -39,11 +33,8 @@ const AdminPointagesView = () => {
         }
       });
 
-      console.log('Statut réponse:', res.status);
-
       if (res.ok) {
         const data = await res.json();
-        console.log('Données reçues:', data);
         
         if (data.success) {
           setPointagesData(data);
@@ -52,14 +43,79 @@ const AdminPointagesView = () => {
         }
       } else {
         const errorText = await res.text();
-        console.error('Erreur serveur:', errorText);
         setMessage({ type: 'error', text: `Erreur ${res.status}: ${errorText}` });
       }
     } catch (err) {
-      console.error('Erreur fetch:', err);
       setMessage({ type: 'error', text: `Erreur de connexion: ${err.message}` });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const exportToExcel = () => {
+    if (!pointagesData) {
+      setMessage({ type: 'error', text: 'Aucune donnée à exporter' });
+      return;
+    }
+
+    try {
+      // Créer un nouveau classeur
+      const wb = XLSX.utils.book_new();
+
+      // Feuille 1: Statistiques
+      const statsData = [
+        ['Rapport de Pointage'],
+        ['Date', dateSelectionnee],
+        [''],
+        ['Statistiques Globales'],
+        ['Total Professeurs', pointagesData.stats.totalProfesseurs],
+        ['Présents', pointagesData.stats.presents],
+        ['Absents', pointagesData.stats.absents],
+        ['Sans Sortie', pointagesData.stats.sansSortie || 0],
+        ['Taux de Présence', `${pointagesData.stats.tauxPresence}%`]
+      ];
+      const wsStats = XLSX.utils.aoa_to_sheet(statsData);
+      XLSX.utils.book_append_sheet(wb, wsStats, 'Statistiques');
+
+      // Feuille 2: Professeurs Pointés
+      const pointagesFormatted = pointagesData.pointages.map(p => ({
+        'Nom': p.nomProfesseur,
+        'Email': p.emailProfesseur,
+        'Heure d\'Entrée': p.heureEntree,
+        'Heure de Sortie': p.heureSortie || 'Non pointée',
+        'Temps de Présence': p.tempsPresence > 0 ? formatTempsPresence(p.tempsPresence) : 'N/A',
+        'Date': new Date(p.date).toLocaleDateString('fr-FR')
+      }));
+      
+      if (pointagesFormatted.length > 0) {
+        const wsPointages = XLSX.utils.json_to_sheet(pointagesFormatted);
+        XLSX.utils.book_append_sheet(wb, wsPointages, 'Professeurs Pointés');
+      }
+
+      // Feuille 3: Professeurs Absents
+      const absentsFormatted = pointagesData.professeursAbsents.map(p => ({
+        'Nom': p.nom,
+        'Email': p.email,
+        'Matière': p.matiere,
+        'Statut': 'Absent',
+        'Date': dateSelectionnee
+      }));
+      
+      if (absentsFormatted.length > 0) {
+        const wsAbsents = XLSX.utils.json_to_sheet(absentsFormatted);
+        XLSX.utils.book_append_sheet(wb, wsAbsents, 'Professeurs Absents');
+      }
+
+      // Générer le fichier Excel
+      const fileName = `Pointages_${dateSelectionnee}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      setMessage({ type: 'success', text: 'Export Excel réussi !' });
+      
+      // Effacer le message après 3 secondes
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: `Erreur lors de l'export: ${error.message}` });
     }
   };
 
@@ -69,31 +125,17 @@ const AdminPointagesView = () => {
     setDateSelectionnee(date.toISOString().split('T')[0]);
   };
 
-  const getStatutColor = (statut) => {
-    switch (statut) {
-      case 'présent': return '#10b981';
-      case 'retard': return '#f59e0b';
-      default: return '#64748b';
-    }
+  const formatTempsPresence = (minutes) => {
+    const heures = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${heures}h ${mins}min`;
   };
 
-  const formatHeure = (heure) => {
-    // Si heure est déjà au format HH:MM, la retourner telle quelle
-    if (typeof heure === 'string' && heure.includes(':')) {
-      return heure;
-    }
-    // Sinon, essayer de la formater depuis une date
-    try {
-      return new Date(heure).toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return heure;
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/';
   };
 
-  // Styles professionnels
   const cardStyle = {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(10px)',
@@ -167,11 +209,62 @@ const AdminPointagesView = () => {
       minHeight: '100vh',
       backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '40px 20px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>      <Sidebar onLogout={handleLogout} />
+
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-                <Sidebar onLogout={handleLogout} />
         
+        {/* Boutons Déconnexion et Export */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          gap: '12px', 
+          marginBottom: '20px',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            onClick={exportToExcel}
+            disabled={!pointagesData}
+            style={{
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              fontWeight: '600',
+              cursor: pointagesData ? 'pointer' : 'not-allowed',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)',
+              opacity: pointagesData ? 1 : 0.6
+            }}
+          >
+            <Download size={18} />
+            Exporter Excel
+          </button>
+          
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            <LogOutIcon2 size={18} />
+            Déconnexion
+          </button>
+        </div>
+
         {/* Header */}
         <div style={{
           ...cardStyle,
@@ -208,7 +301,7 @@ const AdminPointagesView = () => {
             margin: 0,
             fontWeight: '500'
           }}>
-            Consultez les pointages par jour et gérez les présences
+            Consultez les entrées/sorties et gérez les présences
           </p>
         </div>
 
@@ -405,32 +498,6 @@ const AdminPointagesView = () => {
                   width: '50px',
                   height: '50px',
                   borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 16px',
-                  boxShadow: '0 8px 25px rgba(245, 158, 11, 0.3)'
-                }}>
-                  <Clock size={24} style={{ color: 'white' }} />
-                </div>
-                <h3 style={{ fontSize: '28px', fontWeight: '700', color: '#1a202c', margin: '0 0 4px 0' }}>
-                  {pointagesData.stats.retards}
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '14px', margin: 0, fontWeight: '500' }}>
-                  Retards
-                </p>
-              </div>
-
-              <div style={{
-                ...cardStyle,
-                padding: '24px',
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '50%',
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   display: 'flex',
                   alignItems: 'center',
@@ -445,6 +512,32 @@ const AdminPointagesView = () => {
                 </h3>
                 <p style={{ color: '#64748b', fontSize: '14px', margin: 0, fontWeight: '500' }}>
                   Absents
+                </p>
+              </div>
+
+              <div style={{
+                ...cardStyle,
+                padding: '24px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  width: '50px',
+                  height: '50px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                  boxShadow: '0 8px 25px rgba(245, 158, 11, 0.3)'
+                }}>
+                  <Clock size={24} style={{ color: 'white' }} />
+                </div>
+                <h3 style={{ fontSize: '28px', fontWeight: '700', color: '#1a202c', margin: '0 0 4px 0' }}>
+                  {pointagesData.stats.sansSortie || 0}
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '14px', margin: 0, fontWeight: '500' }}>
+                  Sans Sortie
                 </p>
               </div>
 
@@ -478,10 +571,7 @@ const AdminPointagesView = () => {
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '40px',
-              '@media (max-width: 768px)': {
-                gridTemplateColumns: '1fr'
-              }
+              gap: '40px'
             }}>
               
               {/* Liste des pointages */}
@@ -535,7 +625,7 @@ const AdminPointagesView = () => {
                           style={{
                             backgroundColor: 'rgba(248, 250, 252, 0.8)',
                             border: '1px solid rgba(226, 232, 240, 0.8)',
-                            borderLeft: `4px solid ${getStatutColor(pointage.statut)}`,
+                            borderLeft: `4px solid #10b981`,
                             borderRadius: '12px',
                             padding: '20px',
                             transition: 'all 0.3s ease'
@@ -546,55 +636,68 @@ const AdminPointagesView = () => {
                           <div style={{
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center',
+                            alignItems: 'start',
                             marginBottom: '12px'
                           }}>
-                            <h4 style={{
-                              fontWeight: '600',
-                              color: '#1a202c',
-                              margin: 0,
-                              fontSize: '16px'
-                            }}>
-                              {pointage.nomProfesseur}
-                            </h4>
-                            <span style={{
-                              padding: '4px 12px',
-                              borderRadius: '20px',
-                              color: 'white',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              backgroundColor: getStatutColor(pointage.statut)
-                            }}>
-                              {pointage.statut.toUpperCase()}
-                            </span>
+                            <div>
+                              <h4 style={{
+                                fontWeight: '600',
+                                color: '#1a202c',
+                                margin: '0 0 8px 0',
+                                fontSize: '16px'
+                              }}>
+                                {pointage.nomProfesseur}
+                              </h4>
+                              <p style={{ fontSize: '14px', color: '#64748b', margin: 0, fontWeight: '500' }}>
+                                {pointage.emailProfesseur}
+                              </p>
+                            </div>
+                            
+                            {pointage.tempsPresence > 0 && (
+                              <div style={{
+                                padding: '6px 12px',
+                                borderRadius: '20px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                color: '#2563eb'
+                              }}>
+                                {formatTempsPresence(pointage.tempsPresence)}
+                              </div>
+                            )}
                           </div>
                           
                           <div style={{
-                            fontSize: '14px',
-                            color: '#64748b',
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',
-                            gap: '8px',
-                            marginBottom: '12px'
+                            gap: '12px',
+                            marginTop: '12px'
                           }}>
-                            <p style={{ margin: 0, fontWeight: '500' }}>
-                              <strong>Email:</strong><br/>
-                              {pointage.emailProfesseur}
-                            </p>
-                            <p style={{ margin: 0, fontWeight: '500' }}>
-                              <strong>Heure:</strong><br/>
-                              {formatHeure(pointage.heure)}
-                            </p>
-                            {pointage.professeur?.matiere && (
-                              <p style={{ margin: 0, fontWeight: '500' }}>
-                                <strong>Matière:</strong><br/>
-                                {pointage.professeur.matiere}
+                            <div style={{
+                              padding: '12px',
+                              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                              borderRadius: '8px'
+                            }}>
+                              <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px 0', fontWeight: '600' }}>
+                                ENTRÉE
                               </p>
-                            )}
-                            <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', fontWeight: '500' }}>
-                              <strong>QR ID:</strong><br/>
-                              {pointage.codeQRId}
-                            </p>
+                              <p style={{ fontSize: '16px', fontWeight: '700', color: '#10b981', margin: 0 }}>
+                                {pointage.heureEntree}
+                              </p>
+                            </div>
+                            
+                            <div style={{
+                              padding: '12px',
+                              backgroundColor: pointage.heureSortie ? 'rgba(239, 68, 68, 0.1)' : 'rgba(156, 163, 175, 0.1)',
+                              borderRadius: '8px'
+                            }}>
+                              <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 4px 0', fontWeight: '600' }}>
+                                SORTIE
+                              </p>
+                              <p style={{ fontSize: '16px', fontWeight: '700', color: pointage.heureSortie ? '#ef4444' : '#9ca3af', margin: 0 }}>
+                                {pointage.heureSortie || '--:--'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -711,29 +814,6 @@ const AdminPointagesView = () => {
             </div>
           </>
         )}
-
-        {/* Debug info */}
-        <div style={{
-          marginTop: '32px',
-          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-          color: 'white',
-          borderRadius: '16px',
-          padding: '20px',
-          fontSize: '12px',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <p style={{ margin: '0 0 8px 0', fontWeight: '700' }}>Debug Info:</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-            <p style={{ margin: 0 }}>Date sélectionnée: {dateSelectionnee}</p>
-            <p style={{ margin: 0 }}>Token présent: {localStorage.getItem('token') ? 'Oui' : 'Non'}</p>
-            <p style={{ margin: 0 }}>Données chargées: {pointagesData ? 'Oui' : 'Non'}</p>
-            {pointagesData && (
-              <p style={{ margin: 0 }}>
-                Pointages: {pointagesData.pointages.length} / Absents: {pointagesData.professeursAbsents.length}
-              </p>
-            )}
-          </div>
-        </div>
       </div>
       
       <style>
@@ -741,12 +821,6 @@ const AdminPointagesView = () => {
           @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-          }
-          
-          @media (max-width: 768px) {
-            .grid-responsive {
-              grid-template-columns: 1fr !important;
-            }
           }
         `}
       </style>

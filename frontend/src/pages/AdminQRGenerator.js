@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye } from 'lucide-react';
+import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut as LogOutIcon } from 'lucide-react';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
 
 const AdminQRPage = () => {
   const [qrCode, setQrCode] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [validiteHeures, setValiditeHeures] = useState(1);
   const [description, setDescription] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [pointages, setPointages] = useState(null);
@@ -19,7 +14,6 @@ const AdminQRPage = () => {
     fetchPointages();
     fetchQRCodesActifs();
     
-    // Actualiser toutes les minutes
     const interval = setInterval(() => {
       fetchPointages();
       fetchQRCodesActifs();
@@ -71,7 +65,6 @@ const AdminQRPage = () => {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          validiteMinutes: validiteHeures * 60,
           description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}`
         })
       });
@@ -80,7 +73,7 @@ const AdminQRPage = () => {
       
       if (data.success) {
         setQrCode(data.qrCode);
-        setMessage({ type: 'success', text: 'QR Code généré avec succès!' });
+        setMessage({ type: 'success', text: data.message || 'QR Code généré avec succès!' });
         fetchQRCodesActifs();
       } else {
         setMessage({ type: 'error', text: data.message });
@@ -118,6 +111,11 @@ const AdminQRPage = () => {
     link.download = `qr-pointage-${new Date().toISOString().split('T')[0]}.png`;
     link.href = qrCode.dataURL;
     link.click();
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/';
   };
 
   const cardStyle = {
@@ -160,10 +158,33 @@ const AdminQRPage = () => {
       minHeight: '100vh',
       backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '40px 20px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}><Sidebar onLogout={handleLogout} />
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <Sidebar onLogout={handleLogout} />
+        
+        {/* Bouton Déconnexion */}
+        <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            <LogOutIcon size={18} />
+            Déconnexion
+          </button>
+        </div>
+
         {/* Header */}
         <div style={{ 
           ...cardStyle,
@@ -200,7 +221,7 @@ const AdminQRPage = () => {
             fontSize: '16px',
             fontWeight: '500'
           }}>
-            Système de pointage professeurs - Administration
+            Système de pointage - UN QR par jour (20 heures)
           </p>
         </div>
 
@@ -215,7 +236,7 @@ const AdminQRPage = () => {
             }}>
               <Plus size={24} style={{ color: '#667eea', marginRight: '12px' }} />
               <h2 style={{ margin: 0, color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
-                Nouveau QR Code
+                QR Code du Jour
               </h2>
             </div>
 
@@ -239,30 +260,6 @@ const AdminQRPage = () => {
               </div>
             )}
 
-            <div style={{ marginBottom: '24px' }}>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: '8px', 
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '14px'
-              }}>
-                Description
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optionnel - ex: Pointage matinée"
-                style={{
-                  ...inputStyle,
-                  width: '100%'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
-              />
-            </div>
-
             <div style={{ marginBottom: '32px' }}>
               <label style={{ 
                 display: 'block', 
@@ -271,21 +268,23 @@ const AdminQRPage = () => {
                 color: '#374151',
                 fontSize: '14px'
               }}>
-                Durée de validité
+                Description (Optionnel)
               </label>
-              <select
-                value={validiteHeures}
-                onChange={(e) => setValiditeHeures(Number(e.target.value))}
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="ex: Pointage matinée"
                 style={{
                   ...inputStyle,
                   width: '100%'
                 }}
-              >
-                <option value={1}>1 heure</option>
-                <option value={2}>2 heures</option>
-                <option value={4}>4 heures</option>
-                <option value={8}>8 heures</option>
-              </select>
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+              />
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>
+                ⚠️ Un seul QR code par jour, valable 20 heures
+              </p>
             </div>
 
             <button
@@ -317,7 +316,7 @@ const AdminQRPage = () => {
               ) : (
                 <>
                   <QrCode size={20} />
-                  Générer QR Code
+                  Générer/Récupérer QR du Jour
                 </>
               )}
             </button>
@@ -401,20 +400,6 @@ const AdminQRPage = () => {
                   <div style={{ 
                     textAlign: 'center', 
                     padding: '20px', 
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
-                    borderRadius: '16px',
-                    color: 'white',
-                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
-                      {pointages.stats.retards}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Retards</div>
-                  </div>
-                  
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '20px', 
                     background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
                     borderRadius: '16px',
                     color: 'white',
@@ -424,6 +409,20 @@ const AdminQRPage = () => {
                       {pointages.stats.absents}
                     </div>
                     <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Absents</div>
+                  </div>
+                  
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                    borderRadius: '16px',
+                    color: 'white',
+                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
+                  }}>
+                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
+                      {pointages.stats.sansSortie || 0}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Sans Sortie</div>
                   </div>
                   
                   <div style={{ 
@@ -462,7 +461,7 @@ const AdminQRPage = () => {
               }}>
                 <Clock size={24} style={{ color: '#667eea', marginRight: '12px' }} />
                 <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
-                  QR Codes Actifs
+                  QR Code Actif
                 </h3>
                 <span style={{
                   marginLeft: '12px',
@@ -488,7 +487,7 @@ const AdminQRPage = () => {
                   <QrCode size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
                   <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Aucun QR code actif</p>
                   <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.7 }}>
-                    Générez un nouveau QR code pour commencer
+                    Générez le QR code du jour
                   </p>
                 </div>
               ) : (
@@ -499,6 +498,7 @@ const AdminQRPage = () => {
                       style={{
                         backgroundColor: 'rgba(255, 255, 255, 0.8)',
                         border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderLeft: `4px solid #10b981`,
                         borderRadius: '12px',
                         padding: '20px',
                         marginBottom: '16px',
@@ -557,14 +557,12 @@ const AdminQRPage = () => {
                           }}
                           onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
                           onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
-                          title="Supprimer"
                         >
                           <Trash2 size={14} />
                           Supprimer
                         </button>
                       </div>
                       
-                      {/* Progress bar */}
                       <div style={{
                         width: '100%',
                         height: '6px',
@@ -573,10 +571,10 @@ const AdminQRPage = () => {
                         overflow: 'hidden'
                       }}>
                         <div style={{
-                          width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 60) * 100))}%`,
+                          width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 1200) * 100))}%`,
                           height: '100%',
-                          background: qr.tempsRestant < 30 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
-                                     qr.tempsRestant < 60 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
+                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
+                                     qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
                                      'linear-gradient(90deg, #10b981, #059669)',
                           transition: 'all 0.3s ease'
                         }}></div>
@@ -618,7 +616,7 @@ const AdminQRPage = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '600', color: '#1a202c', fontSize: '16px' }}>
                       {pointage.nomProfesseur}
                     </div>
@@ -628,19 +626,30 @@ const AdminQRPage = () => {
                   </div>
                   
                   <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>
-                      {pointage.heure}
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Entrée</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>
+                        {pointage.heureEntree}
+                      </div>
                     </div>
-                    <span style={{
-                      fontSize: '12px',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      fontWeight: '600',
-                      backgroundColor: pointage.statut === 'présent' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                      color: pointage.statut === 'présent' ? '#059669' : '#d97706'
-                    }}>
-                      {pointage.statut}
-                    </span>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Sortie</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: pointage.heureSortie ? '#ef4444' : '#9ca3af' }}>
+                        {pointage.heureSortie || '--:--'}
+                      </div>
+                    </div>
+                    {pointage.tempsPresence > 0 && (
+                      <div style={{
+                        fontSize: '12px',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontWeight: '600',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#2563eb'
+                      }}>
+                        {Math.floor(pointage.tempsPresence / 60)}h {pointage.tempsPresence % 60}min
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

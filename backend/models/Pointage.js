@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-// Schéma pour les pointages
+// Schéma pour les pointages - AVEC ENTRÉE ET SORTIE
 const pointageSchema = new mongoose.Schema({
   professeur: {
     type: mongoose.Schema.Types.ObjectId,
@@ -20,22 +20,38 @@ const pointageSchema = new mongoose.Schema({
     default: Date.now,
     required: true
   },
-  heure: {
+  // ✅ ENTRÉE
+  heureEntree: {
     type: String, // Format: "HH:MM"
     required: true
   },
-  timestamp: {
+  timestampEntree: {
     type: Date,
     default: Date.now
+  },
+  // ✅ SORTIE
+  heureSortie: {
+    type: String, // Format: "HH:MM"
+    default: null
+  },
+  timestampSortie: {
+    type: Date,
+    default: null
+  },
+  // ✅ STATUT SIMPLIFIÉ
+  statut: {
+    type: String,
+    enum: ['présent', 'absent'], // Plus de retard
+    default: 'présent'
+  },
+  // Temps de présence en minutes (calculé automatiquement)
+  tempsPresence: {
+    type: Number, // en minutes
+    default: 0
   },
   codeQRId: {
     type: String,
     required: true
-  },
-  statut: {
-    type: String,
-    enum: ['présent', 'retard'],
-    default: 'présent'
   },
   ipAddress: {
     type: String,
@@ -48,7 +64,16 @@ pointageSchema.index({ date: 1, professeur: 1 });
 pointageSchema.index({ professeur: 1, date: -1 });
 pointageSchema.index({ codeQRId: 1 });
 
-// Schéma pour les QR codes
+// Méthode pour calculer le temps de présence
+pointageSchema.methods.calculerTempsPresence = function() {
+  if (this.timestampSortie && this.timestampEntree) {
+    const diffMs = this.timestampSortie - this.timestampEntree;
+    return Math.floor(diffMs / (1000 * 60)); // en minutes
+  }
+  return 0;
+};
+
+// Schéma pour les QR codes - UN PAR JOUR valable 20H
 const qrCodeSchema = new mongoose.Schema({
   qrId: {
     type: String,
@@ -62,6 +87,10 @@ const qrCodeSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
+  },
+  // ✅ Date du jour (pour UN SEUL QR par jour)
+  dateJour: {
+    type: Date,
     required: true
   },
   createdAt: {
@@ -72,8 +101,10 @@ const qrCodeSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  // ✅ Validité fixe: 20 heures
   validiteMinutes: {
     type: Number,
+    default: 1200, // 20 heures = 1200 minutes
     required: true
   },
   scansCount: {
@@ -94,8 +125,8 @@ const qrCodeSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Index pour l'expiration automatique
-qrCodeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Index unique pour UN SEUL QR CODE par jour
+qrCodeSchema.index({ dateJour: 1 }, { unique: true });
 qrCodeSchema.index({ qrId: 1 });
 qrCodeSchema.index({ createdBy: 1 });
 

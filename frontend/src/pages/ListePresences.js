@@ -363,11 +363,24 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     return;
   }
 
-  // 1) نجمع حسب Classe
-  const classes = {};
+  // 1) Fonction pour extraire le niveau de la classe
+  const getClassLevel = (className) => {
+    const classUpper = className.toUpperCase();
+    if (classUpper.includes('2BAC') || classUpper.includes('2 BAC')) return '2BAC';
+    if (classUpper.includes('1BAC') || classUpper.includes('1 BAC')) return '1BAC';
+    if (classUpper.includes('TRONC') || classUpper.includes('TC')) return 'Tronc Commun';
+    if (classUpper.includes('3AC') || classUpper.includes('3 AC')) return '3AC';
+    if (classUpper.includes('2AC') || classUpper.includes('2 AC')) return '2AC';
+    if (classUpper.includes('1AC') || classUpper.includes('1 AC')) return '1AC';
+    return className; // Retourner le nom original si pas de correspondance
+  };
+
+  // Regrouper par niveau (pas par classe exacte)
+  const niveaux = {};
   sessionsOfDay.forEach(s => {
-    if (!classes[s.cours]) classes[s.cours] = [];
-    classes[s.cours].push(s);
+    const niveau = getClassLevel(s.cours);
+    if (!niveaux[niveau]) niveaux[niveau] = [];
+    niveaux[niveau].push(s);
   });
 
   const header = [
@@ -397,17 +410,48 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   const classRows = []; // Lignes des titres de classes
   const subTitleRows = []; // Lignes des sous-titres
 
-  // 2) داخل كل Classe: نجمع بجداول فرعية حسب (Prof + Période + Matière + Heure)
-  Object.entries(classes)
-    .sort(([a],[b]) => a.localeCompare(b,'fr'))
-    .forEach(([className, sessions], classIdx, classArr) => {
-      // عنوان Classe
-      aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
-      classRows.push(currentRow); // Enregistrer la ligne de classe
+  // Fonction de tri personnalisée pour les classes
+  const getClassOrder = (className) => {
+    const classUpper = className.toUpperCase();
+    
+    // 2BAC (ordre 1)
+    if (classUpper.includes('2BAC') || classUpper.includes('2 BAC')) return 1;
+    
+    // 1BAC (ordre 2)
+    if (classUpper.includes('1BAC') || classUpper.includes('1 BAC')) return 2;
+    
+    // Tronc Commun (ordre 3)
+    if (classUpper.includes('TRONC') || classUpper.includes('TC')) return 3;
+    
+    // 3AC (ordre 4)
+    if (classUpper.includes('3AC') || classUpper.includes('3 AC')) return 4;
+    
+    // 2AC (ordre 5)
+    if (classUpper.includes('2AC') || classUpper.includes('2 AC')) return 5;
+    
+    // 1AC (ordre 6)
+    if (classUpper.includes('1AC') || classUpper.includes('1 AC')) return 6;
+    
+    // Autres classes (à la fin)
+    return 999;
+  };
+
+  // 2) داخل كل Niveau: نجمع بجداول فرعية حسب (Prof + Période + Matière + Heure)
+  Object.entries(niveaux)
+    .sort(([a],[b]) => {
+      const orderA = getClassOrder(a);
+      const orderB = getClassOrder(b);
+      if (orderA !== orderB) return orderA - orderB;
+      return a.localeCompare(b, 'fr'); // Si même ordre, tri alphabétique
+    })
+    .forEach(([niveauName, sessions], niveauIdx, niveauArr) => {
+      // عنوان Niveau
+      aoa.push([`NIVEAU: ${niveauName}`, ...Array(colsCount - 1).fill('')]);
+      classRows.push(currentRow); // Enregistrer la ligne de niveau
       merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
       currentRow++;
 
-      // ⤵️ تجميع فرعي
+      // ⤵️ تجميع فرعي (regrouper par Prof + Période + Matière + Heure, même si classes différentes)
       const subGroups = {};
       sessions.forEach(s => {
         const prof   = s.nomProfesseur || 'N/A';
@@ -468,8 +512,8 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
           }
         });
 
-      // سطر فارغ بين الكلاسات
-      if (classIdx < classArr.length - 1) {
+      // سطر فارغ بين les niveaux
+      if (niveauIdx < niveauArr.length - 1) {
         aoa.push(Array(colsCount).fill(''));
         currentRow++;
       }
@@ -478,51 +522,55 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   // بناء الورقة
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   
-  // ===== STYLES DÉFINIS =====
+  // ===== STYLES OPTIMISÉS POUR L'IMPRESSION (ÉCONOMIE D'ENCRE) =====
   
-  // Style pour le titre principal (fond noir, texte blanc, gras, gros)
+  // Style pour le titre principal - GRIS CLAIR avec texte noir gras
   const titleStyle = {
-    font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
-    fill: { fgColor: { rgb: "000000" } },
-    alignment: { horizontal: "center", vertical: "center" }
-  };
-
-  // Style pour les titres de classe (fond gris foncé, texte blanc, gras)
-  const classStyle = {
-    font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
-    fill: { fgColor: { rgb: "333333" } },
-    alignment: { horizontal: "left", vertical: "center" }
-  };
-
-  // Style pour les sous-titres (fond gris clair, texte noir, gras)
-  const subTitleStyle = {
-    font: { bold: true, sz: 12, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "E6E6E6" } },
-    alignment: { horizontal: "left", vertical: "center" }
-  };
-
-  // ⭐ STYLE POUR LES HEADERS - FOND NOIR, TEXTE BLANC, GRAS ⭐
-  const headerStyle = {
-    font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-    fill: { fgColor: { rgb: "000000" } }, // Fond noir
+    font: { bold: true, sz: 16, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "E0E0E0" } }, // Gris très clair
     alignment: { horizontal: "center", vertical: "center" },
     border: {
-      top: { style: "thin", color: { rgb: "FFFFFF" } },
-      bottom: { style: "thin", color: { rgb: "FFFFFF" } },
-      left: { style: "thin", color: { rgb: "FFFFFF" } },
-      right: { style: "thin", color: { rgb: "FFFFFF" } }
+      top: { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } }
     }
   };
 
-  // Style pour les données normales
+  // Style pour les titres de classe - GRIS LÉGER avec texte noir
+  const classStyle = {
+    font: { bold: true, sz: 14, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "D3D3D3" } }, // Gris clair
+    alignment: { horizontal: "left", vertical: "center" },
+    border: {
+      bottom: { style: "thin", color: { rgb: "000000" } }
+    }
+  };
+
+  // Style pour les sous-titres - TRÈS LÉGER
+  const subTitleStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "F0F0F0" } }, // Gris très très clair
+    alignment: { horizontal: "left", vertical: "center" }
+  };
+
+  // ⭐ STYLE POUR LES HEADERS - SIMPLE AVEC BORDURES ⭐
+  const headerStyle = {
+    font: { bold: true, sz: 11, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "E8E8E8" } }, // Gris très léger
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "medium", color: { rgb: "000000" } },
+      bottom: { style: "medium", color: { rgb: "000000" } },
+      left: { style: "thin", color: { rgb: "666666" } },
+      right: { style: "thin", color: { rgb: "666666" } }
+    }
+  };
+
+  // Style pour les données normales - MINIMAL
   const dataStyle = {
-    font: { sz: 10 },
+    font: { sz: 10, color: { rgb: "000000" } },
     alignment: { vertical: "center" },
     border: {
-      top: { style: "thin", color: { rgb: "CCCCCC" } },
-      bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-      left: { style: "thin", color: { rgb: "CCCCCC" } },
-      right: { style: "thin", color: { rgb: "CCCCCC" } }
+      bottom: { style: "hair", color: { rgb: "CCCCCC" } } // Bordure très fine
     }
   };
 
@@ -547,7 +595,6 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
         ws[cellAddress].s = subTitleStyle;
       }
       else if (headerRows.includes(rowIndex)) {
-        // ⭐ STYLE POUR LES HEADERS ⭐
         ws[cellAddress].s = headerStyle;
       }
       else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
@@ -570,7 +617,6 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   const statusSuffix = statusFilter !== 'all' ? `_${statusFilter}` : '';
   const filename = `presences_${formatDate(date).replace(/\//g, '-')}_classe_groupes${statusSuffix}`;
   
-  // ⭐ IMPORTANT : Utiliser writeFile avec le support des styles ⭐
   XLSX.writeFile(wb, `${filename}.xlsx`);
 };
 // Export présences par mois avec toutes les classes dans une seule page

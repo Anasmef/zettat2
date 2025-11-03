@@ -1,779 +1,672 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  DollarSign, Users, AlertTriangle, TrendingUp, RefreshCw, Bell,
-  Search, Settings, LogOut, CreditCard, UserCheck,
-  Calculator, Target, Clock, X, Activity
-} from 'lucide-react';
-import Sidebar from '../components/Sidebar';
-import RappelModal from '../components/RappelModal'; // adapte le chemin si besoin
-import Header from '../components/Header';
+import React, { useState, useEffect } from 'react';
+import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut as LogOutIcon } from 'lucide-react';
 
-const Dashboardmanager = () => {
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/';
-  };
-
-  const [stats, setStats] = useState({
-    totalEtudiants: 0,
-    etudiantsPayes: 0,
-    montantTotal: 0,
-    montantCollecte: 0,
-    paiementsExpires: 0
-  });
-  
-  // États pour les modals
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [showFinanceModal, setShowFinanceModal] = useState(false);
-  const [selectedEtudiant, setSelectedEtudiant] = useState(null);
-  const [nouveauxEtudiants, setNouveauxEtudiants] = useState([]);
-  
-  // États pour les rappels (ajoutés)
-  const [rappelModal, setRappelModal] = useState(null);
-  const [editDate, setEditDate] = useState('');
-  const [editNote, setEditNote] = useState('');
-  
-  // États généraux
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const AdminQRPage = () => {
+  const [qrCode, setQrCode] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [description, setDescription] = useState('');
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [pointages, setPointages] = useState(null);
+  const [qrCodesActifs, setQrCodesActifs] = useState([]);
 
   useEffect(() => {
-    fetchStatsFinancieres();
-    checkNouveauxEtudiants();
+    fetchPointages();
+    fetchQRCodesActifs();
     
-    // Vérifier périodiquement les nouveaux étudiants (toutes les 5 minutes)
-    const interval = setInterval(checkNouveauxEtudiants, 300000);
+    const interval = setInterval(() => {
+      fetchPointages();
+      fetchQRCodesActifs();
+    }, 60000);
+    
     return () => clearInterval(interval);
   }, []);
 
-  // Hook pour les rappels (ajouté)
-  useEffect(() => {
-    const fetchRappels = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        };
-
-        const res = await fetch('/api/rappels', { headers });
-        if (!res.ok) throw new Error('Erreur lors du chargement des rappels');
-
-        const data = await res.json();
-
-        // Filtrage des rappels pour la date actuelle
-        const today = new Date();
-        const rappelsAujourdhui = data.filter(r =>
-          r.status === 'actif' &&
-          new Date(r.dateRappel).toDateString() <= today.toDateString()
-        );
-
-        console.log('📢 Rappels à afficher aujourd\'hui:', rappelsAujourdhui);
-
-        if (rappelsAujourdhui.length > 0) {
-          setRappelModal(rappelsAujourdhui[0]);
-          setEditDate(rappelsAujourdhui[0].dateRappel?.split('T')[0] || '');
-          setEditNote(rappelsAujourdhui[0].note || '');
-        }
-
-      } catch (err) {
-        console.error('❌ Erreur rappels:', err.message);
-      }
-    };
-
-    fetchRappels();
-  }, []);
-
-  // Gestionnaires pour les rappels (ajoutés)
-  const handleUpdateRappel = async (id) => {
+  const fetchPointages = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/rappels/${id}`, {
-        method: 'PUT',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({ dateRappel: editDate, note: editNote })
-      });
-
-      if (res.ok) {
-        setRappelModal(null);
-        alert("Rappel mis à jour avec succès");
-      } else {
-        throw new Error('Erreur lors de la mise à jour');
-      }
-    } catch (err) {
-      console.error('Erreur mise à jour rappel:', err);
-      alert('Erreur lors de la mise à jour: ' + err.message);
-    }
-  };
-
-  const handleDeleteRappel = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/rappels/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        setRappelModal(null);
-        alert("Rappel supprimé avec succès");
-      } else {
-        throw new Error('Erreur lors de la suppression');
-      }
-    } catch (err) {
-      console.error('Erreur suppression rappel:', err);
-      alert('Erreur lors de la suppression: ' + err.message);
-    }
-  };
-
-  const fetchStatsFinancieres = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const token = localStorage.getItem('token');
-      console.log('Token:', token ? 'Présent' : 'Absent');
-      console.log('URL appelée:', '/api/paiement-manager/stats');
-      
-      const res = await fetch('/api/paiement-manager/stats', {
+      const res = await fetch('/api/admin/pointages', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      if (!res.ok) {
-        throw new Error(`Erreur ${res.status}: ${res.statusText}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPointages(data);
       }
-      
-      const data = await res.json();
-      console.log('Réponse reçue:', data);
-      setStats(data);
-      
-    } catch (err) {
-      console.error('Erreur complète:', err);
-      setError(`Erreur de connexion: ${err.message}`);
-      
-      // Données de démonstration en cas d'erreur
-      setStats({
-        totalEtudiants: 156,
-        etudiantsPayes: 98,
-        montantTotal: 468000,
-        montantCollecte: 294000,
-        paiementsExpires: 12
+    } catch (error) {
+      console.error('Erreur pointages:', error);
+    }
+  };
+
+  const fetchQRCodesActifs = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/qr-codes-actifs', {
+        headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.ok) {
+        const data = await res.json();
+        setQrCodesActifs(data.qrCodesActifs);
+      }
+    } catch (error) {
+      console.error('Erreur QR codes:', error);
+    }
+  };
+
+  const genererQR = async () => {
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/generate-qr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}`
+        })
+      });
+
+      const data = await res.json();
+      
+      if (data.success) {
+        setQrCode(data.qrCode);
+        setMessage({ type: 'success', text: data.message || 'QR Code généré avec succès!' });
+        fetchQRCodesActifs();
+      } else {
+        setMessage({ type: 'error', text: data.message });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Erreur de connexion' });
     } finally {
       setLoading(false);
     }
   };
 
-  const checkNouveauxEtudiants = async () => {
+  const supprimerQR = async (qrId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/paiement-manager/etudiants-nouveaux', {
+      const res = await fetch(`/api/admin/qr-code/${qrId}`, {
+        method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (res.ok) {
-        const data = await res.json();
-        
-        // Filtrer les étudiants sans prix défini
-        const etudiantsSansPrix = data.filter(etudiant => 
-          !etudiant.prixTotal || etudiant.prixTotal === 0
-        );
-        
-        setNouveauxEtudiants(etudiantsSansPrix);
-        
-        // Afficher la modal s'il y a de nouveaux étudiants et qu'elle n'est pas déjà ouverte
-        if (etudiantsSansPrix.length > 0 && !showNotificationModal && !showFinanceModal) {
-          setSelectedEtudiant(etudiantsSansPrix[0]);
-          setShowNotificationModal(true);
+        setMessage({ type: 'success', text: 'QR Code supprimé' });
+        fetchQRCodesActifs();
+        if (qrCode && qrCode.id === qrId) {
+          setQrCode(null);
         }
       }
-    } catch (err) {
-      console.error('Erreur vérification nouveaux étudiants:', err);
-      // Données de démonstration en cas d'erreur
-     
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Erreur suppression' });
     }
   };
 
-  const handleSetPrice = (etudiant) => {
-    setSelectedEtudiant(etudiant);
-    setShowNotificationModal(false);
-    setShowFinanceModal(true);
+  const telechargerQR = () => {
+    if (!qrCode) return;
+    const link = document.createElement('a');
+    link.download = `qr-pointage-${new Date().toISOString().split('T')[0]}.png`;
+    link.href = qrCode.dataURL;
+    link.click();
   };
 
-  const handleFinanceSubmit = async (financeData) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(
-        `/api/etudiants/${selectedEtudiant._id}/finance`,
-        {
-          method: 'PATCH',
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(financeData)
-        }
-      );
-      
-      if (res.ok) {
-        // Rafraîchir les stats et vérifier les nouveaux étudiants
-        await fetchStatsFinancieres();
-        await checkNouveauxEtudiants();
-        setShowFinanceModal(false);
-        
-        // Message de succès
-        alert('Prix défini avec succès pour ' + selectedEtudiant.nomComplet);
-      } else {
-        throw new Error('Erreur lors de la mise à jour');
-      }
-      
-    } catch (err) {
-      console.error('Erreur mise à jour finance:', err);
-      alert('Erreur lors de la mise à jour: ' + err.message);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/';
   };
 
-  const handleShowNextStudent = () => {
-    if (nouveauxEtudiants.length > 1) {
-      const currentIndex = nouveauxEtudiants.findIndex(e => e._id === selectedEtudiant._id);
-      const nextIndex = (currentIndex + 1) % nouveauxEtudiants.length;
-      setSelectedEtudiant(nouveauxEtudiants[nextIndex]);
-    }
+  const cardStyle = {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '16px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s ease'
   };
 
-  const StatCard = ({ title, value, icon: Icon, colorClass, subtitle, percentage, formatAsAmount = false }) => (
-    <div className={`stat-card ${colorClass}`}>
-      <div className="stat-card-content">
-        <div className="stat-card-info">
-          <h3 className="stat-card-title">{title}</h3>
-          <p className="stat-card-value">
-            {formatAsAmount ? `${formatMontant(value)} DH` : value?.toLocaleString() || 0}
-          </p>
-          {subtitle && <p className="stat-card-subtitle">{subtitle}</p>}
-          {percentage !== undefined && (
-            <div style={{marginTop: '12px'}}>
-              <div style={{
-                background: '#E5E7EB',
-                borderRadius: '9999px',
-                height: '8px',
-                marginBottom: '4px'
-              }}>
-                <div 
-                  style={{
-                    background: colorClass === 'blue' ? '#3B82F6' : colorClass === 'green' ? '#10B981' : '#8B5CF6',
-                    borderRadius: '9999px',
-                    height: '8px',
-                    width: `${Math.min(percentage, 100)}%`,
-                    transition: 'width 0.7s ease-in-out'
-                  }}
-                ></div>
-              </div>
-              <p style={{fontSize: '0.75rem', color: '#6B7280'}}>{percentage}% collecté</p>
-            </div>
-          )}
-        </div>
-        <div className={`stat-card-icon ${colorClass}`}>
-          <Icon />
-        </div>
-      </div>
-    </div>
-  );
-
-  // Modal de notification pour nouveaux étudiants
-  const ModalNotificationEtudiant = () => {
-    if (!showNotificationModal || !selectedEtudiant) return null;
-    
-    const currentIndex = nouveauxEtudiants.findIndex(e => e._id === selectedEtudiant._id) + 1;
-    
-    return (
-      <div className="modal-backdrop">
-        <div className="modal">
-          <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px'}}>
-            <h3 style={{fontSize: '18px', fontWeight: 'bold', color: '#1F2937'}}>Nouvel Étudiant Détecté</h3>
-            <button 
-              onClick={() => setShowNotificationModal(false)}
-              style={{
-                padding: '4px',
-                background: 'none',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer'
-              }}
-            >
-              <X size={20} />
-            </button>
-          </div>
-          
-          <div style={{
-            background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '16px'
-          }}>
-            <p style={{fontWeight: '600', color: '#1F2937'}}>{selectedEtudiant.nomComplet}</p>
-            <p style={{color: '#6B7280', fontSize: '14px'}}>{selectedEtudiant.email}</p>
-            <p style={{color: '#3B82F6', fontSize: '12px', marginTop: '4px'}}>
-              Étudiant {currentIndex} sur {nouveauxEtudiants.length}
-            </p>
-          </div>
-          
-          <p style={{color: '#6B7280', marginBottom: '24px'}}>
-            Cet étudiant n'a pas encore de prix défini. Voulez-vous configurer ses informations financières ?
-          </p>
-          
-          <div style={{display: 'flex', gap: '12px'}}>
-            <button 
-              onClick={() => handleSetPrice(selectedEtudiant)}
-              style={{
-                flex: 1,
-                background: 'linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%)',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              Définir le Prix
-            </button>
-            {nouveauxEtudiants.length > 1 && (
-              <button 
-                onClick={handleShowNextStudent}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #D1D5DB',
-                  color: '#374151',
-                  borderRadius: '8px',
-                  background: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                Suivant
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
+  const buttonPrimaryStyle = {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
   };
 
-  // Modal de configuration financière utilisant votre composant existant
-  const ModalFinance = () => {
-    if (!showFinanceModal || !selectedEtudiant) return null;
-
-    const handleModalSubmit = (formFinance) => {
-      handleFinanceSubmit(formFinance);
-    };
-
-    const handleModalClose = () => {
-      setShowFinanceModal(false);
-    };
-
-    return (
-      <div className="modal-overlay" onClick={handleModalClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>Gestion Financière - {selectedEtudiant?.nomComplet}</h3>
-            <button className="btn-fermer-modal" onClick={handleModalClose}>×</button>
-          </div>
-          
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const formFinance = {
-              prixTotal: parseFloat(formData.get('prixTotal')) || 0,
-              paye: formData.get('paye') === 'true',
-              pourcentageBourse: parseFloat(formData.get('pourcentageBourse')) || 0,
-              typePaiement: formData.get('typePaiement') || 'Cash'
-            };
-            handleModalSubmit(formFinance);
-          }}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Prix Total</label>
-                <input
-                  name="prixTotal"
-                  type="number"
-                  defaultValue={selectedEtudiant?.prixTotal || 0}
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>Pourcentage Bourse (%)</label>
-                <input
-                  name="pourcentageBourse"
-                  type="number"
-                  defaultValue={selectedEtudiant?.pourcentageBourse || 0}
-                  min="0"
-                  max="100"
-                />
-              </div>
-            </div>
-            
-            <div className="form-row">
-              <div className="form-group">
-                <label>Type Paiement</label>
-                <select name="typePaiement" defaultValue={selectedEtudiant?.typePaiement || 'Cash'}>
-                  <option value="Cash">Cash</option>
-                  <option value="Virement">Virement</option>
-                  <option value="Chèque">Chèque</option>
-                  <option value="En ligne">En ligne</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Statut Paiement</label>
-                <select name="paye" defaultValue={selectedEtudiant?.paye ? 'true' : 'false'}>
-                  <option value="false">Non payé</option>
-                  <option value="true">Payé</option>
-                </select>
-              </div>
-            </div>
-            
-            <div className="modal-actions">
-              <button type="button" onClick={handleModalClose} className="btn-annuler">
-                Annuler
-              </button>
-              <button type="submit" className="btn-enregistrer">
-                Enregistrer
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
+  const inputStyle = {
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    borderRadius: '12px',
+    padding: '12px 16px',
+    fontSize: '14px',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(5px)',
+    transition: 'all 0.3s ease',
+    outline: 'none'
   };
-
-  const formatMontant = (montant) => {
-    return new Intl.NumberFormat('fr-MA').format(montant || 0);
-  };
-
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-content">
-          <div className="loading-spinner"></div>
-          <p className="loading-text">Chargement des statistiques...</p>
-          <p className="loading-subtext">Récupération des données financières</p>
-        </div>
-      </div>
-    );
-  }
-
-  const collectionRate = calculatePercentage(stats.montantCollecte, stats.montantTotal);
-  const paymentRate = calculatePercentage(stats.etudiantsPayes, stats.totalEtudiants);
 
   return (
-    <div className="admin-dashboard" style={{
+    <div style={{ 
       minHeight: '100vh',
       backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
-      backgroundAttachment: 'fixed'
+      padding: '40px 20px',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      {/* Header ajouté */}
-      <Header />
-      <Sidebar onLogout={handleLogout} />
-      
-      {/* Modal de rappel ajouté */}
-      {rappelModal && (
-        <RappelModal
-          rappel={rappelModal}
-          onClose={() => setRappelModal(null)}
-          onUpdate={() => handleUpdateRappel(rappelModal._id)}
-          onDelete={() => handleDeleteRappel(rappelModal._id)}
-          editDate={editDate}
-          setEditDate={setEditDate}
-          editNote={editNote}
-          setEditNote={setEditNote}
-        />
-      )}
-      
-      <div className="dashboard-container">
-        <div className="dashboard-content">
-          {/* Message d'erreur */}
-          {error && (
-            <div className="alert-section">
-              <div className="alert-content">
-                <AlertTriangle />
-                <div className="alert-text">
-                  <h3>Erreur de Connexion</h3>
-                  <p>{error} - Affichage des données de démonstration</p>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        
+        {/* Bouton Déconnexion */}
+        <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
+            }}
+          >
+            <LogOutIcon size={18} />
+            Déconnexion
+          </button>
+        </div>
+
+        {/* Header */}
+        <div style={{ 
+          ...cardStyle,
+          padding: '40px',
+          marginBottom: '40px',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            marginBottom: '20px'
+          }}>
+            <QrCode size={40} style={{ color: 'white' }} />
+          </div>
+          <h1 style={{ 
+            margin: '0 0 10px 0', 
+            color: '#1a202c',
+            fontSize: '32px',
+            fontWeight: '700',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent'
+          }}>
+            Générateur QR Code
+          </h1>
+          <p style={{ 
+            margin: 0, 
+            color: '#64748b', 
+            fontSize: '16px',
+            fontWeight: '500'
+          }}>
+            Système de pointage - UN QR par jour (20 heures)
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'start' }}>
+          
+          {/* Génération QR */}
+          <div style={{ ...cardStyle, padding: '32px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <Plus size={24} style={{ color: '#667eea', marginRight: '12px' }} />
+              <h2 style={{ margin: 0, color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
+                QR Code du Jour
+              </h2>
+            </div>
+
+            {message.text && (
+              <div style={{
+                padding: '16px 20px',
+                borderRadius: '12px',
+                marginBottom: '24px',
+                backgroundColor: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                color: message.type === 'success' ? '#15803d' : '#dc2626',
+                border: `1px solid ${message.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                {message.type === 'success' ? 
+                  <CheckCircle size={20} /> :
+                  <AlertTriangle size={20} />
+                }
+                <span style={{ fontWeight: '500' }}>{message.text}</span>
+              </div>
+            )}
+
+            <div style={{ marginBottom: '32px' }}>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600',
+                color: '#374151',
+                fontSize: '14px'
+              }}>
+                Description (Optionnel)
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="ex: Pointage matinée"
+                style={{
+                  ...inputStyle,
+                  width: '100%'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#667eea'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+              />
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>
+                ⚠️ Un seul QR code par jour, valable 20 heures
+              </p>
+            </div>
+
+            <button
+              onClick={genererQR}
+              disabled={loading}
+              style={{
+                ...buttonPrimaryStyle,
+                width: '100%',
+                padding: '16px',
+                fontSize: '16px',
+                opacity: loading ? 0.7 : 1,
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+              onMouseEnter={(e) => !loading && (e.target.style.transform = 'translateY(-2px)')}
+              onMouseLeave={(e) => !loading && (e.target.style.transform = 'translateY(0)')}
+            >
+              {loading ? (
+                <>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <QrCode size={20} />
+                  Générer/Récupérer QR du Jour
+                </>
+              )}
+            </button>
+
+            {/* QR Code généré */}
+            {qrCode && (
+              <div style={{ 
+                marginTop: '32px',
+                padding: '24px',
+                textAlign: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.5)',
+                borderRadius: '16px',
+                border: '2px dashed rgba(102, 126, 234, 0.3)'
+              }}>
+                <img
+                  src={qrCode.dataURL}
+                  alt="QR Code"
+                  style={{ 
+                    width: '200px', 
+                    height: '200px', 
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)'
+                  }}
+                />
+                <div style={{ marginTop: '16px' }}>
+                  <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0', fontWeight: '500' }}>
+                    <strong>Description:</strong> {qrCode.description}
+                  </p>
+                  <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0', fontWeight: '500' }}>
+                    <strong>Expire le:</strong> {new Date(qrCode.expiresAt).toLocaleString('fr-FR')}
+                  </p>
+                  <button
+                    onClick={telechargerQR}
+                    style={{
+                      ...buttonPrimaryStyle,
+                      padding: '12px 20px',
+                      fontSize: '14px',
+                      marginTop: '16px'
+                    }}
+                  >
+                    <Download size={16} />
+                    Télécharger
+                  </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Cartes de statistiques principales */}
-          <div className="stats-grid">
-            <StatCard
-              title="Étudiants Inscrits"
-              value={stats.totalEtudiants}
-              icon={Users}
-              colorClass="blue"
-              subtitle={`${stats.etudiantsPayes} payés`}
-              percentage={paymentRate}
-            />
-            
-            <StatCard
-              title="Montant Total Attendu"
-              value={stats.montantTotal}
-              icon={Target}
-              colorClass="purple"
-              subtitle="Revenus prévus"
-              formatAsAmount={true}
-            />
-            
-            <StatCard
-              title="Montant Collecté"
-              value={stats.montantCollecte}
-              icon={DollarSign}
-              colorClass="green"
-              subtitle={`${collectionRate}% collecté`}
-              percentage={collectionRate}
-              formatAsAmount={true}
-            />
-            
-            <StatCard
-              title="Paiements Expirés"
-              value={stats.paiementsExpires}
-              icon={AlertTriangle}
-              colorClass="red"
-              subtitle="Nécessitent action"
-            />
+            )}
           </div>
 
-          {/* Section de résumé financier */}
-          <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '32px'}}>
-            {/* Résumé principal */}
-            <div className="chart-card">
-              <div className="chart-header">
-                <Calculator />
-                <div>
-                  <h3>Résumé Financier</h3>
-                  <p style={{fontSize: '14px', color: '#6B7280'}}>Aperçu des performances de collecte</p>
-                </div>
-              </div>
-              
-              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px'}}>
-                <div style={{
-                  textAlign: 'center',
-                  padding: '16px',
-                  background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
-                  borderRadius: '12px'
-                }}>
-                  <h4 style={{color: '#166534', fontWeight: '600', marginBottom: '8px'}}>Montant Collecté</h4>
-                  <p style={{fontSize: '24px', fontWeight: 'bold', color: '#16A34A'}}>{formatMontant(stats.montantCollecte)} DH</p>
-                  <div style={{marginTop: '8px', background: '#BBF7D0', borderRadius: '9999px', height: '8px'}}>
-                    <div 
-                      style={{
-                        background: '#16A34A',
-                        borderRadius: '9999px',
-                        height: '8px',
-                        width: `${collectionRate}%`,
-                        transition: 'width 1s ease-in-out'
-                      }}
-                    ></div>
-                  </div>
-                  <p style={{color: '#15803D', fontSize: '12px', marginTop: '4px'}}>{collectionRate}% de l'objectif</p>
-                </div>
-                
-                <div style={{
-                  textAlign: 'center',
-                  padding: '16px',
-                  background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-                  borderRadius: '12px'
-                }}>
-                  <h4 style={{color: '#1E40AF', fontWeight: '600', marginBottom: '8px'}}>Montant Restant</h4>
-                  <p style={{fontSize: '24px', fontWeight: 'bold', color: '#2563EB'}}>{formatMontant(stats.montantTotal - stats.montantCollecte)} DH</p>
-                  <div style={{marginTop: '8px', background: '#BFDBFE', borderRadius: '9999px', height: '8px'}}>
-                    <div 
-                      style={{
-                        background: '#2563EB',
-                        borderRadius: '9999px',
-                        height: '8px',
-                        width: `${100 - collectionRate}%`,
-                        transition: 'width 1s ease-in-out'
-                      }}
-                    ></div>
-                  </div>
-                  <p style={{color: '#1D4ED8', fontSize: '12px', marginTop: '4px'}}>{100 - collectionRate}% restant</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Métriques rapides */}
-            <div className="chart-card">
-              <h3 style={{color: '#1F2937', fontWeight: 'bold', fontSize: '18px', marginBottom: '16px'}}>Métriques Clés</h3>
-              
-              <div style={{display: 'flex', flexDirection: 'column', gap: '16px'}}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                  background: '#F8FAFC',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{display: 'flex', alignItems: 'center'}}>
-                    <UserCheck size={16} style={{color: '#10B981', marginRight: '8px'}} />
-                    <span style={{fontSize: '14px', color: '#374151'}}>Taux de Paiement</span>
-                  </div>
-                  <span style={{fontWeight: 'bold', color: '#16A34A'}}>{paymentRate}%</span>
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                  background: '#F8FAFC',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{display: 'flex', alignItems: 'center'}}>
-                    <DollarSign size={16} style={{color: '#3B82F6', marginRight: '8px'}} />
-                    <span style={{fontSize: '14px', color: '#374151'}}>Taux de Collecte</span>
-                  </div>
-                  <span style={{fontWeight: 'bold', color: '#2563EB'}}>{collectionRate}%</span>
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                  background: '#F8FAFC',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{display: 'flex', alignItems: 'center'}}>
-                    <Clock size={16} style={{color: '#F59E0B', marginRight: '8px'}} />
-                    <span style={{fontSize: '14px', color: '#374151'}}>Paiements Expirés</span>
-                  </div>
-                  <span style={{fontWeight: 'bold', color: '#D97706'}}>{stats.paiementsExpires}</span>
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                  background: '#F8FAFC',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{display: 'flex', alignItems: 'center'}}>
-                    <Calculator size={16} style={{color: '#8B5CF6', marginRight: '8px'}} />
-                    <span style={{fontSize: '14px', color: '#374151'}}>Revenus Moyens</span>
-                  </div>
-                  <span style={{fontWeight: 'bold', color: '#7C3AED'}}>
-                    {formatMontant(stats.totalEtudiants > 0 ? stats.montantTotal / stats.totalEtudiants : 0)} DH
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tableau de bord détaillé */}
-          <div className="chart-card">
-            <div className="chart-header">
-              <Activity />
-              <div>
-                <h3>Analyse Détaillée</h3>
-                <p style={{fontSize: '14px', color: '#6B7280'}}>Métriques de performance financière</p>
-              </div>
-              <div style={{marginLeft: 'auto', textAlign: 'right'}}>
-                <p style={{fontSize: '12px', color: '#9CA3AF'}}>Dernière mise à jour</p>
-                <p style={{fontSize: '14px', fontWeight: '500', color: '#374151'}}>Il y a quelques instants</p>
-              </div>
-            </div>
+          {/* Statistiques et QR actifs */}
+          <div>
             
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px'}}>
-              <div style={{
-                textAlign: 'center',
-                padding: '16px',
-                background: 'linear-gradient(135deg, #EBF8FF 0%, #DBEAFE 100%)',
-                borderRadius: '12px',
-                border: '1px solid #BFDBFE'
-              }}>
+            {/* Statistiques */}
+            {pointages && (
+              <div style={{ ...cardStyle, padding: '32px', marginBottom: '32px' }}>
                 <div style={{
-                  display: 'inline-flex',
-                  padding: '12px',
-                  borderRadius: '50%',
-                  background: 'rgba(59, 130, 246, 0.2)',
-                  marginBottom: '12px'
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: '24px'
                 }}>
-                  <Users style={{color: '#2563EB'}} size={24} />
+                  <BarChart3 size={24} style={{ color: '#667eea', marginRight: '12px' }} />
+                  <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
+                    Statistiques du Jour
+                  </h3>
                 </div>
-                <h4 style={{fontWeight: '600', color: '#1E40AF', marginBottom: '4px'}}>Taux de Participation</h4>
-                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#2563EB'}}>{paymentRate}%</p>
-                <p style={{fontSize: '12px', color: '#1D4ED8'}}>{stats.etudiantsPayes} sur {stats.totalEtudiants}</p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                    borderRadius: '16px',
+                    color: 'white',
+                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
+                  }}>
+                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
+                      {pointages.stats.presents}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Présents</div>
+                  </div>
+                  
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
+                    borderRadius: '16px',
+                    color: 'white',
+                    boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
+                  }}>
+                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
+                      {pointages.stats.absents}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Absents</div>
+                  </div>
+                  
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
+                    borderRadius: '16px',
+                    color: 'white',
+                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
+                  }}>
+                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
+                      {pointages.stats.sansSortie || 0}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Sans Sortie</div>
+                  </div>
+                  
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
+                    borderRadius: '16px',
+                    color: 'white',
+                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                  }}>
+                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
+                      {pointages.stats.tauxPresence}%
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Taux Présence</div>
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#64748b', 
+                  textAlign: 'center', 
+                  marginTop: '16px',
+                  fontWeight: '500'
+                }}>
+                  Total: {pointages.stats.totalProfesseurs} professeurs
+                </div>
               </div>
-              
+            )}
+
+            {/* QR Codes Actifs */}
+            <div style={{ ...cardStyle, padding: '32px' }}>
               <div style={{
-                textAlign: 'center',
-                padding: '16px',
-                background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
-                borderRadius: '12px',
-                border: '1px solid #BBF7D0'
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '24px'
               }}>
-                <div style={{
-                  display: 'inline-flex',
-                  padding: '12px',
-                  borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  marginBottom: '12px'
+                <Clock size={24} style={{ color: '#667eea', marginRight: '12px' }} />
+                <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
+                  QR Code Actif
+                </h3>
+                <span style={{
+                  marginLeft: '12px',
+                  backgroundColor: '#667eea',
+                  color: 'white',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '600'
                 }}>
-                  <DollarSign style={{color: '#059669'}} size={24} />
-                </div>
-                <h4 style={{fontWeight: '600', color: '#166534', marginBottom: '4px'}}>Efficacité Collecte</h4>
-                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#16A34A'}}>{collectionRate}%</p>
-                <p style={{fontSize: '12px', color: '#15803D'}}>de l'objectif atteint</p>
+                  {qrCodesActifs.length}
+                </span>
               </div>
-              
-              <div style={{
-                textAlign: 'center',
-                padding: '16px',
-                background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
-                borderRadius: '12px',
-                border: '1px solid #FCD34D'
-              }}>
-                <div style={{
-                  display: 'inline-flex',
-                  padding: '12px',
-                  borderRadius: '50%',
-                  background: 'rgba(245, 158, 11, 0.2)',
-                  marginBottom: '12px'
+
+              {qrCodesActifs.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  color: '#64748b', 
+                  padding: '40px 20px',
+                  backgroundColor: 'rgba(248, 250, 252, 0.8)',
+                  borderRadius: '16px'
                 }}>
-                  <AlertTriangle style={{color: '#D97706'}} size={24} />
+                  <QrCode size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
+                  <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Aucun QR code actif</p>
+                  <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.7 }}>
+                    Générez le QR code du jour
+                  </p>
                 </div>
-                <h4 style={{fontWeight: '600', color: '#92400E', marginBottom: '4px'}}>Retards de Paiement</h4>
-                <p style={{fontSize: '24px', fontWeight: 'bold', color: '#D97706'}}>{stats.paiementsExpires}</p>
-                <p style={{fontSize: '12px', color: '#A16207'}}>étudiants en retard</p>
-              </div>
+              ) : (
+                <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                  {qrCodesActifs.map((qr) => (
+                    <div
+                      key={qr.id}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        borderLeft: `4px solid #10b981`,
+                        borderRadius: '12px',
+                        padding: '20px',
+                        marginBottom: '16px',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ 
+                            margin: '0 0 8px 0', 
+                            fontSize: '16px',
+                            fontWeight: '600',
+                            color: '#1a202c'
+                          }}>
+                            {qr.description}
+                          </h4>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                            <span style={{ 
+                              fontSize: '13px', 
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Clock size={14} />
+                              {qr.tempsRestant} min restantes
+                            </span>
+                            <span style={{ 
+                              fontSize: '13px', 
+                              color: '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Eye size={14} />
+                              {qr.scansCount} scans
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <button
+                          onClick={() => supprimerQR(qr.id)}
+                          style={{
+                            backgroundColor: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: '500',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                        >
+                          <Trash2 size={14} />
+                          Supprimer
+                        </button>
+                      </div>
+                      
+                      <div style={{
+                        width: '100%',
+                        height: '6px',
+                        backgroundColor: 'rgba(226, 232, 240, 0.8)',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 1200) * 100))}%`,
+                          height: '100%',
+                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
+                                     qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
+                                     'linear-gradient(90deg, #10b981, #059669)',
+                          transition: 'all 0.3s ease'
+                        }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Modals */}
-      <ModalNotificationEtudiant />
-      <ModalFinance />
+        {/* Liste des pointages récents */}
+        {pointages && pointages.pointages.length > 0 && (
+          <div style={{ ...cardStyle, padding: '32px', marginTop: '40px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <Users size={24} style={{ color: '#667eea', marginRight: '12px' }} />
+              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
+                Pointages Récents
+              </h3>
+            </div>
+            
+            <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+              {pointages.pointages.slice(0, 10).map((pointage, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    backgroundColor: index % 2 === 0 ? 'rgba(248, 250, 252, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: '12px',
+                    marginBottom: '8px',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', color: '#1a202c', fontSize: '16px' }}>
+                      {pointage.nomProfesseur}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
+                      {pointage.emailProfesseur}
+                    </div>
+                  </div>
+                  
+                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Entrée</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>
+                        {pointage.heureEntree}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Sortie</div>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: pointage.heureSortie ? '#ef4444' : '#9ca3af' }}>
+                        {pointage.heureSortie || '--:--'}
+                      </div>
+                    </div>
+                    {pointage.tempsPresence > 0 && (
+                      <div style={{
+                        fontSize: '12px',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        fontWeight: '600',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        color: '#2563eb'
+                      }}>
+                        {Math.floor(pointage.tempsPresence / 60)}h {pointage.tempsPresence % 60}min
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
       
-      <style jsx>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </div>
   );
-
-  // Fonction pour calculer les pourcentages
-  function calculatePercentage(value, total) {
-    return total > 0 ? Math.round((value / total) * 100) : 0;
-  }
 };
 
-export default Dashboardmanager;
+export default AdminQRPage;

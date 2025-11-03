@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Upload, QrCode, CheckCircle, AlertTriangle, User, Clock, RefreshCw, LogOut, Scan, Smartphone } from 'lucide-react';
+import { Camera, Upload, QrCode, CheckCircle, AlertTriangle, User, Clock, RefreshCw, LogOut, Scan, Home } from 'lucide-react';
 import jsQR from 'jsqr';
-import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeur
-
+import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeu
 const handleLogout = () => {
   localStorage.removeItem('token');
   window.location.href = '/';
@@ -13,10 +12,9 @@ const ProfesseurScanner = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '', details: null });
   const [professeur, setProfesseur] = useState(null);
-  const [pointageReussi, setPointageReussi] = useState(false);
+  const [pointageInfo, setPointageInfo] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
-  const [scanStartTime, setScanStartTime] = useState(null);
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -25,20 +23,12 @@ const ProfesseurScanner = () => {
   const scanningRef = useRef(false);
 
   useEffect(() => {
-    // Récupérer QR ID depuis URL
     const urlPath = window.location.pathname;
     const qrIdFromUrl = urlPath.split('/scan-qr/')[1];
+    if (qrIdFromUrl) setQrId(qrIdFromUrl);
     
-    if (qrIdFromUrl) {
-      setQrId(qrIdFromUrl);
-    }
-
-    // Récupérer infos professeur
     fetchProfesseurInfo();
-
-    return () => {
-      stopCamera();
-    };
+    return () => stopCamera();
   }, []);
 
   const fetchProfesseurInfo = async () => {
@@ -49,88 +39,6 @@ const ProfesseurScanner = () => {
     }
 
     try {
-      console.log('🔄 Récupération du profil professeur...');
-      console.log('🔑 Token:', token.substring(0, 50) + '...');
-      
-      // Essayer d'abord la route profile simple
-      let res = await fetch('/api/professeur/profile', {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('📡 Réponse profile professeur:', res.status);
-      
-      if (res.ok) {
-        const data = await res.json();
-        console.log('✅ Données professeur reçues (profile):', data);
-        
-        // Adapter selon la structure de réponse du backend
-        let professeurData = null;
-        
-        if (data.professeur) {
-          professeurData = data.professeur;
-        } else if (data.nom && data.email) {
-          professeurData = data;
-        } else {
-          console.warn('⚠️ Structure de réponse inattendue:', data);
-          professeurData = data;
-        }
-        
-        console.log('📝 Professeur final à sauvegarder:', professeurData);
-        setProfesseur(professeurData);
-        
-        // Vérifier le pointage du jour
-        checkPointageAujourdhui(token);
-        
-      } else if (res.status === 404) {
-        console.log('⚠️ Route profile non trouvée, essai statut-aujourd-hui...');
-        
-        res = await fetch('/api/professeur/statut-aujourd-hui', {
-          headers: { 
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          console.log('✅ Données professeur reçues (statut):', data);
-          
-          setProfesseur(data.professeur);
-          
-          if (data.aPointe) {
-            setMessage({
-              type: 'error',
-              text: 'Vous avez déjà pointé aujourd\'hui',
-              details: data.pointageAujourdhui
-            });
-          }
-        } else {
-          const errorText = await res.text();
-          console.error('❌ Erreur statut professeur:', res.status, errorText);
-          setMessage({ 
-            type: 'error', 
-            text: `Erreur ${res.status}: ${errorText}`
-          });
-        }
-      } else {
-        const errorText = await res.text();
-        console.error('❌ Erreur récupération professeur:', res.status, errorText);
-        setMessage({ 
-          type: 'error', 
-          text: `Erreur ${res.status}: Vérifiez votre connexion`
-        });
-      }
-    } catch (error) {
-      console.error('❌ Erreur fetch professeur complète:', error);
-      setMessage({ type: 'error', text: `Erreur réseau: ${error.message}` });
-    }
-  };
-
-  const checkPointageAujourdhui = async (token) => {
-    try {
       const res = await fetch('/api/professeur/statut-aujourd-hui', {
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -140,25 +48,32 @@ const ProfesseurScanner = () => {
       
       if (res.ok) {
         const data = await res.json();
+        setProfesseur(data.professeur);
+        
         if (data.aPointe) {
-          setMessage({
-            type: 'error',
-            text: 'Vous avez déjà pointé aujourd\'hui',
-            details: data.pointageAujourdhui
-          });
+          setPointageInfo(data.pointageAujourdhui);
+        }
+      } else {
+        const res2 = await fetch('/api/professeur/profile', {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (res2.ok) {
+          const data2 = await res2.json();
+          setProfesseur(data2.professeur || data2);
         }
       }
     } catch (error) {
-      console.log('ℹ️ Impossible de vérifier le pointage du jour:', error.message);
+      console.error('❌ Erreur fetch professeur:', error);
+      setMessage({ type: 'error', text: `Erreur réseau: ${error.message}` });
     }
   };
 
   const scannerQRCode = async (qrIdToScan) => {
     const currentQrId = qrIdToScan || qrId;
-    
-    console.log('=== DEBUT SCAN QR ===');
-    console.log('QR ID à scanner:', currentQrId);
-    console.log('Professeur actuel:', professeur);
     
     if (!currentQrId) {
       setMessage({ type: 'error', text: 'QR Code invalide' });
@@ -166,35 +81,21 @@ const ProfesseurScanner = () => {
     }
 
     if (!professeur) {
-      console.warn('⚠️ Pas de données professeur, tentative de récupération...');
       await fetchProfesseurInfo();
-      
       setTimeout(() => {
-        if (professeur) {
-          scannerQRCode(currentQrId);
-        } else {
-          setMessage({ type: 'error', text: 'Impossible de récupérer vos informations. Reconnectez-vous.' });
-        }
+        if (professeur) scannerQRCode(currentQrId);
+        else setMessage({ type: 'error', text: 'Impossible de récupérer vos informations. Reconnectez-vous.' });
       }, 1000);
       return;
     }
 
     setLoading(true);
-    setMessage({ type: '', text: 'Pointage en cours...' });
+    setMessage({ type: '', text: 'Enregistrement de l\'entrée...' });
 
     const token = localStorage.getItem('token');
-    console.log('🔑 Token présent:', !!token);
-    
-    if (!token) {
-      setMessage({ type: 'error', text: 'Token manquant. Reconnectez-vous.' });
-      setLoading(false);
-      return;
-    }
     
     try {
       const url = `/api/scan-qr/${currentQrId}`;
-      console.log('📞 URL appelée:', url);
-      console.log('👨‍🏫 Professeur envoyé:', professeur.nom);
       
       const res = await fetch(url, {
         method: 'POST',
@@ -204,32 +105,22 @@ const ProfesseurScanner = () => {
         }
       });
 
-      console.log('📡 Statut réponse:', res.status);
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('❌ Erreur serveur complète:', errorText);
-        throw new Error(`HTTP ${res.status}: ${errorText}`);
-      }
-
       const data = await res.json();
-      console.log('✅ Données reçues:', data);
 
       if (data.success) {
-        setPointageReussi(true);
+        setPointageInfo(data.pointage);
         setQrId(currentQrId);
         stopCamera();
         
-        // Vibration sur mobile
-        if (navigator.vibrate) {
-          navigator.vibrate(200);
-        }
+        if (navigator.vibrate) navigator.vibrate(200);
         
         setMessage({ 
           type: 'success', 
           text: data.message,
           details: data.pointage
         });
+        
+        fetchProfesseurInfo();
       } else {
         setMessage({ 
           type: 'error', 
@@ -238,7 +129,58 @@ const ProfesseurScanner = () => {
         });
       }
     } catch (error) {
-      console.error('❌ ERREUR SCAN COMPLÈTE:', error);
+      console.error('❌ ERREUR SCAN:', error);
+      setMessage({ 
+        type: 'error', 
+        text: `Erreur: ${error.message}` 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const enregistrerSortie = async () => {
+    if (!professeur) {
+      setMessage({ type: 'error', text: 'Professeur non identifié' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: '', text: 'Enregistrement de la sortie...' });
+
+    const token = localStorage.getItem('token');
+    
+    try {
+      const res = await fetch('/api/professeur/sortie', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setPointageInfo(data.pointage);
+        
+        if (navigator.vibrate) navigator.vibrate(200);
+        
+        setMessage({ 
+          type: 'success', 
+          text: data.message,
+          details: data.pointage
+        });
+        
+        fetchProfesseurInfo();
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: data.message
+        });
+      }
+    } catch (error) {
+      console.error('❌ ERREUR SORTIE:', error);
       setMessage({ 
         type: 'error', 
         text: `Erreur: ${error.message}` 
@@ -249,94 +191,64 @@ const ProfesseurScanner = () => {
   };
 
   const startCamera = async () => {
-    console.log('🚀 startCamera appelée');
-    
-    // Réinitialiser les états
     setMessage({ type: '', text: '' });
     setCameraReady(false);
-    setScanStartTime(Date.now());
     
     try {
-      console.log('📷 Démarrage caméra...');
-      
-      // Vérifier support navigateur
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Votre navigateur ne supporte pas l\'accès caméra');
       }
 
-      // Afficher d'abord l'interface caméra
       setShowCamera(true);
       setMessage({ type: '', text: 'Demande d\'accès à la caméra...' });
 
-      const constraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           facingMode: { ideal: 'environment' },
           width: { ideal: 640, max: 1280 },
           height: { ideal: 480, max: 720 }
-        } 
-      };
-      
-      console.log('🎥 Demande de stream avec contraintes:', constraints);
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('✅ Stream obtenu:', stream);
+        }
+      });
       
       streamRef.current = stream;
       
-      // Attendre que l'élément vidéo soit monté
       await new Promise((resolve) => {
         const checkVideo = () => {
           if (videoRef.current) {
-            console.log('📹 Élément vidéo trouvé');
             videoRef.current.srcObject = stream;
             
             videoRef.current.onloadedmetadata = () => {
-              console.log('📹 Métadonnées vidéo chargées');
               setCameraReady(true);
-              setMessage({ type: '', text: 'Caméra prête - pointez vers un QR code' });
+              setMessage({ type: '', text: 'Caméra prête - pointez vers le QR code' });
               resolve();
             };
             
             videoRef.current.onplay = () => {
-              console.log('▶️ Lecture vidéo démarrée');
               setTimeout(() => {
                 scanningRef.current = true;
                 scanQRFromCamera();
               }, 500);
             };
             
-            videoRef.current.onerror = (error) => {
-              console.error('❌ Erreur vidéo:', error);
-              throw new Error('Erreur lors du chargement de la vidéo');
-            };
-            
             videoRef.current.play().catch(error => {
-              console.error('❌ Erreur play:', error);
               throw new Error('Impossible de démarrer la vidéo');
             });
           } else {
-            console.log('⏳ Attente de l\'élément vidéo...');
             setTimeout(checkVideo, 100);
           }
         };
         
-        // Démarrer la vérification après un petit délai pour laisser React monter le composant
         setTimeout(checkVideo, 100);
       });
       
     } catch (error) {
       console.error('❌ Erreur caméra:', error);
-      
       let errorMessage = 'Erreur d\'accès à la caméra';
       
       if (error.name === 'NotAllowedError') {
         errorMessage = 'Permission caméra refusée. Autorisez l\'accès et rechargez.';
       } else if (error.name === 'NotFoundError') {
         errorMessage = 'Aucune caméra trouvée sur cet appareil.';
-      } else if (error.name === 'NotSupportedError') {
-        errorMessage = 'Caméra non supportée sur ce navigateur.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Caméra utilisée par une autre application.';
       } else {
         errorMessage = error.message;
       }
@@ -347,16 +259,11 @@ const ProfesseurScanner = () => {
   };
 
   const stopCamera = () => {
-    console.log('🛑 Arrêt de la caméra...');
-    
     scanningRef.current = false;
     setCameraReady(false);
     
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        console.log('⏹️ Piste arrêtée:', track.kind);
-      });
+      streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     
@@ -376,8 +283,6 @@ const ProfesseurScanner = () => {
       return;
     }
 
-    console.log('📷 Upload d\'image:', file.name, file.size, 'bytes');
-
     setLoading(true);
     setMessage({ type: '', text: 'Analyse de l\'image en cours...' });
 
@@ -387,8 +292,6 @@ const ProfesseurScanner = () => {
         const img = new Image();
         img.onload = async () => {
           try {
-            console.log('🖼️ Image chargée:', img.width, 'x', img.height);
-            
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
@@ -397,129 +300,44 @@ const ProfesseurScanner = () => {
             ctx.drawImage(img, 0, 0);
             
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            console.log('🔍 Analyse des données image...', imageData.data.length, 'pixels');
             
-            // Essayer plusieurs configurations de jsQR
-            let code = null;
-            
-            console.log('🔍 Tentative 1: Configuration standard');
-            code = jsQR(imageData.data, imageData.width, imageData.height, {
-              inversionAttempts: "dontInvert"
+            let code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "attemptBoth"
             });
             
-            if (!code) {
-              console.log('🔍 Tentative 2: Avec inversion');
-              code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "onlyInvert"
-              });
-            }
-            
-            if (!code) {
-              console.log('🔍 Tentative 3: Essayer les deux');
-              code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: "attemptBoth"
-              });
-            }
-            
-            if (!code) {
-              console.log('🔍 Tentative 4: Mode agressif');
-              code = jsQR(imageData.data, imageData.width, imageData.height);
-            }
-            
             if (code && code.data) {
-              console.log('✅ QR détecté depuis image:', code.data);
-              console.log('📍 Position:', code.location);
+              let detectedQrId = code.data.trim();
               
-              let detectedQrId = code.data;
-              console.log('🔗 QR brut:', detectedQrId);
-              
-              // Extraire l'ID si c'est une URL complète
               if (detectedQrId.includes('/scan-qr/')) {
                 detectedQrId = detectedQrId.split('/scan-qr/')[1];
-                console.log('🎯 ID extrait (après /scan-qr/):', detectedQrId);
               }
-              
               if (detectedQrId.includes('?')) {
                 detectedQrId = detectedQrId.split('?')[0];
-                console.log('🎯 ID extrait (après ?):', detectedQrId);
               }
-              
-              // Nettoyer l'ID
-              detectedQrId = detectedQrId.trim();
-              console.log('🧹 ID final nettoyé:', detectedQrId);
               
               if (detectedQrId) {
                 setQrId(detectedQrId);
                 await scannerQRCode(detectedQrId);
               } else {
-                console.error('❌ ID vide après extraction');
-                setMessage({ 
-                  type: 'error', 
-                  text: 'QR code détecté mais ID invalide' 
-                });
+                setMessage({ type: 'error', text: 'QR code détecté mais ID invalide' });
                 setLoading(false);
               }
             } else {
-              console.log('❌ Aucun QR code détecté dans l\'image');
-              
-              // Essayer avec une image redimensionnée
-              console.log('🔍 Tentative avec redimensionnement...');
-              const maxSize = 800;
-              let newWidth = img.width;
-              let newHeight = img.height;
-              
-              if (img.width > maxSize || img.height > maxSize) {
-                const ratio = Math.min(maxSize / img.width, maxSize / img.height);
-                newWidth = Math.floor(img.width * ratio);
-                newHeight = Math.floor(img.height * ratio);
-                
-                console.log('📏 Redimensionnement:', img.width + 'x' + img.height, '->', newWidth + 'x' + newHeight);
-                
-                const resizedCanvas = document.createElement('canvas');
-                const resizedCtx = resizedCanvas.getContext('2d');
-                resizedCanvas.width = newWidth;
-                resizedCanvas.height = newHeight;
-                resizedCtx.drawImage(img, 0, 0, newWidth, newHeight);
-                
-                const resizedImageData = resizedCtx.getImageData(0, 0, newWidth, newHeight);
-                
-                const resizedCode = jsQR(resizedImageData.data, resizedImageData.width, resizedImageData.height, {
-                  inversionAttempts: "attemptBoth"
-                });
-                
-                if (resizedCode && resizedCode.data) {
-                  console.log('✅ QR détecté depuis image redimensionnée:', resizedCode.data);
-                  let detectedQrId = resizedCode.data.trim();
-                  
-                  if (detectedQrId.includes('/scan-qr/')) {
-                    detectedQrId = detectedQrId.split('/scan-qr/')[1];
-                  }
-                  if (detectedQrId.includes('?')) {
-                    detectedQrId = detectedQrId.split('?')[0];
-                  }
-                  
-                  setQrId(detectedQrId);
-                  await scannerQRCode(detectedQrId);
-                  return;
-                }
-              }
-              
               setMessage({ 
                 type: 'error', 
-                text: 'Aucun QR code détecté. Assurez-vous que l\'image contient un QR code net et bien contrasté.' 
+                text: 'Aucun QR code détecté. Assurez-vous que l\'image est nette.' 
               });
               setLoading(false);
             }
             
           } catch (error) {
             console.error('❌ Erreur traitement image:', error);
-            setMessage({ type: 'error', text: 'Erreur lors du traitement de l\'image: ' + error.message });
+            setMessage({ type: 'error', text: 'Erreur lors du traitement de l\'image' });
             setLoading(false);
           }
         };
         
         img.onerror = () => {
-          console.error('❌ Erreur chargement image');
           setMessage({ type: 'error', text: 'Erreur lors du chargement de l\'image' });
           setLoading(false);
         };
@@ -528,7 +346,6 @@ const ProfesseurScanner = () => {
       };
       
       reader.onerror = () => {
-        console.error('❌ Erreur lecture fichier');
         setMessage({ type: 'error', text: 'Erreur lors de la lecture du fichier' });
         setLoading(false);
       };
@@ -536,16 +353,14 @@ const ProfesseurScanner = () => {
       reader.readAsDataURL(file);
       
     } catch (error) {
-      console.error('❌ Erreur upload générale:', error);
-      setMessage({ type: 'error', text: 'Erreur lors de l\'upload: ' + error.message });
+      console.error('❌ Erreur upload:', error);
+      setMessage({ type: 'error', text: 'Erreur lors de l\'upload' });
       setLoading(false);
     }
   };
 
   const scanQRFromCamera = () => {
-    if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
-      return;
-    }
+    if (!scanningRef.current || !videoRef.current || !canvasRef.current) return;
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -557,26 +372,18 @@ const ProfesseurScanner = () => {
     
     try {
       const context = canvas.getContext('2d');
-      
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0);
       
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      
-      // SIMPLE - juste utiliser jsQR sans options complexes
       const code = jsQR(imageData.data, imageData.width, imageData.height);
       
       if (code && code.data) {
-        console.log('QR détecté:', code.data);
-        
         scanningRef.current = false;
         stopCamera();
         
-        // Utiliser directement la donnée du QR
         let qrData = code.data.trim();
-        
-        // Si c'est une URL, extraire juste l'ID final
         if (qrData.includes('/')) {
           const parts = qrData.split('/');
           qrData = parts[parts.length - 1];
@@ -587,23 +394,19 @@ const ProfesseurScanner = () => {
         return;
       }
       
-      // Continuer le scan
       if (scanningRef.current) {
         requestAnimationFrame(scanQRFromCamera);
       }
       
     } catch (error) {
-      console.error('Erreur scan:', error);
       if (scanningRef.current) {
         requestAnimationFrame(scanQRFromCamera);
       }
     }
   };
 
-  // Auto scan si QR ID dans URL
   useEffect(() => {
-    if (qrId && professeur && !message.text && !pointageReussi && !showCamera) {
-      console.log('🚀 Auto-scan du QR depuis URL');
+    if (qrId && professeur && !message.text && !pointageInfo && !showCamera) {
       const timer = setTimeout(() => {
         scannerQRCode();
       }, 1000);
@@ -614,10 +417,17 @@ const ProfesseurScanner = () => {
 
   const resetScanner = () => {
     setMessage({ type: '', text: '' });
-    setPointageReussi(false);
+    setPointageInfo(null);
     setQrId('');
     setLoading(false);
     stopCamera();
+    fetchProfesseurInfo();
+  };
+
+  const formatTempsPresence = (minutes) => {
+    const heures = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${heures}h ${mins}min`;
   };
 
   const getCurrentDateTime = () => {
@@ -630,7 +440,6 @@ const ProfesseurScanner = () => {
 
   const datetime = getCurrentDateTime();
 
-  // Styles
   const cardStyle = {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(10px)',
@@ -645,6 +454,8 @@ const ProfesseurScanner = () => {
     color: 'white',
     border: 'none',
     borderRadius: '16px',
+    padding: '18px 24px',
+    fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
@@ -652,7 +463,8 @@ const ProfesseurScanner = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px'
+    gap: '12px',
+    width: '100%'
   };
 
   const buttonSecondaryStyle = {
@@ -660,6 +472,8 @@ const ProfesseurScanner = () => {
     color: 'white',
     border: 'none',
     borderRadius: '16px',
+    padding: '16px 24px',
+    fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
@@ -667,7 +481,26 @@ const ProfesseurScanner = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '12px'
+    gap: '12px',
+    width: '100%'
+  };
+
+  const buttonDangerStyle = {
+    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '16px',
+    padding: '18px 24px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 8px 25px rgba(239, 68, 68, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    width: '100%'
   };
 
   return (
@@ -675,16 +508,10 @@ const ProfesseurScanner = () => {
       minHeight: '100vh',
       backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '20px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      <Sidebar onLogout={handleLogout} />
-        
-      <div style={{ 
-        maxWidth: '480px', 
-        margin: '0 auto',
-        ...cardStyle,
-        padding: '32px'
-      }}>
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    }}>      <Sidebar onLogout={handleLogout} />
+
+      <div style={{ maxWidth: '480px', margin: '0 auto', ...cardStyle, padding: '32px' }}>
         
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -695,11 +522,11 @@ const ProfesseurScanner = () => {
             width: '80px',
             height: '80px',
             borderRadius: '50%',
-            background: pointageReussi ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            background: pointageInfo ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             marginBottom: '20px',
             boxShadow: '0 10px 25px rgba(102, 126, 234, 0.3)'
           }}>
-            {pointageReussi ? (
+            {pointageInfo ? (
               <CheckCircle size={40} style={{ color: 'white' }} />
             ) : (
               <QrCode size={40} style={{ color: 'white' }} />
@@ -710,28 +537,19 @@ const ProfesseurScanner = () => {
             fontSize: '28px', 
             fontWeight: '700', 
             color: '#1a202c',
-            marginBottom: '8px',
-            background: pointageReussi ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
+            marginBottom: '8px'
           }}>
-            {pointageReussi ? 'Pointage Réussi!' : 'Scanner QR Code'}
+            {pointageInfo ? 'Pointage Enregistré' : 'Scanner QR Code'}
           </h1>
           
-          <p style={{ 
-            color: '#64748b', 
-            fontSize: '16px',
-            margin: 0,
-            fontWeight: '500'
-          }}>
-            {pointageReussi ? 'Votre présence a été enregistrée' : 'Système de pointage professeurs'}
+          <p style={{ color: '#64748b', fontSize: '16px', margin: 0, fontWeight: '500' }}>
+            Système de pointage - Entrée/Sortie
           </p>
         </div>
 
-        {/* Canvas caché */}
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-        {/* Interface caméra */}
+        {/* Caméra */}
         {showCamera && (
           <div style={{ marginBottom: '32px', textAlign: 'center' }}>
             <div style={{
@@ -756,7 +574,6 @@ const ProfesseurScanner = () => {
                 autoPlay
               />
               
-              {/* Overlay de visée */}
               {cameraReady && (
                 <div style={{
                   position: 'absolute',
@@ -772,7 +589,6 @@ const ProfesseurScanner = () => {
                 }} />
               )}
               
-              {/* Indicateur de statut */}
               <div style={{
                 position: 'absolute',
                 bottom: '16px',
@@ -790,26 +606,13 @@ const ProfesseurScanner = () => {
             </div>
             
             <div style={{ marginTop: '20px' }}>
-              <button
-                onClick={stopCamera}
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '12px 24px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-              >
+              <button onClick={stopCamera} style={{ ...buttonDangerStyle, padding: '12px 24px' }}>
                 Arrêter Caméra
               </button>
             </div>
             
             <p style={{ fontSize: '14px', color: '#64748b', marginTop: '12px', fontWeight: '500' }}>
-              Pointez la caméra vers le QR code pour le scanner automatiquement
+              Pointez la caméra vers le QR code
             </p>
           </div>
         )}
@@ -865,7 +668,7 @@ const ProfesseurScanner = () => {
             border: '1px solid rgba(102, 126, 234, 0.2)'
           }}>
             <div style={{ marginBottom: '8px' }}>
-              <Clock size={20} style={{ color: '#667eea', marginRight: '8px' }} />
+              <Clock size={20} style={{ color: '#667eea', marginRight: '8px', display: 'inline' }} />
               <span style={{ fontSize: '16px', fontWeight: '700', color: '#374151' }}>
                 {datetime.date}
               </span>
@@ -876,13 +679,65 @@ const ProfesseurScanner = () => {
           </div>
         )}
 
+        {/* Info pointage actuel */}
+        {pointageInfo && !showCamera && (
+          <div style={{
+            backgroundColor: pointageInfo.heureSortie ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+            border: `2px solid ${pointageInfo.heureSortie ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '32px'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1a202c', marginBottom: '16px' }}>
+              📋 Votre pointage aujourd'hui
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px', fontWeight: '600' }}>
+                  ENTRÉE
+                </p>
+                <p style={{ fontSize: '20px', fontWeight: '700', color: '#10b981', margin: 0 }}>
+                  {pointageInfo.heureEntree}
+                </p>
+              </div>
+              
+              <div>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px', fontWeight: '600' }}>
+                  SORTIE
+                </p>
+                <p style={{ fontSize: '20px', fontWeight: '700', color: pointageInfo.heureSortie ? '#ef4444' : '#9ca3af', margin: 0 }}>
+                  {pointageInfo.heureSortie || '--:--'}
+                </p>
+              </div>
+            </div>
+            
+            {pointageInfo.heureSortie && pointageInfo.tempsPresence > 0 && (
+              <div style={{ 
+                marginTop: '16px', 
+                padding: '12px', 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)', 
+                borderRadius: '12px',
+                textAlign: 'center'
+              }}>
+                <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0', fontWeight: '600' }}>
+                  Temps de présence
+                </p>
+                <p style={{ fontSize: '24px', fontWeight: '700', color: '#667eea', margin: 0 }}>
+                  {formatTempsPresence(pointageInfo.tempsPresence)}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Messages */}
         {message.text && (
           <div style={{
             backgroundColor: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
             border: `1px solid ${message.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
             borderRadius: '16px',
-            padding: '24px',
+            padding: '20px',
             marginBottom: '32px'
           }}>
             <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
@@ -894,8 +749,7 @@ const ProfesseurScanner = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0,
-                marginTop: '2px'
+                flexShrink: 0
               }}>
                 {message.type === 'success' ? (
                   <CheckCircle size={14} style={{ color: 'white' }} />
@@ -904,55 +758,14 @@ const ProfesseurScanner = () => {
                 )}
               </div>
               
-              <div style={{ flex: 1 }}>
-                <p style={{ 
-                  fontWeight: '600', 
-                  marginBottom: '12px', 
-                  color: message.type === 'success' ? '#15803d' : '#dc2626',
-                  fontSize: '16px'
-                }}>
-                  {message.text}
-                </p>
-                
-                {message.details && message.type === 'success' && (
-                  <div style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    fontSize: '14px',
-                    color: '#374151'
-                  }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <p style={{ margin: 0 }}>
-                        <strong>Professeur:</strong><br/>
-                        {message.details.professeur}
-                      </p>
-                      <p style={{ margin: 0 }}>
-                        <strong>Heure:</strong><br/>
-                        {message.details.heure}
-                      </p>
-                      <p style={{ margin: 0 }}>
-                        <strong>Date:</strong><br/>
-                        {message.details.date}
-                      </p>
-                      <div style={{ gridColumn: '1 / -1', marginTop: '8px' }}>
-                        <strong>Statut:</strong>
-                        <span style={{
-                          marginLeft: '8px',
-                          padding: '4px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          backgroundColor: message.details.statut === 'présent' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                          color: message.details.statut === 'présent' ? '#15803d' : '#d97706'
-                        }}>
-                          {message.details.statut.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <p style={{ 
+                fontWeight: '600', 
+                margin: 0,
+                color: message.type === 'success' ? '#15803d' : '#dc2626',
+                fontSize: '16px'
+              }}>
+                {message.text}
+              </p>
             </div>
           </div>
         )}
@@ -962,10 +775,7 @@ const ProfesseurScanner = () => {
           <div style={{
             textAlign: 'center',
             padding: '32px',
-            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-            borderRadius: '16px',
-            marginBottom: '32px',
-            border: '1px solid rgba(102, 126, 234, 0.2)'
+            marginBottom: '32px'
           }}>
             <div style={{
               width: '40px',
@@ -977,27 +787,23 @@ const ProfesseurScanner = () => {
               margin: '0 auto 16px'
             }}></div>
             <p style={{ color: '#667eea', fontWeight: '600', fontSize: '16px', margin: 0 }}>
-              {message.text || 'Pointage en cours...'}
+              {message.text || 'Traitement en cours...'}
             </p>
           </div>
         )}
 
         {/* Boutons d'action */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {!pointageReussi && !loading && !qrId && !showCamera && (
+          {!pointageInfo && !loading && !showCamera && (
             <>
               <button
                 onClick={startCamera}
-                style={{
-                  ...buttonPrimaryStyle,
-                  padding: '18px 24px',
-                  fontSize: '16px'
-                }}
+                style={buttonPrimaryStyle}
                 onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
                 onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
               >
                 <Camera size={24} />
-                Scanner avec Caméra
+                Scanner QR (Entrée)
               </button>
 
               <input
@@ -1010,11 +816,7 @@ const ProfesseurScanner = () => {
               
               <button
                 onClick={() => fileInputRef.current?.click()}
-                style={{
-                  ...buttonSecondaryStyle,
-                  padding: '16px 24px',
-                  fontSize: '16px'
-                }}
+                style={buttonSecondaryStyle}
                 onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
                 onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
               >
@@ -1024,36 +826,34 @@ const ProfesseurScanner = () => {
             </>
           )}
 
-          {/* Bouton nouveau scan après succès */}
-          {pointageReussi && (
+          {pointageInfo && !pointageInfo.heureSortie && !loading && (
+            <button
+              onClick={enregistrerSortie}
+              style={buttonDangerStyle}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <LogOut size={24} />
+              Enregistrer Sortie
+            </button>
+          )}
+
+          {pointageInfo && pointageInfo.heureSortie && (
             <button
               onClick={resetScanner}
               style={{
-                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '16px 24px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 8px 25px rgba(6, 182, 212, 0.3)',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px'
+                ...buttonPrimaryStyle,
+                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
               }}
               onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
               onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
             >
               <RefreshCw size={20} />
-              Nouveau Scan
+              Terminé pour aujourd'hui
             </button>
           )}
 
-          {/* Bouton réessayer en cas d'erreur */}
-          {!pointageReussi && !loading && message.type === 'error' && (
+          {!pointageInfo && !loading && message.type === 'error' && (
             <button
               onClick={() => {
                 setMessage({ type: '', text: '' });
@@ -1064,20 +864,8 @@ const ProfesseurScanner = () => {
                 }
               }}
               style={{
-                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '16px 24px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 8px 25px rgba(6, 182, 212, 0.3)',
-                transition: 'all 0.3s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px'
+                ...buttonPrimaryStyle,
+                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
               }}
               onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
               onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
