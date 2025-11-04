@@ -644,7 +644,7 @@ const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
 
   const header = [
     'Date', 'Matière', 'Professeur', 'Période', 'Heure', 
-    'Étudiant', 'Statut', 'Retard (min)', 'Remarque', 
+    'Étudiant', 'Statut', 'Retard ', 'Remarque', 
     'Total Étudiants', 'Taux Présence'
   ];
   const colWidths = [
