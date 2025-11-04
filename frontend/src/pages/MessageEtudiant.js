@@ -231,7 +231,7 @@ const MessageEtudiant = () => {
       }
 
       try {
-        const response = await fetch('http://localhost:5000/api/etudiant/me', {
+        const response = await fetch('/api/etudiant/me', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -260,7 +260,7 @@ const MessageEtudiant = () => {
 
       setIsLoadingProfesseurs(true);
       try {
-        const response = await fetch('http://localhost:5000/api/etudiant/mes-professeurs-messages', {
+        const response = await fetch('/api/etudiant/mes-professeurs-messages', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -296,7 +296,7 @@ const MessageEtudiant = () => {
       if (!token) return;
 
       try {
-        const response = await fetch('http://localhost:5000/api/messages/unread-by-sender', {
+        const response = await fetch('/api/messages/unread-by-sender', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -318,7 +318,7 @@ const MessageEtudiant = () => {
       if (!token) return;
 
       try {
-        const response = await fetch('http://localhost:5000/api/users/online-status', {
+        const response = await fetch('/api/users/online-status', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -346,7 +346,7 @@ const MessageEtudiant = () => {
 
       setIsLoadingMessages(true);
       try {
-        const response = await fetch(`http://localhost:5000/api/messages/etudiant/${selectedProf._id}`, {
+        const response = await fetch(`/api/messages/etudiant/${selectedProf._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -358,7 +358,7 @@ const MessageEtudiant = () => {
         setMessages(Array.isArray(data) ? data : []);
         
         // Marquer les messages comme lus
-        await fetch('http://localhost:5000/api/messages/mark-conversation-read', {
+        await fetch('/api/messages/mark-conversation-read', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -400,7 +400,7 @@ const MessageEtudiant = () => {
   if (fichier) formData.append('fichier', fichier);
 
   try {
-    const response = await fetch('http://localhost:5000/api/messages/upload', {
+    const response = await fetch('/api/messages/upload', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData
@@ -455,7 +455,7 @@ const startRecording = async () => {
       formData.append('fichier', file);
 
       try {
-        const response = await fetch('http://localhost:5000/api/messages/upload', {
+        const response = await fetch('/api/messages/upload', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData
@@ -505,7 +505,7 @@ const stopRecording = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/messages/${messageToDelete}`, {
+      const response = await fetch(`/api/messages/${messageToDelete}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -26,7 +26,7 @@ const AdminPointagesView = () => {
     }
     
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/pointages?date=${dateSelectionnee}`, {
+      const res = await fetch(`/api/admin/pointages?date=${dateSelectionnee}`, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

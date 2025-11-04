@@ -39,7 +39,7 @@ const ProfesseurScanner = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/professeur/statut-aujourd-hui', {
+      const res = await fetch('/api/professeur/statut-aujourd-hui', {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -54,7 +54,7 @@ const ProfesseurScanner = () => {
           setPointageInfo(data.pointageAujourdhui);
         }
       } else {
-        const res2 = await fetch('http://localhost:5000/api/professeur/profile', {
+        const res2 = await fetch('/api/professeur/profile', {
           headers: { 
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -95,7 +95,7 @@ const ProfesseurScanner = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const url = `http://localhost:5000/api/scan-qr/${currentQrId}`;
+      const url = `/api/scan-qr/${currentQrId}`;
       
       const res = await fetch(url, {
         method: 'POST',
@@ -151,7 +151,7 @@ const ProfesseurScanner = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch('http://localhost:5000/api/professeur/sortie', {
+      const res = await fetch('/api/professeur/sortie', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

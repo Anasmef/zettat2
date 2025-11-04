@@ -46,7 +46,7 @@ const Calendrier = () => {
     const fetchEvenements = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/evenements', {
+        const res = await axios.get('/api/evenements', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -233,7 +233,7 @@ const Calendrier = () => {
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'événement "${event.titre}" ?`)) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:5000/api/evenements/${event._id}`, {
+        await axios.delete(`/api/evenements/${event._id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -251,7 +251,7 @@ const Calendrier = () => {
   const fetchEvenements = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://localhost:5000/api/evenements', {
+      const res = await axios.get('/api/evenements', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -284,7 +284,7 @@ const Calendrier = () => {
       }
 
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:5000/api/evenements/${editingEvent._id}`, {
+      await axios.put(`/api/evenements/${editingEvent._id}`, {
         titre: editingEvent.titre,
         description: editingEvent.description,
         dateDebut: editingEvent.dateDebut,
@@ -340,7 +340,7 @@ const Calendrier = () => {
       }
 
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:5000/api/evenements', {
+      await axios.post('/api/evenements', {
         titre: newEvent.titre,
         description: newEvent.description,
         dateDebut: newEvent.dateDebut,

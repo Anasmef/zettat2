@@ -41,7 +41,7 @@ const [dateTo, setDateTo] = useState('');
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/presences', {
+        const res = await axios.get('/api/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -207,7 +207,7 @@ const handleDeletePresence = async (presenceId, sessionIndex, presenceIndex) => 
   }
   try {
     const token = localStorage.getItem('token');
-    await axios.delete(`http://localhost:5000/api/presences/${presenceId}`, {
+    await axios.delete(`/api/presences/${presenceId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const updatedSessions = [...filteredSessions];
@@ -243,7 +243,7 @@ const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
   try {
     const token = localStorage.getItem('token');
     const response = await axios.put(
-      `http://localhost:5000/api/admin/presences/${presenceId}`,
+      `/api/admin/presences/${presenceId}`,
       editForm,
       {
         headers: { Authorization: `Bearer ${token}` }
