@@ -24,9 +24,9 @@ const DashboardPaiementManager = () => {
       
       const token = localStorage.getItem('token');
       console.log('Token:', token ? 'Présent' : 'Absent');
-      console.log('URL appelée:', '/api/paiement-manager/stats');
+      console.log('URL appelée:', 'http://localhost:5000/api/paiement-manager/stats');
       
-      const res = await axios.get('/api/paiement-manager/stats', {
+      const res = await axios.get('http://localhost:5000/api/paiement-manager/stats', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

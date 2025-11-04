@@ -41,7 +41,7 @@ const [dateTo, setDateTo] = useState('');
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get('/api/presences', {
+        const res = await axios.get('http://localhost:5000/api/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -207,7 +207,7 @@ const handleDeletePresence = async (presenceId, sessionIndex, presenceIndex) => 
   }
   try {
     const token = localStorage.getItem('token');
-    await axios.delete(`/api/presences/${presenceId}`, {
+    await axios.delete(`http://localhost:5000/api/presences/${presenceId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const updatedSessions = [...filteredSessions];
@@ -243,7 +243,7 @@ const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
   try {
     const token = localStorage.getItem('token');
     const response = await axios.put(
-      `/api/admin/presences/${presenceId}`,
+      `http://localhost:5000/api/admin/presences/${presenceId}`,
       editForm,
       {
         headers: { Authorization: `Bearer ${token}` }
@@ -363,24 +363,10 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     return;
   }
 
-  // 1) Fonction pour extraire le niveau de la classe
-  const getClassLevel = (className) => {
-    const classUpper = className.toUpperCase();
-    if (classUpper.includes('2BAC') || classUpper.includes('2 BAC')) return '2BAC';
-    if (classUpper.includes('1BAC') || classUpper.includes('1 BAC')) return '1BAC';
-    if (classUpper.includes('TRONC') || classUpper.includes('TC')) return 'Tronc Commun';
-    if (classUpper.includes('3AC') || classUpper.includes('3 AC')) return '3AC';
-    if (classUpper.includes('2AC') || classUpper.includes('2 AC')) return '2AC';
-    if (classUpper.includes('1AC') || classUpper.includes('1 AC')) return '1AC';
-    return className; // Retourner le nom original si pas de correspondance
-  };
-
-  // Regrouper par niveau (pas par classe exacte)
-  const niveaux = {};
+  const classes = {};
   sessionsOfDay.forEach(s => {
-    const niveau = getClassLevel(s.cours);
-    if (!niveaux[niveau]) niveaux[niveau] = [];
-    niveaux[niveau].push(s);
+    if (!classes[s.cours]) classes[s.cours] = [];
+    classes[s.cours].push(s);
   });
 
   const header = [
@@ -398,60 +384,25 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   const merges = [];
   const colsCount = header.length;
 
-  // عنوان عام
   const bigTitle = `PRÉSENCES — ${formatDate(date)}${professorName ? ' — ' + professorName : ''}${!isAllPeriode ? ' — ' + periodeFilter : ''}`;
   aoa.push([bigTitle, ...Array(colsCount - 1).fill('')]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
   aoa.push(Array(colsCount).fill(''));
 
   let currentRow = aoa.length;
-  const headerRows = []; // Pour garder une trace des lignes de headers
-  const titleRows = [0]; // Ligne du titre principal
-  const classRows = []; // Lignes des titres de classes
-  const subTitleRows = []; // Lignes des sous-titres
+  const headerRows = [];
+  const titleRows = [0];
+  const classRows = [];
+  const subTitleRows = [];
 
-  // Fonction de tri personnalisée pour les classes
-  const getClassOrder = (className) => {
-    const classUpper = className.toUpperCase();
-    
-    // 2BAC (ordre 1)
-    if (classUpper.includes('2BAC') || classUpper.includes('2 BAC')) return 1;
-    
-    // 1BAC (ordre 2)
-    if (classUpper.includes('1BAC') || classUpper.includes('1 BAC')) return 2;
-    
-    // Tronc Commun (ordre 3)
-    if (classUpper.includes('TRONC') || classUpper.includes('TC')) return 3;
-    
-    // 3AC (ordre 4)
-    if (classUpper.includes('3AC') || classUpper.includes('3 AC')) return 4;
-    
-    // 2AC (ordre 5)
-    if (classUpper.includes('2AC') || classUpper.includes('2 AC')) return 5;
-    
-    // 1AC (ordre 6)
-    if (classUpper.includes('1AC') || classUpper.includes('1 AC')) return 6;
-    
-    // Autres classes (à la fin)
-    return 999;
-  };
-
-  // 2) داخل كل Niveau: نجمع بجداول فرعية حسب (Prof + Période + Matière + Heure)
-  Object.entries(niveaux)
-    .sort(([a],[b]) => {
-      const orderA = getClassOrder(a);
-      const orderB = getClassOrder(b);
-      if (orderA !== orderB) return orderA - orderB;
-      return a.localeCompare(b, 'fr'); // Si même ordre, tri alphabétique
-    })
-    .forEach(([niveauName, sessions], niveauIdx, niveauArr) => {
-      // عنوان Niveau
-      aoa.push([`NIVEAU: ${niveauName}`, ...Array(colsCount - 1).fill('')]);
-      classRows.push(currentRow); // Enregistrer la ligne de niveau
+  Object.entries(classes)
+    .sort(([a],[b]) => a.localeCompare(b,'fr'))
+    .forEach(([className, sessions], classIdx, classArr) => {
+      aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
+      classRows.push(currentRow);
       merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
       currentRow++;
 
-      // ⤵️ تجميع فرعي (regrouper par Prof + Période + Matière + Heure, même si classes différentes)
       const subGroups = {};
       sessions.forEach(s => {
         const prof   = s.nomProfesseur || 'N/A';
@@ -463,114 +414,106 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
         subGroups[key].push(s);
       });
 
-      // دور على كل SubGroup بترتيب واضح
       Object.entries(subGroups)
         .sort(([ka],[kb]) => ka.localeCompare(kb,'fr'))
         .forEach(([key, groupSessions], sgIdx, sgArr) => {
           const [prof, periode, mat, heure] = key.split('||');
 
-          // عنوان فرعي: Prof + Période + Matière + Heure
           aoa.push([`Prof: ${prof} — Période: ${periode} — Matière: ${mat} — Heure: ${heure}`, ...Array(colsCount - 1).fill('')]);
-          subTitleRows.push(currentRow); // Enregistrer la ligne de sous-titre
+          subTitleRows.push(currentRow);
           merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
           currentRow++;
 
-          // هيدر
           aoa.push([...header]);
-          headerRows.push(currentRow); // Sauvegarder la position du header
+          headerRows.push(currentRow);
           currentRow++;
 
-          // سطور البيانات
           groupSessions
             .sort((a,b) => new Date(a.date) - new Date(b.date))
             .forEach(session => {
-           session.presences.forEach(p => {
-  if (statusFilter === 'absent' && p.present) return;
-  if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) return;
-  if (statusFilter === 'absent_retard' && (p.present && (p.retardMinutes || 0) === 0)) return;  // ← AJOUTER CETTE LIGNE
+              session.presences.forEach(p => {
+                if (statusFilter === 'absent' && p.present) return;
+                if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) return;
+                if (statusFilter === 'absent_retard' && (p.present && (p.retardMinutes || 0) === 0)) return;
 
-  aoa.push([
-    formatDate(session.date),
-    session.cours,
-    session.matiere || 'N/A',
-    session.nomProfesseur || 'N/A',
-    session.presences[0]?.periode || 'N/A',
-    session.presences[0]?.heure || 'N/A',
-    p.etudiant?.nomComplet || 'N/A',
-    p.present ? ((p.retardMinutes || 0) > 0 ? 'En retard' : 'Présent') : 'Absent',
-    p.retardMinutes || 0,
-    p.remarque || ''
-  ]);
-  currentRow++;
-});
+                aoa.push([
+                  formatDate(session.date),
+                  session.cours,
+                  session.matiere || 'N/A',
+                  session.nomProfesseur || 'N/A',
+                  session.presences[0]?.periode || 'N/A',
+                  session.presences[0]?.heure || 'N/A',
+                  p.etudiant?.nomComplet || 'N/A',
+                  p.present ? ((p.retardMinutes || 0) > 0 ? 'En retard' : 'Présent') : 'Absent',
+                  p.retardMinutes || 0,
+                  p.remarque || ''
+                ]);
+                currentRow++;
+              });
             });
 
-          // سطر فارغ بين الجداول الفرعية
           if (sgIdx < sgArr.length - 1) {
             aoa.push(Array(colsCount).fill(''));
             currentRow++;
           }
         });
 
-      // سطر فارغ بين les niveaux
-      if (niveauIdx < niveauArr.length - 1) {
+      if (classIdx < classArr.length - 1) {
         aoa.push(Array(colsCount).fill(''));
         currentRow++;
       }
     });
 
-  // بناء الورقة
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   
-  // ===== STYLES OPTIMISÉS POUR L'IMPRESSION (ÉCONOMIE D'ENCRE) =====
+  // ===== STYLES OPTIMISÉS POUR ÉCONOMISER L'ENCRE =====
   
-  // Style pour le titre principal - GRIS CLAIR avec texte noir gras
+  // Titre principal - Texte noir gras, SANS fond de couleur
   const titleStyle = {
-    font: { bold: true, sz: 16, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "E0E0E0" } }, // Gris très clair
+    font: { bold: true, sz: 14, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
     border: {
-      top: { style: "medium", color: { rgb: "000000" } },
       bottom: { style: "medium", color: { rgb: "000000" } }
     }
   };
 
-  // Style pour les titres de classe - GRIS LÉGER avec texte noir
+  // Titres de classe - Texte noir gras, fond très léger
   const classStyle = {
-    font: { bold: true, sz: 14, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "D3D3D3" } }, // Gris clair
+    font: { bold: true, sz: 12, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: "F5F5F5" } }, // Gris ultra léger
     alignment: { horizontal: "left", vertical: "center" },
     border: {
       bottom: { style: "thin", color: { rgb: "000000" } }
     }
   };
 
-  // Style pour les sous-titres - TRÈS LÉGER
+  // Sous-titres - Texte noir, SANS fond de couleur
   const subTitleStyle = {
-    font: { bold: true, sz: 11, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "F0F0F0" } }, // Gris très très clair
+    font: { bold: true, sz: 10, color: { rgb: "000000" } },
     alignment: { horizontal: "left", vertical: "center" }
   };
 
-  // ⭐ STYLE POUR LES HEADERS - SIMPLE AVEC BORDURES ⭐
+  // Headers - Texte noir gras, bordures simples, SANS fond
   const headerStyle = {
-    font: { bold: true, sz: 11, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "E8E8E8" } }, // Gris très léger
+    font: { bold: true, sz: 10, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
     border: {
-      top: { style: "medium", color: { rgb: "000000" } },
-      bottom: { style: "medium", color: { rgb: "000000" } },
-      left: { style: "thin", color: { rgb: "666666" } },
-      right: { style: "thin", color: { rgb: "666666" } }
+      top: { style: "thin", color: { rgb: "000000" } },
+      bottom: { style: "thin", color: { rgb: "000000" } },
+      left: { style: "thin", color: { rgb: "CCCCCC" } },
+      right: { style: "thin", color: { rgb: "CCCCCC" } }
     }
   };
 
-  // Style pour les données normales - MINIMAL
+  // Données - Bordures légères grises
   const dataStyle = {
-    font: { sz: 10, color: { rgb: "000000" } },
+    font: { sz: 9 },
     alignment: { vertical: "center" },
     border: {
-      bottom: { style: "hair", color: { rgb: "CCCCCC" } } // Bordure très fine
+      top: { style: "hair", color: { rgb: "DDDDDD" } },
+      bottom: { style: "hair", color: { rgb: "DDDDDD" } },
+      left: { style: "hair", color: { rgb: "DDDDDD" } },
+      right: { style: "hair", color: { rgb: "DDDDDD" } }
     }
   };
 
@@ -579,12 +522,10 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     for (let colIndex = 0; colIndex < colsCount; colIndex++) {
       const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
       
-      // S'assurer que la cellule existe
       if (!ws[cellAddress]) {
         ws[cellAddress] = { t: 's', v: '' };
       }
       
-      // Appliquer les styles selon le type de ligne
       if (titleRows.includes(rowIndex)) {
         ws[cellAddress].s = titleStyle;
       }
@@ -603,14 +544,12 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     }
   }
 
-  // Configuration de la feuille
   ws['!merges'] = merges;
   ws['!cols'] = colWidths;
-  ws['!rows'] = [{ hpx: 28 }];
+  ws['!rows'] = [{ hpx: 24 }];
   ws['!margins'] = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 };
   ws['!pageSetup'] = { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0, paperSize: 9 };
 
-  // Création du workbook et export
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Présences Jour');
 
@@ -644,7 +583,7 @@ const exportMonthlyPresences = (month, year, statusFilter = 'all') => {
 
   const header = [
     'Date', 'Matière', 'Professeur', 'Période', 'Heure', 
-    'Étudiant', 'Statut', 'Retard ', 'Remarque', 
+    'Étudiant', 'Statut', 'Retard (min)', 'Remarque', 
     'Total Étudiants', 'Taux Présence'
   ];
   const colWidths = [

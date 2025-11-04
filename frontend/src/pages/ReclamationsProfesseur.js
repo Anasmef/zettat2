@@ -91,7 +91,7 @@ const ProfesseurReclamations = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/professeur/etudiants', {
+      const res = await fetch('http://localhost:5000/api/professeur/etudiants', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -115,7 +115,7 @@ const ProfesseurReclamations = () => {
         ...Object.fromEntries(Object.entries(filtres).filter(([_, v]) => v))
       });
 
-      const res = await fetch(`/api/professeur/reclamations?${params}`, {
+      const res = await fetch(`http://localhost:5000/api/professeur/reclamations?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -141,7 +141,7 @@ const ProfesseurReclamations = () => {
         ...formData
       };
 
-      const res = await fetch('/api/professeur/reclamations', {
+      const res = await fetch('http://localhost:5000/api/professeur/reclamations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

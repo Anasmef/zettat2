@@ -68,7 +68,7 @@ const PaiementManagerPage = () => {
       console.log('🔑 Token présent:', !!token);
 
       // Utiliser l'endpoint filtré pour les gestionnaires de paiement
-      const response = await fetch('/api/etudiants/filtered', {
+      const response = await fetch('http://localhost:5000/api/etudiants/filtered', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -209,7 +209,7 @@ const PaiementManagerPage = () => {
 
       console.log('💾 Sauvegarde des données:', requestBody);
 
-      const response = await fetch(`/api/etudiants/${etudiantId}/finance`, {
+      const response = await fetch(`http://localhost:5000/api/etudiants/${etudiantId}/finance`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -63,9 +63,9 @@ const InscripteurDashboard = () => {
 
       // Récupération des données avec les permissions inscripteur
       const [etudiantsRes, coursRes, professeursRes] = await Promise.all([
-        fetch('/api/etudiants', { headers }),
-        fetch('/api/cours', { headers }),
-        fetch('/api/professeurs', { headers })
+        fetch('http://localhost:5000/api/etudiants', { headers }),
+        fetch('http://localhost:5000/api/cours', { headers }),
+        fetch('http://localhost:5000/api/professeurs', { headers })
       ]);
 
       // Vérification des statuts

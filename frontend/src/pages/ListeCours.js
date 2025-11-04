@@ -36,9 +36,9 @@ const ListeCours = () => {
         const token = localStorage.getItem('token');
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
-        const resCours = await fetch('/api/cours', config);
-        const resEtudiants = await fetch('/api/etudiants', config);
-        const resProfs = await fetch('/api/professeurs', config);
+        const resCours = await fetch('http://localhost:5000/api/cours', config);
+        const resEtudiants = await fetch('http://localhost:5000/api/etudiants', config);
+        const resProfs = await fetch('http://localhost:5000/api/professeurs', config);
 
         if (resCours.ok && resEtudiants.ok && resProfs.ok) {
           const coursData = await resCours.json();
@@ -109,7 +109,7 @@ const ListeCours = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/cours', {
+      const response = await fetch('http://localhost:5000/api/cours', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ const ListeCours = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/cours/${coursASupprimer._id}`, {
+      const response = await fetch(`http://localhost:5000/api/cours/${coursASupprimer._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

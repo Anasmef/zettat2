@@ -74,7 +74,7 @@ const UploadPhotoFinal = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/etudiant/photo/info', {
+      const response = await fetch('http://localhost:5000/api/etudiant/photo/info', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -157,7 +157,7 @@ const UploadPhotoFinal = () => {
       const formData = new FormData();
       formData.append('photo', selectedFile);
 
-      const response = await fetch('/api/etudiant/photo/upload-photo', {
+      const response = await fetch('http://localhost:5000/api/etudiant/photo/upload-photo', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

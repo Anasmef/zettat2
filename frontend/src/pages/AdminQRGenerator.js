@@ -25,7 +25,7 @@ const AdminQRPage = () => {
   const fetchPointages = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/pointages', {
+      const res = await fetch('http://localhost:5000/api/admin/pointages', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -40,7 +40,7 @@ const AdminQRPage = () => {
   const fetchQRCodesActifs = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/qr-codes-actifs', {
+      const res = await fetch('http://localhost:5000/api/admin/qr-codes-actifs', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -58,7 +58,7 @@ const AdminQRPage = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/generate-qr', {
+      const res = await fetch('http://localhost:5000/api/admin/generate-qr', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,7 +88,7 @@ const AdminQRPage = () => {
   const supprimerQR = async (qrId) => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/qr-code/${qrId}`, {
+      const res = await fetch(`http://localhost:5000/api/admin/qr-code/${qrId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });

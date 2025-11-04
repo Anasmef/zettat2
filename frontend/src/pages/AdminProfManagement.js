@@ -52,7 +52,7 @@ const AdminProfManagement = () => {
   const fetchProfesseurs = async () => {
     const token = localStorage.getItem('token');
     try {
-      const resProfesseurs = await fetch('/api/admin/professeurs-avec-stats', {
+      const resProfesseurs = await fetch('http://localhost:5000/api/admin/professeurs-avec-stats', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -78,7 +78,7 @@ const AdminProfManagement = () => {
   const ajouterRetard = async () => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`/api/admin/professeur/${showAddModal.profId}/retard`, {
+      const res = await fetch(`http://localhost:5000/api/admin/professeur/${showAddModal.profId}/retard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ const AdminProfManagement = () => {
   const ajouterAbsence = async () => {
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`/api/admin/professeur/${showAddModal.profId}/absence`, {
+      const res = await fetch(`http://localhost:5000/api/admin/professeur/${showAddModal.profId}/absence`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ const AdminProfManagement = () => {
   
   try {
     // ETAPE 1: Récupérer les données actualisées directement du serveur
-    const resHistorique = await fetch(`/api/admin/professeur/${prof._id}/historique`, {
+    const resHistorique = await fetch(`http://localhost:5000/api/admin/professeur/${prof._id}/historique`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     
@@ -165,7 +165,7 @@ const AdminProfManagement = () => {
     };
 
     // ETAPE 3: Envoyer l'email avec les données complètes
-    const res = await fetch('/api/admin/send-prof-individual-report', {
+    const res = await fetch('http://localhost:5000/api/admin/send-prof-individual-report', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -203,7 +203,7 @@ const AdminProfManagement = () => {
     setLoadingHistory(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`/api/admin/professeur/${profId}/historique`, {
+      const res = await fetch(`http://localhost:5000/api/admin/professeur/${profId}/historique`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

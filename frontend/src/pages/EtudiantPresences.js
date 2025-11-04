@@ -33,21 +33,21 @@ const EtudiantPresencesAbsences = () => {
         const token = localStorage.getItem('token');
         
         // Récupérer les présences
-        const presencesRes = await fetch('/api/etudiant/presences', {
+        const presencesRes = await fetch('http://localhost:5000/api/etudiant/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const presencesData = await presencesRes.json();
         setPresences(presencesData);
 
         // Récupérer les absences
-        const absencesRes = await fetch('/api/etudiant/absences', {
+        const absencesRes = await fetch('http://localhost:5000/api/etudiant/absences', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const absencesData = await absencesRes.json();
         setAbsences(absencesData);
 
         // Récupérer les retards
-        const retardsRes = await fetch('/api/etudiant/retards', {
+        const retardsRes = await fetch('http://localhost:5000/api/etudiant/retards', {
           headers: { Authorization: `Bearer ${token}` }
         });
         const retardsData = await retardsRes.json();

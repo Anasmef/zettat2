@@ -201,7 +201,7 @@ document.head.appendChild(styleSheet);
   const fetchEtudiants = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/etudiants', {
+      const res = await fetch('http://localhost:5000/api/etudiants', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -272,7 +272,7 @@ document.head.appendChild(styleSheet);
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/etudiants/${etudiantId}/autorisation`, {
+      const res = await fetch(`http://localhost:5000/api/etudiants/${etudiantId}/autorisation`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
