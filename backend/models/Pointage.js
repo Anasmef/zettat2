@@ -41,7 +41,7 @@ const pointageSchema = new mongoose.Schema({
   // ✅ STATUT SIMPLIFIÉ
   statut: {
     type: String,
-    enum: ['présent', 'absent'], // Plus de retard
+    enum: ['présent', 'absent'],
     default: 'présent'
   },
   // Temps de présence en minutes (calculé automatiquement)
@@ -73,7 +73,7 @@ pointageSchema.methods.calculerTempsPresence = function() {
   return 0;
 };
 
-// Schéma pour les QR codes - UN PAR JOUR valable 20H
+// ✅ Schéma pour les QR codes - UN PAR MOIS valable 30 JOURS
 const qrCodeSchema = new mongoose.Schema({
   qrId: {
     type: String,
@@ -82,15 +82,21 @@ const qrCodeSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    default: 'Pointage du jour'
+    default: 'Pointage mensuel'
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
   },
-  // ✅ Date du jour (pour UN SEUL QR par jour)
-  dateJour: {
-    type: Date,
+  // ✅ Mois et année (pour UN SEUL QR par mois)
+  mois: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 12
+  },
+  annee: {
+    type: Number,
     required: true
   },
   createdAt: {
@@ -101,10 +107,10 @@ const qrCodeSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  // ✅ Validité fixe: 20 heures
-  validiteMinutes: {
+  // ✅ Validité fixe: 30 jours
+  validiteJours: {
     type: Number,
-    default: 1200, // 20 heures = 1200 minutes
+    default: 30,
     required: true
   },
   scansCount: {
@@ -125,8 +131,8 @@ const qrCodeSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Index unique pour UN SEUL QR CODE par jour
-qrCodeSchema.index({ dateJour: 1 }, { unique: true });
+// ✅ Index unique pour UN SEUL QR CODE par mois
+qrCodeSchema.index({ mois: 1, annee: 1 }, { unique: true });
 qrCodeSchema.index({ qrId: 1 });
 qrCodeSchema.index({ createdBy: 1 });
 
@@ -135,11 +141,11 @@ qrCodeSchema.methods.isValid = function() {
   return this.isActive && new Date() < this.expiresAt;
 };
 
-// Méthode pour calculer le temps restant en minutes
+// Méthode pour calculer le temps restant en jours
 qrCodeSchema.methods.getTimeRemaining = function() {
   const now = new Date();
   const remaining = Math.max(0, this.expiresAt - now);
-  return Math.floor(remaining / (1000 * 60));
+  return Math.floor(remaining / (1000 * 60 * 60 * 24)); // en jours
 };
 
 const Pointage = mongoose.model('Pointage', pointageSchema);

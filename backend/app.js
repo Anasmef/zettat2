@@ -1371,39 +1371,47 @@ app.get('/api/etudiants/filtered', authAdminOrInscripteurOrPaiementManager, asyn
   }
 });
 
-// ===== ROUTE PUT - MISE À JOUR D'UN ÉTUDIANT =====
-
-// ✅ 1. GÉNÉRER UN SEUL QR CODE PAR JOUR (valable 20H)
+// ✅ 1. GÉNÉRER UN SEUL QR CODE PAR MOIS (valable 30 JOURS, réutilisable chaque jour)
 app.post('/api/admin/generate-qr', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
-    // Date du jour à 00:00:00
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
+    const maintenant = new Date();
+    const moisActuel = maintenant.getMonth() + 1; // 1-12
+    const anneeActuelle = maintenant.getFullYear();
     
-    // ✅ Vérifier s'il existe déjà un QR pour aujourd'hui
+    console.log(`📅 Vérification QR pour ${moisActuel}/${anneeActuelle}`);
+    
+    // ✅ Vérifier s'il existe déjà un QR pour ce mois
     const qrExistant = await QRCode.findOne({ 
-      dateJour: aujourdhui,
+      mois: moisActuel,
+      annee: anneeActuelle,
       isActive: true 
     });
     
     if (qrExistant && qrExistant.isValid()) {
+      const joursRestants = qrExistant.getTimeRemaining();
+      console.log(`✅ QR existant trouvé, ${joursRestants} jours restants`);
+      
       return res.json({
         success: true,
-        message: 'QR Code déjà existant pour aujourd\'hui',
+        message: `QR Code actif pour ce mois (${joursRestants} jours restants)`,
         qrCode: {
           id: qrExistant.qrId,
           dataURL: qrExistant.dataURL,
           scanUrl: qrExistant.scanUrl,
           expiresAt: qrExistant.expiresAt,
           description: qrExistant.description,
-          validiteMinutes: qrExistant.validiteMinutes
+          validiteJours: qrExistant.validiteJours,
+          mois: qrExistant.mois,
+          annee: qrExistant.annee,
+          joursRestants: joursRestants,
+          scansCount: qrExistant.scansCount
         }
       });
     }
     
-    // ✅ Créer un nouveau QR pour aujourd'hui (20 heures de validité)
+    // ✅ Créer un nouveau QR pour ce mois (30 jours de validité)
     const qrId = uuidv4();
-    const expirationTime = new Date(Date.now() + (20 * 60 * 60 * 1000)); // 20 heures
+    const expirationTime = new Date(Date.now() + (30 * 24 * 60 * 60 * 1000)); // 30 jours
     
     const scanUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/scan-qr/${qrId}`;
     
@@ -1415,30 +1423,39 @@ app.post('/api/admin/generate-qr', authAdminOrInscripteurOrPaiementManager, asyn
       width: 256
     });
     
+    const nomMois = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
     const newQRCode = new QRCode({
       qrId: qrId,
-      description: `Pointage du ${aujourdhui.toLocaleDateString('fr-FR')}`,
+      description: req.body.description || `Pointage ${nomMois[moisActuel - 1]} ${anneeActuelle}`,
       createdBy: req.adminId,
-      dateJour: aujourdhui,
+      mois: moisActuel,
+      annee: anneeActuelle,
       expiresAt: expirationTime,
-      validiteMinutes: 1200, // 20 heures
+      validiteJours: 30,
       dataURL: qrCodeDataURL,
       scanUrl: scanUrl
     });
     
     await newQRCode.save();
     
-    console.log(`✅ QR Code créé pour le ${aujourdhui.toLocaleDateString('fr-FR')}`);
+    console.log(`✅ Nouveau QR créé pour ${nomMois[moisActuel - 1]} ${anneeActuelle} (valable 30 jours)`);
     
     res.json({
       success: true,
+      message: `QR Code créé pour ${nomMois[moisActuel - 1]} ${anneeActuelle}`,
       qrCode: {
         id: qrId,
         dataURL: qrCodeDataURL,
         scanUrl: scanUrl,
         expiresAt: expirationTime,
         description: newQRCode.description,
-        validiteMinutes: 1200
+        validiteJours: 30,
+        mois: moisActuel,
+        annee: anneeActuelle,
+        joursRestants: 30,
+        scansCount: 0
       }
     });
     
@@ -1451,7 +1468,7 @@ app.post('/api/admin/generate-qr', authAdminOrInscripteurOrPaiementManager, asyn
   }
 });
 
-// ✅ 2. SCAN QR - ENTRÉE
+// ✅ 2. SCAN QR - ENTRÉE (même QR réutilisable chaque jour)
 app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
   try {
     const { qrId } = req.params;
@@ -1461,7 +1478,7 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
     console.log('QR ID:', qrId);
     console.log('Professeur:', professeur.nom);
     
-    // Vérifier le QR code
+    // ✅ Vérifier le QR code
     const qrCode = await QRCode.findOne({ qrId: qrId, isActive: true });
     
     if (!qrCode) {
@@ -1478,8 +1495,12 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
       });
     }
     
-    // ✅ Vérifier si déjà pointé aujourd'hui
-    const today = new Date();
+    // ✅ Vérifier si déjà pointé AUJOURD'HUI (fuseau horaire Maroc)
+    const maintenant = new Date();
+    // Convertir en heure locale Maroc (UTC+1 en hiver, UTC+0 en été)
+    const marocTime = new Date(maintenant.toLocaleString('en-US', { timeZone: 'Africa/Casablanca' }));
+    
+    const today = new Date(marocTime);
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1490,7 +1511,7 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
     });
     
     if (pointageExistant) {
-      // Déjà scanné = déjà présent
+      console.log(`⚠️ ${professeur.nom} a déjà scanné aujourd'hui`);
       return res.status(400).json({
         success: false,
         message: 'Vous avez déjà scanné aujourd\'hui (entrée enregistrée)',
@@ -1502,9 +1523,8 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
       });
     }
     
-    // ✅ CRÉER LE POINTAGE D'ENTRÉE
-    const maintenant = new Date();
-    const heureEntree = maintenant.toLocaleTimeString('fr-FR', { 
+    // ✅ CRÉER LE POINTAGE D'ENTRÉE POUR AUJOURD'HUI (heure Maroc)
+    const heureEntree = marocTime.toLocaleTimeString('fr-FR', { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
@@ -1513,11 +1533,11 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
       professeur: professeur._id,
       nomProfesseur: professeur.nom,
       emailProfesseur: professeur.email,
-      date: maintenant,
+      date: marocTime,
       heureEntree: heureEntree,
-      timestampEntree: maintenant,
+      timestampEntree: marocTime,
       codeQRId: qrId,
-      statut: 'présent', // Toujours présent si scanné
+      statut: 'présent',
       ipAddress: req.ip
     });
     
@@ -1535,7 +1555,7 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
       pointage: {
         professeur: professeur.nom,
         heureEntree: heureEntree,
-        date: maintenant.toLocaleDateString('fr-FR'),
+        date: marocTime.toLocaleDateString('fr-FR'),
         statut: 'présent'
       }
     });
@@ -1550,7 +1570,7 @@ app.post('/api/scan-qr/:qrId', authProfesseur, async (req, res) => {
   }
 });
 
-// ✅ 3. NOUVELLE ROUTE - SORTIE (bouton)
+// ✅ 3. SORTIE (bouton)
 app.post('/api/professeur/sortie', authProfesseur, async (req, res) => {
   try {
     const professeur = req.professeur;
@@ -1558,8 +1578,10 @@ app.post('/api/professeur/sortie', authProfesseur, async (req, res) => {
     console.log('=== SORTIE PROFESSEUR ===');
     console.log('Professeur:', professeur.nom);
     
-    // Trouver le pointage d'aujourd'hui
-    const today = new Date();
+    // Trouver le pointage d'aujourd'hui (heure Maroc)
+    const marocTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Casablanca' }));
+    
+    const today = new Date(marocTime);
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1584,15 +1606,16 @@ app.post('/api/professeur/sortie', authProfesseur, async (req, res) => {
       });
     }
     
-    // ✅ ENREGISTRER LA SORTIE
-    const maintenant = new Date();
-    const heureSortie = maintenant.toLocaleTimeString('fr-FR', { 
+    // ✅ ENREGISTRER LA SORTIE (heure Maroc) - Réutilise marocTime pour l'heure actuelle
+    const marocTimeSortie = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Casablanca' }));
+    
+    const heureSortie = marocTimeSortie.toLocaleTimeString('fr-FR', { 
       hour: '2-digit', 
       minute: '2-digit' 
     });
     
     pointage.heureSortie = heureSortie;
-    pointage.timestampSortie = maintenant;
+    pointage.timestampSortie = marocTimeSortie;
     pointage.tempsPresence = pointage.calculerTempsPresence();
     
     await pointage.save();
@@ -1627,7 +1650,10 @@ app.get('/api/professeur/statut-aujourd-hui', authProfesseur, async (req, res) =
   try {
     const professeur = req.professeur;
     
-    const today = new Date();
+    const now = new Date();
+    const marocTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Casablanca' }));
+    
+    const today = new Date(marocTime);
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1686,11 +1712,10 @@ app.get('/api/admin/pointages', authAdminOrInscripteurOrPaiementManager, async (
     const stats = {
       date: dateRecherche.toLocaleDateString('fr-FR'),
       totalProfesseurs: tousProfesseurs.length,
-      presents: pointages.length, // Tous ceux qui ont scanné sont présents
+      presents: pointages.length,
       absents: professeursAbsents.length,
       tauxPresence: tousProfesseurs.length > 0 ? 
         Math.round((pointages.length / tousProfesseurs.length) * 100) : 0,
-      // ✅ Nouvelles stats
       avecSortie: pointages.filter(p => p.heureSortie).length,
       sansSortie: pointages.filter(p => !p.heureSortie).length
     };
@@ -1721,6 +1746,72 @@ app.get('/api/admin/pointages', authAdminOrInscripteurOrPaiementManager, async (
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des pointages'
+    });
+  }
+});
+
+// ✅ 6. ADMIN - QR Codes actifs (pour afficher dans l'interface)
+app.get('/api/admin/qr-codes-actifs', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const qrCodesActifs = await QRCode.find({ 
+      isActive: true,
+      expiresAt: { $gt: new Date() }
+    }).sort({ createdAt: -1 });
+    
+    const qrCodesFormates = qrCodesActifs.map(qr => ({
+      id: qr.qrId,
+      description: qr.description,
+      mois: qr.mois,
+      annee: qr.annee,
+      joursRestants: qr.getTimeRemaining(),
+      scansCount: qr.scansCount,
+      createdAt: qr.createdAt,
+      expiresAt: qr.expiresAt
+    }));
+    
+    res.json({
+      success: true,
+      qrCodesActifs: qrCodesFormates
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur QR codes actifs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la récupération des QR codes'
+    });
+  }
+});
+
+// ✅ 7. ADMIN - Supprimer un QR code
+app.delete('/api/admin/qr-code/:qrId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { qrId } = req.params;
+    
+    const qrCode = await QRCode.findOne({ qrId: qrId });
+    
+    if (!qrCode) {
+      return res.status(404).json({
+        success: false,
+        message: 'QR code introuvable'
+      });
+    }
+    
+    qrCode.isActive = false;
+    await qrCode.save();
+    
+    console.log(`🗑️ QR Code désactivé: ${qrId}`);
+    
+    res.json({
+      success: true,
+      message: 'QR code supprimé avec succès'
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur suppression QR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la suppression du QR code'
     });
   }
 });

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut as LogOutIcon } from 'lucide-react';
-import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
+import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut, Calendar } from 'lucide-react';
 
 const AdminQRPage = () => {
   const [qrCode, setQrCode] = useState(null);
@@ -58,6 +57,12 @@ const AdminQRPage = () => {
     
     try {
       const token = localStorage.getItem('token');
+      const maintenant = new Date();
+      const nomMois = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const mois = nomMois[maintenant.getMonth()];
+      const annee = maintenant.getFullYear();
+      
       const res = await fetch('/api/admin/generate-qr', {
         method: 'POST',
         headers: {
@@ -65,7 +70,7 @@ const AdminQRPage = () => {
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}`
+          description: description || `Pointage ${mois} ${annee}`
         })
       });
 
@@ -73,7 +78,7 @@ const AdminQRPage = () => {
       
       if (data.success) {
         setQrCode(data.qrCode);
-        setMessage({ type: 'success', text: data.message || 'QR Code généré avec succès!' });
+        setMessage({ type: 'success', text: data.message || 'QR Code récupéré avec succès!' });
         fetchQRCodesActifs();
       } else {
         setMessage({ type: 'error', text: data.message });
@@ -86,6 +91,10 @@ const AdminQRPage = () => {
   };
 
   const supprimerQR = async (qrId) => {
+    if (!window.confirm('Supprimer le QR code du mois ? Cela désactivera tous les pointages futurs.')) {
+      return;
+    }
+    
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/qr-code/${qrId}`, {
@@ -108,7 +117,10 @@ const AdminQRPage = () => {
   const telechargerQR = () => {
     if (!qrCode) return;
     const link = document.createElement('a');
-    link.download = `qr-pointage-${new Date().toISOString().split('T')[0]}.png`;
+    const maintenant = new Date();
+    const mois = maintenant.getMonth() + 1;
+    const annee = maintenant.getFullYear();
+    link.download = `qr-pointage-${mois}-${annee}.png`;
     link.href = qrCode.dataURL;
     link.click();
   };
@@ -159,7 +171,7 @@ const AdminQRPage = () => {
       backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
       padding: '40px 20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}><Sidebar onLogout={handleLogout} />
+    }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         
         {/* Bouton Déconnexion */}
@@ -180,7 +192,7 @@ const AdminQRPage = () => {
               boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
             }}
           >
-            <LogOutIcon size={18} />
+            <LogOut size={18} />
             Déconnexion
           </button>
         </div>
@@ -213,7 +225,7 @@ const AdminQRPage = () => {
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent'
           }}>
-            Générateur QR Code
+            Générateur QR Code Mensuel
           </h1>
           <p style={{ 
             margin: 0, 
@@ -221,7 +233,7 @@ const AdminQRPage = () => {
             fontSize: '16px',
             fontWeight: '500'
           }}>
-            Système de pointage - UN QR par jour (20 heures)
+            🔄 UN QR par mois • Réutilisable chaque jour • Valable 30 jours
           </p>
         </div>
 
@@ -234,9 +246,9 @@ const AdminQRPage = () => {
               alignItems: 'center',
               marginBottom: '24px'
             }}>
-              <Plus size={24} style={{ color: '#667eea', marginRight: '12px' }} />
+              <Calendar size={24} style={{ color: '#667eea', marginRight: '12px' }} />
               <h2 style={{ margin: 0, color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
-                QR Code du Jour
+                QR Code du Mois
               </h2>
             </div>
 
@@ -274,7 +286,7 @@ const AdminQRPage = () => {
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="ex: Pointage matinée"
+                placeholder="ex: Pointage Novembre 2024"
                 style={{
                   ...inputStyle,
                   width: '100%'
@@ -283,7 +295,7 @@ const AdminQRPage = () => {
                 onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
               />
               <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>
-                ⚠️ Un seul QR code par jour, valable 20 heures
+                ℹ️ Un seul QR code par mois, réutilisable chaque jour pendant 30 jours
               </p>
             </div>
 
@@ -311,12 +323,12 @@ const AdminQRPage = () => {
                     borderRadius: '50%',
                     animation: 'spin 1s linear infinite'
                   }}></div>
-                  Génération...
+                  Chargement...
                 </>
               ) : (
                 <>
                   <QrCode size={20} />
-                  Générer/Récupérer QR du Jour
+                  Générer/Récupérer QR du Mois
                 </>
               )}
             </button>
@@ -346,7 +358,20 @@ const AdminQRPage = () => {
                     <strong>Description:</strong> {qrCode.description}
                   </p>
                   <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0', fontWeight: '500' }}>
-                    <strong>Expire le:</strong> {new Date(qrCode.expiresAt).toLocaleString('fr-FR')}
+                    <strong>Expire le:</strong> {new Date(qrCode.expiresAt).toLocaleDateString('fr-FR')}
+                  </p>
+                  <p style={{ 
+                    fontSize: '16px', 
+                    color: '#10b981', 
+                    margin: '12px 0', 
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}>
+                    <Calendar size={20} />
+                    {qrCode.joursRestants} jours restants
                   </p>
                   <button
                     onClick={telechargerQR}
@@ -487,11 +512,11 @@ const AdminQRPage = () => {
                   <QrCode size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
                   <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Aucun QR code actif</p>
                   <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.7 }}>
-                    Générez le QR code du jour
+                    Générez le QR code du mois
                   </p>
                 </div>
               ) : (
-                <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                <div>
                   {qrCodesActifs.map((qr) => (
                     <div
                       key={qr.id}
@@ -523,8 +548,8 @@ const AdminQRPage = () => {
                               alignItems: 'center',
                               gap: '4px'
                             }}>
-                              <Clock size={14} />
-                              {qr.tempsRestant} min restantes
+                              <Calendar size={14} />
+                              {qr.joursRestants} jours restants
                             </span>
                             <span style={{ 
                               fontSize: '13px', 
@@ -571,10 +596,10 @@ const AdminQRPage = () => {
                         overflow: 'hidden'
                       }}>
                         <div style={{
-                          width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 1200) * 100))}%`,
+                          width: `${Math.max(0, Math.min(100, (qr.joursRestants / 30) * 100))}%`,
                           height: '100%',
-                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
-                                     qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
+                          background: qr.joursRestants < 5 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
+                                     qr.joursRestants < 10 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
                                      'linear-gradient(90deg, #10b981, #059669)',
                           transition: 'all 0.3s ease'
                         }}></div>
