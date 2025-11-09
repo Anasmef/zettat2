@@ -49,8 +49,8 @@ const AjouterPaiement = () => {
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       try {
-        const resEtudiants = await axios.get('/api/etudiants', config);
-        const resCours = await axios.get('/api/cours', config);
+        const resEtudiants = await axios.get('http://localhost:5000/api/etudiants', config);
+        const resCours = await axios.get('http://localhost:5000/api/cours', config);
 
         const etudiantsActifs = resEtudiants.data.filter(e => e.actif);
 
@@ -100,7 +100,7 @@ const AjouterPaiement = () => {
       }
 
       const token = localStorage.getItem('token');
-      const resPaiements = await axios.get(`/api/paiements/etudiant/${etudiantId}`, {
+      const resPaiements = await axios.get(`http://localhost:5000/api/paiements/etudiant/${etudiantId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -213,7 +213,7 @@ const AjouterPaiement = () => {
     };
 
     try {
-      await axios.post('/api/paiements', paiementData, {
+      await axios.post('http://localhost:5000/api/paiements', paiementData, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage('✅ Paiement ajouté avec succès');
@@ -262,7 +262,7 @@ const AjouterPaiement = () => {
     };
 
     try {
-      const res = await fetch('/api/rappels', {
+      const res = await fetch('http://localhost:5000/api/rappels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)

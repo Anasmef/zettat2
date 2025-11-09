@@ -44,7 +44,7 @@ const PaiementManagersPage = () => {
       console.log('Fetching managers...');
       setLoading(true);
       
-      const res = await fetch('/api/admin/paiement-managers', { 
+      const res = await fetch('http://localhost:5000/api/admin/paiement-managers', { 
         headers,
         method: 'GET'
       });
@@ -133,8 +133,8 @@ const PaiementManagersPage = () => {
     
     try {
       const url = editingManager 
-        ? `/api/admin/paiement-managers/${editingManager._id}`
-        : '/api/admin/paiement-managers';
+        ? `http://localhost:5000/api/admin/paiement-managers/${editingManager._id}`
+        : 'http://localhost:5000/api/admin/paiement-managers';
       
       const method = editingManager ? 'PUT' : 'POST';
       
@@ -198,7 +198,7 @@ const PaiementManagersPage = () => {
     setSuccess('');
     
     try {
-      const res = await fetch(`/api/admin/paiement-managers/${managerToDelete._id}`, {
+      const res = await fetch(`http://localhost:5000/api/admin/paiement-managers/${managerToDelete._id}`, {
         method: 'DELETE',
         headers
       });
@@ -232,7 +232,7 @@ const PaiementManagersPage = () => {
       setError('');
       setSuccess('');
       
-      const res = await fetch(`/api/admin/paiement-managers/${manager._id}/toggle`, {
+      const res = await fetch(`http://localhost:5000/api/admin/paiement-managers/${manager._id}/toggle`, {
         method: 'PATCH',
         headers
       });

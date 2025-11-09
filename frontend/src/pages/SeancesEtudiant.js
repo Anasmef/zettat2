@@ -49,7 +49,7 @@ const SeancesEtudiant = () => {
           return;
         }
 
-        const res = await fetch('/api/seances/etudiant', {
+        const res = await fetch('http://localhost:5000/api/seances/etudiant', {
           headers: {
             Authorization: `Bearer ${token}`
           }

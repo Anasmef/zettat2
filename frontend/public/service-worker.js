@@ -49,7 +49,7 @@ self.addEventListener('activate', event => {
 // Interception des requêtes
 self.addEventListener('fetch', event => {
   // Stratégie Network First pour les API calls
-  if (event.request.url.includes('/api/')) {
+  if (event.request.url.includes('http://localhost:5000/api/')) {
     event.respondWith(
       fetch(event.request)
         .catch(() => {

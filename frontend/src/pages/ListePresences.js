@@ -41,7 +41,7 @@ const [dateTo, setDateTo] = useState('');
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await axios.get('/api/presences', {
+        const res = await axios.get('http://localhost:5000/api/presences', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -207,7 +207,7 @@ const handleDeletePresence = async (presenceId, sessionIndex, presenceIndex) => 
   }
   try {
     const token = localStorage.getItem('token');
-    await axios.delete(`/api/presences/${presenceId}`, {
+    await axios.delete(`http://localhost:5000/api/presences/${presenceId}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     const updatedSessions = [...filteredSessions];
@@ -243,7 +243,7 @@ const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
   try {
     const token = localStorage.getItem('token');
     const response = await axios.put(
-      `/api/admin/presences/${presenceId}`,
+      `http://localhost:5000/api/admin/presences/${presenceId}`,
       editForm,
       {
         headers: { Authorization: `Bearer ${token}` }
@@ -369,6 +369,52 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     classes[s.cours].push(s);
   });
 
+  // ===== TRI PERSONNALISÉ PAR NIVEAU ET SUFFIXE =====
+  const levelOrder = {
+    "2BAC": 1,
+    "1BAC": 2,
+    "Tronc Commun": 3,
+    "3AC": 4,
+    "2AC": 5,
+    "1AC": 6
+  };
+
+  const getClassSortKey = (className) => {
+    // Extraire le niveau et le suffixe
+    // Ex: "2BAC PC A" → niveau="2BAC PC", suffixe="A"
+    // Ex: "Tronc Commun A" → niveau="Tronc Commun", suffixe="A"
+    
+    let level = "";
+    let suffix = "";
+    
+    // Détecter le niveau
+    if (className.startsWith("2BAC")) {
+      level = "2BAC";
+      suffix = className.replace(/^2BAC\s*(PC|Économie)?\s*/, "").trim();
+    } else if (className.startsWith("1BAC")) {
+      level = "1BAC";
+      suffix = className.replace(/^1BAC\s*(SC|Économie)?\s*/, "").trim();
+    } else if (className.startsWith("Tronc Commun")) {
+      level = "Tronc Commun";
+      suffix = className.replace(/^Tronc Commun\s*/, "").trim();
+    } else if (className.startsWith("3AC")) {
+      level = "3AC";
+      suffix = className.replace(/^3AC\s*/, "").trim();
+    } else if (className.startsWith("2AC")) {
+      level = "2AC";
+      suffix = className.replace(/^2AC\s*/, "").trim();
+    } else if (className.startsWith("1AC")) {
+      level = "1AC";
+      suffix = className.replace(/^1AC\s*/, "").trim();
+    } else {
+      level = className;
+      suffix = "ZZZ"; // Classes inconnues à la fin
+    }
+    
+    const levelPriority = levelOrder[level] || 999;
+    return { levelPriority, suffix: suffix || "A" };
+  };
+
   const header = [
     'Date','Classe','Matière','Professeur',
     'Période','Heure','Étudiant','Statut',
@@ -395,8 +441,20 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   const classRows = [];
   const subTitleRows = [];
 
+  // ===== TRI: D'ABORD PAR NIVEAU, PUIS PAR SUFFIXE =====
   Object.entries(classes)
-    .sort(([a],[b]) => a.localeCompare(b,'fr'))
+    .sort(([a], [b]) => {
+      const aKey = getClassSortKey(a);
+      const bKey = getClassSortKey(b);
+      
+      // Comparer d'abord par niveau
+      if (aKey.levelPriority !== bKey.levelPriority) {
+        return aKey.levelPriority - bKey.levelPriority;
+      }
+      
+      // Si même niveau, comparer par suffixe (A, B, C, D...)
+      return aKey.suffix.localeCompare(bKey.suffix, 'fr');
+    })
     .forEach(([className, sessions], classIdx, classArr) => {
       aoa.push([`CLASSE: ${className}`, ...Array(colsCount - 1).fill('')]);
       classRows.push(currentRow);
@@ -468,7 +526,6 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
   
   // ===== STYLES OPTIMISÉS POUR ÉCONOMISER L'ENCRE =====
   
-  // Titre principal - Texte noir gras, SANS fond de couleur
   const titleStyle = {
     font: { bold: true, sz: 14, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
@@ -477,23 +534,20 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     }
   };
 
-  // Titres de classe - Texte noir gras, fond très léger
   const classStyle = {
     font: { bold: true, sz: 12, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: "F5F5F5" } }, // Gris ultra léger
+    fill: { fgColor: { rgb: "F5F5F5" } },
     alignment: { horizontal: "left", vertical: "center" },
     border: {
       bottom: { style: "thin", color: { rgb: "000000" } }
     }
   };
 
-  // Sous-titres - Texte noir, SANS fond de couleur
   const subTitleStyle = {
     font: { bold: true, sz: 10, color: { rgb: "000000" } },
     alignment: { horizontal: "left", vertical: "center" }
   };
 
-  // Headers - Texte noir gras, bordures simples, SANS fond
   const headerStyle = {
     font: { bold: true, sz: 10, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
@@ -505,7 +559,6 @@ const exportDailyPresences = (date, professorName = null, statusFilter = 'all', 
     }
   };
 
-  // Données - Bordures légères grises
   const dataStyle = {
     font: { sz: 9 },
     alignment: { vertical: "center" },

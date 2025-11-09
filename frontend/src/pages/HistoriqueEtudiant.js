@@ -33,7 +33,7 @@ const searchStudents = async (query) => {
     const token = localStorage.getItem('token');
     
     // Utiliser la route qui fonctionne pour récupérer tous les étudiants
-    const response = await axios.get(`/api/etudiants`, {
+    const response = await axios.get(`http://localhost:5000/api/etudiants`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     
@@ -63,7 +63,7 @@ const searchStudents = async (query) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`/api/presences/student/${studentId}`, {
+      const response = await axios.get(`http://localhost:5000/api/presences/student/${studentId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

@@ -22,7 +22,7 @@ const EtudiantPublic = () => {
       setError('');
 
       // ⚠️ ROUTE PUBLIQUE - Sans authentification
-      const response = await fetch(`/api/etudiants/public/${id}`);
+      const response = await fetch(`http://localhost:5000/api/etudiants/public/${id}`);
 
       if (!response.ok) {
         throw new Error('Étudiant non trouvé');
