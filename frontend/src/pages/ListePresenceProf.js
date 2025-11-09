@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, Clock } from 'lucide-react';
+import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, Clock, Edit } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import SidebarProf from '../components/SidebarProf';
@@ -25,6 +25,11 @@ const ListePresences = () => {
   const [professeurFilter, setProfesseurFilter] = useState('');
   const [availableMatieres, setAvailableMatieres] = useState([]);
   const [availableProfesseurs, setAvailableProfesseurs] = useState([]);
+  
+  // 🆕 États pour la modification
+  const [editingPresence, setEditingPresence] = useState(null);
+  const [editFormData, setEditFormData] = useState({ present: false, retardMinutes: 0, remarque: '' });
+  
   const navigate = useNavigate();
 
   // Utilitaire pour formater l'horaire
@@ -35,75 +40,75 @@ const ListePresences = () => {
     return `${heure} (${periode.charAt(0).toUpperCase() + periode.slice(1)})`;
   };
 
-  useEffect(() => {
-    const fetchPresences = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-        const role = localStorage.getItem('role');
+  const fetchPresences = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const role = localStorage.getItem('role');
 
-        if (!token || role !== 'prof') {
-          navigate('/');
-          return;
-        }
-
-        const res = await axios.get('/api/professeur/presences', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        const data = res.data;
-
-        // ===== NOUVEAU GROUPAGE =====
-        const grouped = {};
-        for (let p of data) {
-          const dateStr = new Date(p.dateSession).toDateString();
-          const heureStr = p.heure || 'Non spécifiée';
-          const periodeStr = p.periode || 'Non spécifiée';
-          const matiereStr = p.matiere || 'Non spécifiée';
-          const nomProfesseurStr = p.nomProfesseur || 'Non spécifié';
-          const key = `${dateStr}_${p.cours}_${heureStr}_${periodeStr}_${matiereStr}_${nomProfesseurStr}`;
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(p);
-        }
-
-        const sessions = Object.entries(grouped).map(([key, values]) => {
-          const [date, cours, heure, periode, matiere, nomProfesseur] = key.split('_');
-          const presentCount = values.filter(p => p.present).length;
-          const retardCount = values.filter(p => p.present && p.retardMinutes > 0).length; // 🆕
-          const totalCount = values.length;
-          return {
-            date,
-            cours,
-            heure,
-            periode,
-            matiere,
-            nomProfesseur,
-            presences: values,
-            presentCount,
-            retardCount, // 🆕
-            totalCount,
-            attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
-          };
-        }).sort((a, b) => new Date(b.date) - new Date(a.date)); // ✅ ترتيب تنازلي حسب التاريخ
-
-        const uniqueCours = [...new Set(sessions.map(s => s.cours))];
-        setAvailableCours(uniqueCours);
-        const uniqueHeures = [...new Set(sessions.map(s => s.heure).filter(h => h && h !== 'Non spécifiée'))];
-        setAvailableHeures(uniqueHeures);
-        const uniqueMatieres = [...new Set(sessions.map(s => s.matiere).filter(m => m && m !== 'Non spécifiée'))];
-        setAvailableMatieres(uniqueMatieres);
-        const uniqueProfesseurs = [...new Set(sessions.map(s => s.nomProfesseur).filter(p => p && p !== 'Non spécifié'))];
-        setAvailableProfesseurs(uniqueProfesseurs);
-
-        setGroupedSessions(sessions);
-        setFilteredSessions(sessions);
-      } catch (err) {
-        console.error('❌ Erreur chargement présences:', err);
-      } finally {
-        setLoading(false);
+      if (!token || role !== 'prof') {
+        navigate('/');
+        return;
       }
-    };
 
+      const res = await axios.get('/api/professeur/presences', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      const data = res.data;
+
+      // Groupage des sessions
+      const grouped = {};
+      for (let p of data) {
+        const dateStr = new Date(p.dateSession).toDateString();
+        const heureStr = p.heure || 'Non spécifiée';
+        const periodeStr = p.periode || 'Non spécifiée';
+        const matiereStr = p.matiere || 'Non spécifiée';
+        const nomProfesseurStr = p.nomProfesseur || 'Non spécifié';
+        const key = `${dateStr}_${p.cours}_${heureStr}_${periodeStr}_${matiereStr}_${nomProfesseurStr}`;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(p);
+      }
+
+      const sessions = Object.entries(grouped).map(([key, values]) => {
+        const [date, cours, heure, periode, matiere, nomProfesseur] = key.split('_');
+        const presentCount = values.filter(p => p.present).length;
+        const retardCount = values.filter(p => p.present && p.retardMinutes > 0).length;
+        const totalCount = values.length;
+        return {
+          date,
+          cours,
+          heure,
+          periode,
+          matiere,
+          nomProfesseur,
+          presences: values,
+          presentCount,
+          retardCount,
+          totalCount,
+          attendanceRate: totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0
+        };
+      }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const uniqueCours = [...new Set(sessions.map(s => s.cours))];
+      setAvailableCours(uniqueCours);
+      const uniqueHeures = [...new Set(sessions.map(s => s.heure).filter(h => h && h !== 'Non spécifiée'))];
+      setAvailableHeures(uniqueHeures);
+      const uniqueMatieres = [...new Set(sessions.map(s => s.matiere).filter(m => m && m !== 'Non spécifiée'))];
+      setAvailableMatieres(uniqueMatieres);
+      const uniqueProfesseurs = [...new Set(sessions.map(s => s.nomProfesseur).filter(p => p && p !== 'Non spécifié'))];
+      setAvailableProfesseurs(uniqueProfesseurs);
+
+      setGroupedSessions(sessions);
+      setFilteredSessions(sessions);
+    } catch (err) {
+      console.error('❌ Erreur chargement présences:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPresences();
   }, []);
 
@@ -111,7 +116,6 @@ const ListePresences = () => {
   useEffect(() => {
     let filtered = [...groupedSessions];
 
-    // Recherche textuelle
     if (searchTerm) {
       filtered = filtered.filter(session =>
         session.cours.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,28 +127,23 @@ const ListePresences = () => {
       );
     }
 
-    // Filtre par date
     if (dateFilter) {
       const filterDate = new Date(dateFilter).toDateString();
       filtered = filtered.filter(session => session.date === filterDate);
     }
 
-    // Filtre par cours
     if (coursFilter && coursFilter !== 'all') {
       filtered = filtered.filter(session => session.cours === coursFilter);
     }
 
-    // Filtre par matière
     if (matiereFilter && matiereFilter !== 'all') {
       filtered = filtered.filter(session => session.matiere === matiereFilter);
     }
 
-    // Filtre par professeur
     if (professeurFilter && professeurFilter !== 'all') {
       filtered = filtered.filter(session => session.nomProfesseur === professeurFilter);
     }
 
-    // Filtre par taux de présence
     if (presenceRateFilter && presenceRateFilter !== 'all') {
       filtered = filtered.filter(session => {
         switch (presenceRateFilter) {
@@ -160,20 +159,19 @@ const ListePresences = () => {
       });
     }
 
-    // Filtre par heure
     if (heureFilter && heureFilter !== 'all') {
       filtered = filtered.filter(session => session.heure === heureFilter);
     }
 
-    // Filtre par période
     if (periodeFilter && periodeFilter !== 'all') {
       filtered = filtered.filter(session => session.periode === periodeFilter);
     }
 
-    setFilteredSessions(filtered.sort((a, b) => new Date(b.date) - new Date(a.date))); // ✅ ترتيب النتائج المفلترة أيضًا
+    setFilteredSessions(filtered.sort((a, b) => new Date(b.date) - new Date(a.date)));
   }, [searchTerm, dateFilter, coursFilter, presenceRateFilter, heureFilter, periodeFilter, matiereFilter, professeurFilter, groupedSessions]);
 
   const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
+  
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/';
@@ -186,12 +184,47 @@ const ListePresences = () => {
     setPresenceRateFilter('');
     setHeureFilter('');
     setPeriodeFilter('');
+    setMatiereFilter('');
+    setProfesseurFilter('');
+  };
+
+  // 🆕 Fonction pour ouvrir le modal d'édition
+  const handleEditClick = (presence) => {
+    setEditingPresence(presence);
+    setEditFormData({
+      present: presence.present,
+      retardMinutes: presence.retardMinutes || 0,
+      remarque: presence.remarque || ''
+    });
+  };
+
+  // 🆕 Fonction pour mettre à jour la présence
+  const handleUpdatePresence = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(
+        `/api/presences/${editingPresence._id}`,
+        editFormData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Recharger les données
+      await fetchPresences();
+      
+      // Fermer le modal d'édition
+      setEditingPresence(null);
+      
+      alert('✅ Présence mise à jour avec succès!');
+    } catch (err) {
+      console.error('Erreur mise à jour:', err);
+      alert('❌ Erreur lors de la mise à jour de la présence');
+    }
   };
 
   const styles = {
     container: {
       minHeight: '100vh',
-    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
       padding: '20px',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     },
@@ -212,17 +245,11 @@ const ListePresences = () => {
       alignItems: 'center',
       gap: '12px'
     },
- 
     title: {
       fontSize: '32px',
       fontWeight: 'bold',
       color: '#111827',
       margin: 0
-    },
-    subtitle: {
-      color: '#6b7280',
-      margin: '4px 0 0 0',
-      fontSize: '14px'
     },
     searchContainer: {
       padding: '24px',
@@ -367,6 +394,22 @@ const ListePresences = () => {
       cursor: 'pointer',
       transition: 'background-color 0.2s'
     },
+    // 🆕 Style pour le bouton modifier
+    editButton: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px',
+      padding: '6px 10px',
+      fontSize: '12px',
+      fontWeight: '500',
+      color: '#7c3aed',
+      backgroundColor: '#f5f3ff',
+      border: '1px solid #ddd6fe',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      marginRight: '8px'
+    },
     progressContainer: {
       display: 'flex',
       alignItems: 'center',
@@ -405,6 +448,16 @@ const ListePresences = () => {
       width: '100%',
       maxHeight: '90vh',
       overflow: 'hidden'
+    },
+    // 🆕 Modal d'édition plus petit
+    modalContentSmall: {
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      maxWidth: '500px',
+      width: '100%',
+      maxHeight: '90vh',
+      overflowY: 'auto'
     },
     modalHeader: {
       padding: '24px',
@@ -497,6 +550,85 @@ const ListePresences = () => {
     mobileCard: {
       padding: '16px',
       borderBottom: '1px solid #f3f4f6'
+    },
+    // 🆕 Styles pour le formulaire d'édition
+    editInfo: {
+      padding: '16px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '8px',
+      marginBottom: '20px'
+    },
+    editForm: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px'
+    },
+    formGroup: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px'
+    },
+    formLabel: {
+      fontSize: '13px',
+      fontWeight: '500',
+      color: '#374151'
+    },
+    formSelect: {
+      padding: '10px 12px',
+      fontSize: '14px',
+      border: '1px solid #d1d5db',
+      borderRadius: '6px',
+      backgroundColor: 'white',
+      cursor: 'pointer'
+    },
+    formInput: {
+      padding: '10px 12px',
+      fontSize: '14px',
+      border: '1px solid #d1d5db',
+      borderRadius: '6px',
+      backgroundColor: 'white'
+    },
+    formTextarea: {
+      padding: '10px 12px',
+      fontSize: '14px',
+      border: '1px solid #d1d5db',
+      borderRadius: '6px',
+      backgroundColor: 'white',
+      fontFamily: 'inherit',
+      resize: 'vertical'
+    },
+    modalFooter: {
+      padding: '16px 24px',
+      borderTop: '1px solid #e5e7eb',
+      backgroundColor: '#f9fafb',
+      display: 'flex',
+      gap: '8px',
+      justifyContent: 'flex-end'
+    },
+    cancelButton: {
+      padding: '10px 16px',
+      backgroundColor: '#f3f4f6',
+      color: '#374151',
+      border: '1px solid #d1d5db',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    },
+    saveButton: {
+      padding: '10px 16px',
+      backgroundColor: '#10b981',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '6px'
     }
   };
 
@@ -526,6 +658,11 @@ const ListePresences = () => {
           
           .button:hover {
             background-color: #dbeafe;
+          }
+          
+          .edit-button-hover:hover {
+            background-color: #ede9fe;
+            border-color: #c4b5fd;
           }
           
           .close-button:hover {
@@ -571,7 +708,7 @@ const ListePresences = () => {
       </style>
 
       <div style={styles.maxWidth}>
-              {/* Header */} <SidebarProf onLogout={handleLogout} /> {/* ✅ Utilisation du composant SidebarProfesseur */}
+        <SidebarProf onLogout={handleLogout} />
 
         {/* Header */}
         <div style={styles.card}>
@@ -581,8 +718,6 @@ const ListePresences = () => {
             alignItems: 'center',
             textAlign: 'center'
           }}>
-            <div style={styles.iconContainer}>
-            </div>
             <div>
               <h1 style={{ ...styles.title, textAlign: 'center', width: '100%' }}>Liste des Présences</h1>
             </div>
@@ -590,7 +725,6 @@ const ListePresences = () => {
 
           {/* Barre de recherche et filtres */}
           <div style={styles.searchContainer}>
-            {/* Barre de recherche principale */}
             <div style={styles.searchBar}>
               <Search size={20} style={styles.searchIcon} />
               <input
@@ -603,7 +737,6 @@ const ListePresences = () => {
               />
             </div>
 
-            {/* Toggle filtres avancés */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
@@ -621,7 +754,7 @@ const ListePresences = () => {
                 />
               </button>
 
-              {(searchTerm || dateFilter || coursFilter || presenceRateFilter || heureFilter || periodeFilter) && (
+              {(searchTerm || dateFilter || coursFilter || presenceRateFilter || heureFilter || periodeFilter || matiereFilter || professeurFilter) && (
                 <button
                   onClick={clearFilters}
                   style={styles.clearButton}
@@ -632,7 +765,6 @@ const ListePresences = () => {
               )}
             </div>
 
-            {/* Filtres avancés */}
             {showAdvancedFilters && (
               <div style={styles.advancedFilters}>
                 <div style={styles.filtersGrid} className="filters-grid">
@@ -739,7 +871,6 @@ const ListePresences = () => {
               </div>
             )}
 
-            {/* Compteur de résultats */}
             <div style={styles.resultsCount}>
               {filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''} trouvée{filteredSessions.length !== 1 ? 's' : ''}
               {filteredSessions.length !== groupedSessions.length && (
@@ -847,12 +978,11 @@ const ListePresences = () => {
                           {session.nomProfesseur || 'Non spécifié'}
                         </div>
                       </td>
-                    <td style={styles.td}>
-  <div style={{ fontWeight: '500', color: '#111827' }}>
-    {formatHoraire(session.heure, session.periode)}
-  </div>
-</td>
-
+                      <td style={styles.td}>
+                        <div style={{ fontWeight: '500', color: '#111827' }}>
+                          {formatHoraire(session.heure, session.periode)}
+                        </div>
+                      </td>
                       <td style={styles.td}>
                         <div style={styles.progressContainer}>
                           <div style={styles.progressBar}>
@@ -931,7 +1061,7 @@ const ListePresences = () => {
                       </p>
                       <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Clock size={12} />
-{formatHoraire(session.heure, session.periode)}
+                        {formatHoraire(session.heure, session.periode)}
                       </p>
                       <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <AlertCircle size={12} />
@@ -1007,7 +1137,7 @@ const ListePresences = () => {
                   </div>
                   <p style={{ fontSize: '14px', color: '#6b7280', margin: '2px 0 0 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={16} />
-{formatHoraire(sessionActive.heure, sessionActive.periode)}
+                    {formatHoraire(sessionActive.heure, sessionActive.periode)}
                   </p>
                 </div>
                 <button
@@ -1070,6 +1200,7 @@ const ListePresences = () => {
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Statut</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Retard (min)</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Remarque</th>
+                          <th style={{ ...styles.th, padding: '12px 16px' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody style={{ backgroundColor: 'white' }}>
@@ -1111,6 +1242,16 @@ const ListePresences = () => {
                             <td style={{ ...styles.td, padding: '12px 16px' }}>
                               <span style={{ color: '#6b7280' }}>{p.remarque || '—'}</span>
                             </td>
+                            <td style={{ ...styles.td, padding: '12px 16px' }}>
+                              <button
+                                className="edit-button-hover"
+                                style={styles.editButton}
+                                onClick={() => handleEditClick(p)}
+                              >
+                                <Edit size={14} />
+                                Modifier
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1145,10 +1286,18 @@ const ListePresences = () => {
                           </div>
                         )}
                         {p.remarque && (
-                          <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280' }}>
+                          <div style={{ padding: '8px', backgroundColor: '#f9fafb', borderRadius: '6px', fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
                             <strong>Remarque:</strong> {p.remarque}
                           </div>
                         )}
+                        <button
+                          className="edit-button-hover"
+                          style={{ ...styles.editButton, marginTop: '8px' }}
+                          onClick={() => handleEditClick(p)}
+                        >
+                          <Edit size={14} />
+                          Modifier
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -1175,6 +1324,93 @@ const ListePresences = () => {
                   onMouseOut={(e) => e.target.style.backgroundColor = '#4b5563'}
                 >
                   Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🆕 Modal d'édition */}
+        {editingPresence && (
+          <div style={styles.modal}>
+            <div style={styles.modalContentSmall}>
+              <div style={styles.modalHeader}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Edit size={20} color="#2563eb" />
+                  Modifier la présence
+                </h3>
+                <button className="close-button" style={styles.closeButton} onClick={() => setEditingPresence(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div style={styles.modalBody}>
+                <div style={styles.editInfo}>
+                  <p style={{ margin: '4px 0', fontSize: '14px', color: '#374151' }}>
+                    <strong>Étudiant:</strong> {editingPresence.etudiant?.nomComplet}
+                  </p>
+                  <p style={{ margin: '4px 0', fontSize: '14px', color: '#374151' }}>
+                    <strong>Cours:</strong> {editingPresence.cours}
+                  </p>
+                </div>
+                
+                <div style={styles.editForm}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Statut</label>
+                    <select
+                      style={styles.formSelect}
+                      value={editFormData.present}
+                      onChange={(e) => setEditFormData({
+                        ...editFormData,
+                        present: e.target.value === 'true',
+                        retardMinutes: e.target.value === 'false' ? 0 : editFormData.retardMinutes
+                      })}
+                    >
+                      <option value="true">Présent</option>
+                      <option value="false">Absent</option>
+                    </select>
+                  </div>
+
+                  {editFormData.present && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Retard (minutes)</label>
+                      <input
+                        type="number"
+                        style={styles.formInput}
+                        min="0"
+                        max="60"
+                        value={editFormData.retardMinutes}
+                        onChange={(e) => setEditFormData({
+                          ...editFormData,
+                          retardMinutes: parseInt(e.target.value) || 0
+                        })}
+                      />
+                    </div>
+                  )}
+
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Remarque</label>
+                    <textarea
+                      style={styles.formTextarea}
+                      rows="3"
+                      value={editFormData.remarque}
+                      onChange={(e) => setEditFormData({
+                        ...editFormData,
+                        remarque: e.target.value
+                      })}
+                      placeholder="Ajouter une remarque (optionnel)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.modalFooter}>
+                <button style={styles.cancelButton} onClick={() => setEditingPresence(null)}>
+                  Annuler
+                </button>
+                <button style={styles.saveButton} onClick={handleUpdatePresence}>
+                  <Check size={16} />
+                  Enregistrer
                 </button>
               </div>
             </div>

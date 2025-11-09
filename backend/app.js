@@ -4981,7 +4981,46 @@ app.get('/api/etudiant/profile', authEtudiant, async (req, res) => {
     res.status(500).json({ message: 'خطأ في جلب الملف الشخصي', error: err.message });
   }
 });
+// Route pour mettre à jour le statut d'une présence
+app.put('/api/presences/:id', authProfesseur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { present, retardMinutes, remarque } = req.body;
 
+    // Vérifier que la présence existe et appartient à ce professeur
+    const presence = await Presence.findOne({ _id: id, creePar: req.professeurId });
+    
+    if (!presence) {
+      return res.status(404).json({ message: 'Présence non trouvée ou non autorisée.' });
+    }
+
+    // Mettre à jour les champs
+    if (present !== undefined) {
+      presence.present = present;
+    }
+    
+    if (retardMinutes !== undefined) {
+      presence.retardMinutes = Math.min(Math.max(retardMinutes, 0), 60);
+      if (retardMinutes > 0) {
+        presence.present = true; // Si retard, alors présent
+      }
+    }
+    
+    if (remarque !== undefined) {
+      presence.remarque = remarque;
+    }
+
+    await presence.save();
+    
+    // Repopuler l'étudiant avant de renvoyer
+    await presence.populate('etudiant', 'nomComplet');
+    
+    res.json(presence);
+  } catch (err) {
+    console.error('Erreur mise à jour présence:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ✅ API pour créer/modifier une présence avec gestion des retards
 app.post('/api/presences', authProfesseur, async (req, res) => {

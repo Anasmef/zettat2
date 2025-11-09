@@ -109,7 +109,7 @@ const SidebarProf = ({ onLogout }) => {
     },
     {
       path: '/presences',
-      label: 'Présences',
+      label: 'Liste des Présences',
       icon: ClipboardList
     },
 

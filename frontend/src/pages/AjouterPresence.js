@@ -16,6 +16,7 @@ import {
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/SidebarProf';
+import ModalMessageProf from '../components/ModalMessageProf';
 
 const AjouterPresence = () => {
   const [cours, setCours] = useState([]);
@@ -35,6 +36,8 @@ const AjouterPresence = () => {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(true); // true = s'affiche automatiquement
+
   const navigate = useNavigate();
 
   // Charger les cours au montage
@@ -768,9 +771,14 @@ const AjouterPresence = () => {
                 )}
               </div>
             )}
+   
           </div>
         </div>
       </div>
+         <ModalMessageProf 
+      isOpen={showInfoModal} 
+      onClose={() => setShowInfoModal(false)} 
+    />
     </div>
   );
 };
