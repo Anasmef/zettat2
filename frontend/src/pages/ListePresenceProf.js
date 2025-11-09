@@ -51,7 +51,7 @@ const ListePresences = () => {
         return;
       }
 
-      const res = await axios.get('http://localhost:5000/api/professeur/presences', {
+      const res = await axios.get('/api/professeur/presences', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -203,7 +203,7 @@ const ListePresences = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:5000/api/presences/${editingPresence._id}`,
+        `/api/presences/${editingPresence._id}`,
         editFormData,
         { headers: { Authorization: `Bearer ${token}` } }
       );

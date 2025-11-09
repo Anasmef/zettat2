@@ -63,7 +63,7 @@ const ActualitesPage = () => {
         params.append('sortBy', sortBy);
       }
 
-      const response = await fetch(`http://localhost:5000/api/actualites?${params.toString()}`);
+      const response = await fetch(`/api/actualites?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error(`Erreur HTTP: ${response.status}`);

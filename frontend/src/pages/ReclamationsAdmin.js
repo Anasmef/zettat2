@@ -64,7 +64,7 @@ const AdminReclamations = () => {
         ...Object.fromEntries(Object.entries(filtres).filter(([_, v]) => v))
       });
 
-      const res = await fetch(`http://localhost:5000/api/admin/reclamations?${params}`, {
+      const res = await fetch(`/api/admin/reclamations?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -85,7 +85,7 @@ const AdminReclamations = () => {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/admin/reclamations/stats/detailed', {
+      const res = await fetch('/api/admin/reclamations/stats/detailed', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -101,7 +101,7 @@ const AdminReclamations = () => {
     try {
       setUpdating(true);
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/admin/reclamations/${id}/traiter`, {
+      const res = await fetch(`/api/admin/reclamations/${id}/traiter`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ const AdminReclamations = () => {
     try {
       setUpdating(true);
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/admin/reclamations/${id}/valider`, {
+      const res = await fetch(`/api/admin/reclamations/${id}/valider`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

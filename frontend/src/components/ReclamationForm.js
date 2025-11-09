@@ -48,13 +48,13 @@ const ReclamationForm = ({ onClose, onSubmit, etudiant = null }) => {
       const token = localStorage.getItem('token');
       
       // Récupérer les étudiants du professeur
-      const resEtudiants = await axios.get('http://localhost:5000/api/professeur/etudiants', {
+      const resEtudiants = await axios.get('/api/professeur/etudiants', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setEtudiants(resEtudiants.data);
 
       // Récupérer les cours du professeur
-      const resProfesseur = await axios.get('http://localhost:5000/api/professeur/profile', {
+      const resProfesseur = await axios.get('/api/professeur/profile', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCours(resProfesseur.data.cours || []);
@@ -119,7 +119,7 @@ const ReclamationForm = ({ onClose, onSubmit, etudiant = null }) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/professeur/reclamations', formData, {
+      const response = await axios.post('/api/professeur/reclamations', formData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

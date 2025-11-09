@@ -72,7 +72,7 @@ const BadgeGeneratorModern = () => {
         throw new Error('Vous devez être connecté');
       }
 
-      const response = await fetch('http://localhost:5000/api/etudiants', {
+      const response = await fetch('/api/etudiants', {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
