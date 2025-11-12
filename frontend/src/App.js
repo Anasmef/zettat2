@@ -85,6 +85,7 @@ import PageProfesseurRapports from './pages/PageProfesseurRapports';
 
 import MesRapports from './pages/MesRapports';
 
+import ListePresencesmanager from './pages/ListePresencesmanager';
 import HistoriqueEtudiant from './pages/HistoriqueEtudiant';
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
@@ -365,6 +366,9 @@ function AppContent() {
         <Route path="/professeur/seances" element={<SeancesProfesseur />} />
         <Route path="/admin/Bulletin" element={<AdminBulletins />} />
         <Route path="/manager/messages" element={<AdminMessagesmanager />} />
+
+
+        <Route path="/manager/liste-presences" element={<ListePresencesmanager />} />
         <Route path="/etudiant/Bulletin" element={<EtudiantBulletins />} />
         <Route path="/professeur/AjouterBulletin" element={<ProfAjouterBulletin />} />
         <Route path="/manager/VieScolaire" element={<AdminVieScolairemanager />} />

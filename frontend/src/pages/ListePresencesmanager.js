@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download, Edit, Trash2, Save } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx-js-style';
-import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
+import Sidebar from '../components/Sidebarmanager'; // ✅ استيراد صحيح
 
 const ListePresences = () => {
   const [presences, setPresences] = useState([]);

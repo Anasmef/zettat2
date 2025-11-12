@@ -3,6 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
+import RapportNotificationModal from '../components/RapportNotificationModal';
 import { 
   Users, GraduationCap, Calendar, CreditCard, 
   UserCheck, UserX, TrendingUp, AlertTriangle 
@@ -47,10 +48,51 @@ const AdminDashboard = () => {
 const [rappelModal, setRappelModal] = useState(null);
 const [editDate, setEditDate] = useState('');
 const [editNote, setEditNote] = useState('');
+const [showRapportModal, setShowRapportModal] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
+  useEffect(() => {
+  const checkRapportsAujourdhui = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const role = localStorage.getItem('role');
+      
+      if (!token || role !== 'admin') return;
+
+      const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const res = await fetch('/api/rapports/admin/rapports', { headers });
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      
+      // Filtrer rapports du jour
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+      
+      const rapportsDuJour = data.filter(r => {
+        const dateRapport = new Date(r.date);
+        dateRapport.setHours(0, 0, 0, 0);
+        return dateRapport.getTime() === aujourdhui.getTime();
+      });
+
+      // Afficher le modal si rapports trouvés
+      if (rapportsDuJour.length > 0) {
+        setShowRapportModal(true);
+      }
+    } catch (error) {
+      console.error('Erreur vérification rapports:', error);
+    }
+  };
+
+  checkRapportsAujourdhui();
+}, []); // Se déclenche au montage du composant
+
   useEffect(() => {
   const fetchRappels = async () => {
     try {
@@ -639,6 +681,15 @@ const handleDeleteRappel = async (id) => {
       
         </div>
       </div>
+{showRapportModal && (
+  <RapportNotificationModal 
+    show={showRapportModal}
+    onClose={() => {
+      console.log('🔴 Fermeture du modal');
+      setShowRapportModal(false);
+    }} 
+  />
+)}
     </div>
   );
 };

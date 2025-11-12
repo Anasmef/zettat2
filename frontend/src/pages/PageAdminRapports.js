@@ -1,10 +1,9 @@
 // ============================================
-// PAGE ADMIN - GestionRapports.jsx (COMPLET AVEC PDF)
+// PAGE ADMIN - GestionRapports.jsx (STYLE DASHBOARD)
 // ============================================
 import React, { useEffect, useState } from 'react';
 import { 
   FileText,
-  Filter,
   CheckCircle,
   XCircle,
   Eye,
@@ -15,44 +14,29 @@ import {
   AlertTriangle,
   Shield,
   Clock,
-  Search,
   Download,
-  BarChart3,
-  RefreshCw
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import SidebarAdmin from '../components/Sidebar';
+import './AdminDashboard.css';
 
 const GestionRapports = () => {
   const [rapports, setRapports] = useState([]);
-  const [rapportsFiltres, setRapportsFiltres] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedRapport, setSelectedRapport] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [stats, setStats] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
-
-  // Filtres
-  const [filters, setFilters] = useState({
-    statut: '',
-    cours: '',
-    dateDebut: '',
-    dateFin: '',
-    search: ''
-  });
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchRapports();
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [filters, rapports]);
+  }, [selectedDate]);
 
   const fetchRapports = async () => {
     try {
@@ -69,65 +53,23 @@ const GestionRapports = () => {
         timeout: 15000
       });
 
-      setRapports(res.data);
-      setRapportsFiltres(res.data);
+      // Filtrer par date sélectionnée
+      const filtered = res.data.filter(rapport => {
+        const rapportDate = new Date(rapport.date);
+        return (
+          rapportDate.getDate() === selectedDate.getDate() &&
+          rapportDate.getMonth() === selectedDate.getMonth() &&
+          rapportDate.getFullYear() === selectedDate.getFullYear()
+        );
+      });
+
+      setRapports(filtered);
       setIsLoading(false);
     } catch (error) {
       console.error('❌ Erreur chargement rapports:', error);
       setMessage('error');
       setIsLoading(false);
     }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      const res = await axios.get('/api/rapports/admin/rapports/stats/general', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      setStats(res.data);
-    } catch (error) {
-      console.error('Erreur stats:', error);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...rapports];
-
-    if (filters.statut) {
-      filtered = filtered.filter(r => r.statut === filters.statut);
-    }
-
-    if (filters.cours) {
-      filtered = filtered.filter(r => 
-        r.cours.toLowerCase().includes(filters.cours.toLowerCase())
-      );
-    }
-
-    if (filters.dateDebut) {
-      filtered = filtered.filter(r => 
-        new Date(r.date) >= new Date(filters.dateDebut)
-      );
-    }
-    if (filters.dateFin) {
-      filtered = filtered.filter(r => 
-        new Date(r.date) <= new Date(filters.dateFin)
-      );
-    }
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(r => 
-        r.etudiant?.nomComplet?.toLowerCase().includes(searchLower) ||
-        r.professeur?.nom?.toLowerCase().includes(searchLower) ||
-        r.professeur?.prenom?.toLowerCase().includes(searchLower) ||
-        r.descriptionIncident?.toLowerCase().includes(searchLower)
-      );
-    }
-
-    setRapportsFiltres(filtered);
   };
 
   const handleLogout = () => {
@@ -147,7 +89,6 @@ const GestionRapports = () => {
 
       setMessage('visa_success');
       fetchRapports();
-      fetchStats();
       setShowModal(false);
       
       setTimeout(() => setMessage(''), 3000);
@@ -169,7 +110,6 @@ const GestionRapports = () => {
 
       setMessage('statut_success');
       fetchRapports();
-      fetchStats();
       
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -193,7 +133,6 @@ const GestionRapports = () => {
 
       setMessage('delete_success');
       fetchRapports();
-      fetchStats();
       setShowModal(false);
       
       setTimeout(() => setMessage(''), 3000);
@@ -208,7 +147,6 @@ const GestionRapports = () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Appel API pour générer le PDF
       const res = await axios.post(
         `/api/rapports/admin/rapports/${rapport._id}/generate-pdf`,
         {},
@@ -218,12 +156,10 @@ const GestionRapports = () => {
         }
       );
 
-      // Créer un lien de téléchargement
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
       
-      // Nom du fichier avec date et étudiant
       const date = new Date(rapport.date).toLocaleDateString('fr-FR').replace(/\//g, '-');
       const filename = `Rapport_${rapport.etudiant?.nomComplet || 'Etudiant'}_${date}.pdf`;
       
@@ -243,51 +179,14 @@ const GestionRapports = () => {
     }
   };
 
-  const downloadAllPDFs = async () => {
-    if (rapportsFiltres.length === 0) {
-      alert('Aucun rapport à télécharger');
-      return;
-    }
+  const changeDate = (days) => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + days);
+    setSelectedDate(newDate);
+  };
 
-    if (!window.confirm(`Télécharger ${rapportsFiltres.length} rapport(s) en PDF ?`)) {
-      return;
-    }
-
-    setIsDownloading(true);
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Créer un tableau avec les IDs des rapports filtrés
-      const rapportIds = rapportsFiltres.map(r => r._id);
-      
-      const res = await axios.post(
-        '/api/rapports/admin/rapports/download-multiple',
-        { rapportIds },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: 'blob'
-        }
-      );
-
-      // Télécharger le ZIP
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      const date = new Date().toLocaleDateString('fr-FR').replace(/\//g, '-');
-      link.setAttribute('download', `Rapports_${date}.zip`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      setMessage('download_all_success');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      console.error('Erreur téléchargement multiple:', error);
-      setMessage('error_download');
-      setTimeout(() => setMessage(''), 3000);
-    } finally {
-      setIsDownloading(false);
-    }
+  const setToday = () => {
+    setSelectedDate(new Date());
   };
 
   const openModal = (rapport) => {
@@ -310,310 +209,367 @@ const GestionRapports = () => {
     });
   };
 
+  const formatDateTitle = (date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return "Aujourd'hui";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Hier";
+    } else {
+      return date.toLocaleDateString('fr-FR', { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    }
+  };
+
   const getStatutBadge = (statut) => {
     const config = {
-      'en_attente': { bg: '#fef3c7', color: '#92400e', text: 'En attente', icon: Clock },
-      'traite': { bg: '#dcfce7', color: '#166534', text: 'Traité', icon: CheckCircle },
-      'archive': { bg: '#f3f4f6', color: '#6b7280', text: 'Archivé', icon: FileText }
+      'en_attente': { bg: '#FEF3C7', color: '#92400E', text: 'En attente' },
+      'traite': { bg: '#DCFCE7', color: '#166534', text: 'Traité' },
+      'archive': { bg: '#F3F4F6', color: '#6B7280', text: 'Archivé' }
     };
     
     const conf = config[statut] || config['en_attente'];
-    const Icon = conf.icon;
     
     return (
-      <div style={{
-        ...s.badge,
+      <span style={{
+        padding: '4px 12px',
+        borderRadius: '12px',
+        fontSize: '12px',
+        fontWeight: '600',
         backgroundColor: conf.bg,
         color: conf.color,
         border: `1px solid ${conf.color}30`
       }}>
-        <Icon style={s.badgeIcon} />
         {conf.text}
-      </div>
+      </span>
     );
   };
 
   if (isLoading) {
     return (
-      <div style={s.container}>
+      <div className="admin-dashboard" style={{ background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)' }}>
         <SidebarAdmin onLogout={handleLogout} />
-        <div style={s.loadingContainer}>
-          <div style={s.spinner} />
-          <p style={s.loadingText}>Chargement des rapports...</p>
+        <div className="loading-container">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Chargement des rapports...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={s.container}>
+    <div className="admin-dashboard" style={{ background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)' }}>
       <SidebarAdmin onLogout={handleLogout} />
 
-      <div style={s.header}>
-        <div style={s.headerContent}>
-          <h1 style={s.title}>Gestion des Rapports Disciplinaires</h1>
-          <div style={s.headerActions}>
-            <button 
-              style={s.refreshButton}
-              onClick={() => {
-                fetchRapports();
-                fetchStats();
-              }}
-              title="Actualiser"
-            >
-              <RefreshCw style={s.refreshIcon} />
-            </button>
-            <button
-              style={{
-                ...s.downloadAllButton,
-                opacity: isDownloading ? 0.6 : 1,
-                cursor: isDownloading ? 'not-allowed' : 'pointer'
-              }}
-              onClick={downloadAllPDFs}
-              disabled={isDownloading || rapportsFiltres.length === 0}
-            >
-              {isDownloading ? (
-                <>
-                  <div style={s.smallSpinner} />
-                  Téléchargement...
-                </>
-              ) : (
-                <>
-                  <Download style={s.downloadAllIcon} />
-                  Télécharger Tous ({rapportsFiltres.length})
-                </>
-              )}
-            </button>
+      <div className="dashboard-header">
+        <div className="container">
+          <div className="header-content" style={{ 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            textAlign: 'center' 
+          }}>
+            <div className="header-info">
+              <h1>Gestion des Rapports Disciplinaires</h1>
+              <p style={{ color: '#6B7280', marginBottom: '4px' }}>
+                Consultez et gérez les rapports par date
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={s.mainContent}>
-        {/* Statistiques */}
-        {stats && (
-          <div style={s.statsContainer}>
-            <div style={s.statCard}>
-              <div style={{...s.statIcon, backgroundColor: '#dbeafe'}}>
-                <FileText style={{width: '24px', height: '24px', color: '#1e40af'}} />
-              </div>
-              <div>
-                <div style={s.statValue}>{stats.total}</div>
-                <div style={s.statLabel}>Total Rapports</div>
-              </div>
-            </div>
-
-            <div style={s.statCard}>
-              <div style={{...s.statIcon, backgroundColor: '#fef3c7'}}>
-                <Clock style={{width: '24px', height: '24px', color: '#92400e'}} />
-              </div>
-              <div>
-                <div style={s.statValue}>{stats.parStatut.enAttente}</div>
-                <div style={s.statLabel}>En Attente</div>
-              </div>
-            </div>
-
-            <div style={s.statCard}>
-              <div style={{...s.statIcon, backgroundColor: '#dcfce7'}}>
-                <CheckCircle style={{width: '24px', height: '24px', color: '#166534'}} />
-              </div>
-              <div>
-                <div style={s.statValue}>{stats.parStatut.traites}</div>
-                <div style={s.statLabel}>Traités</div>
-              </div>
-            </div>
-
-            <div style={s.statCard}>
-              <div style={{...s.statIcon, backgroundColor: '#f3f4f6'}}>
-                <BarChart3 style={{width: '24px', height: '24px', color: '#6b7280'}} />
-              </div>
-              <div>
-                <div style={s.statValue}>{stats.parStatut.archives}</div>
-                <div style={s.statLabel}>Archivés</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filtres */}
-        <div style={s.filtersCard}>
-          <div style={s.filtersHeader}>
-            <Filter style={s.filterIcon} />
-            <h3 style={s.filtersTitle}>Filtres de Recherche</h3>
-          </div>
-
-          <div style={s.filtersGrid}>
-            <div style={s.filterGroup}>
-              <label style={s.filterLabel}>
-                <Search style={s.filterLabelIcon} />
-                Recherche
-              </label>
-              <input
-                type="text"
-                style={s.filterInput}
-                placeholder="Étudiant, professeur, description..."
-                value={filters.search}
-                onChange={(e) => setFilters({...filters, search: e.target.value})}
-              />
-            </div>
-
-            <div style={s.filterGroup}>
-              <label style={s.filterLabel}>
-                <Shield style={s.filterLabelIcon} />
-                Statut
-              </label>
-              <select
-                style={s.filterSelect}
-                value={filters.statut}
-                onChange={(e) => setFilters({...filters, statut: e.target.value})}
+      <div className="dashboard-container">
+        <div className="dashboard-content">
+          
+          {/* Navigation par date */}
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '24px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
+            border: '1px solid rgba(229, 231, 235, 0.5)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '20px',
+              flexWrap: 'wrap'
+            }}>
+              <button 
+                onClick={() => changeDate(-1)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                  flex: '1',
+                  minWidth: '150px',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
               >
-                <option value="">Tous les statuts</option>
-                <option value="en_attente">En attente</option>
-                <option value="traite">Traité</option>
-                <option value="archive">Archivé</option>
-              </select>
-            </div>
+                <ChevronLeft style={{ width: '20px', height: '20px' }} />
+                <span style={{ display: 'none' }} className="desktop-text">Jour précédent</span>
+                <span className="mobile-text">Précédent</span>
+              </button>
+              
+              <div style={{ textAlign: 'center', flex: '2', minWidth: '200px' }}>
+                <Calendar style={{ 
+                  width: '32px', 
+                  height: '32px', 
+                  color: '#3B82F6', 
+                  margin: '0 auto 8px',
+                  display: 'block'
+                }} />
+                <h2 style={{
+                  fontSize: '28px',
+                  fontWeight: '700',
+                  color: '#1F2937',
+                  margin: '0 0 4px 0',
+                  textTransform: 'capitalize'
+                }}>
+                  {formatDateTitle(selectedDate)}
+                </h2>
+                <span style={{ fontSize: '16px', color: '#6B7280' }}>
+                  {selectedDate.toLocaleDateString('fr-FR')}
+                </span>
+                <div style={{ marginTop: '12px' }}>
+                  <button
+                    onClick={setToday}
+                    style={{
+                      padding: '8px 16px',
+                      background: '#DBEAFE',
+                      color: '#1E40AF',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Retour à aujourd'hui
+                  </button>
+                </div>
+              </div>
 
-            <div style={s.filterGroup}>
-              <label style={s.filterLabel}>
-                <BookOpen style={s.filterLabelIcon} />
-                Cours
-              </label>
-              <input
-                type="text"
-                style={s.filterInput}
-                placeholder="Nom du cours..."
-                value={filters.cours}
-                onChange={(e) => setFilters({...filters, cours: e.target.value})}
-              />
-            </div>
-
-            <div style={s.filterGroup}>
-              <label style={s.filterLabel}>
-                <Calendar style={s.filterLabelIcon} />
-                Date début
-              </label>
-              <input
-                type="date"
-                style={s.filterInput}
-                value={filters.dateDebut}
-                onChange={(e) => setFilters({...filters, dateDebut: e.target.value})}
-              />
-            </div>
-
-            <div style={s.filterGroup}>
-              <label style={s.filterLabel}>
-                <Calendar style={s.filterLabelIcon} />
-                Date fin
-              </label>
-              <input
-                type="date"
-                style={s.filterInput}
-                value={filters.dateFin}
-                onChange={(e) => setFilters({...filters, dateFin: e.target.value})}
-              />
+              <button 
+                onClick={() => changeDate(1)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                  flex: '1',
+                  minWidth: '150px',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <span style={{ display: 'none' }} className="desktop-text">Jour suivant</span>
+                <span className="mobile-text">Suivant</span>
+                <ChevronRight style={{ width: '20px', height: '20px' }} />
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Liste des rapports */}
-        <div style={s.rapportsCard}>
-          <div style={s.rapportsHeader}>
-            <h3 style={s.rapportsTitle}>
-              <FileText style={s.rapportsIcon} />
-              Rapports ({rapportsFiltres.length})
-            </h3>
-          </div>
-
-          {rapportsFiltres.length === 0 ? (
-            <div style={s.emptyState}>
-              <FileText style={s.emptyIcon} />
-              <p style={s.emptyText}>Aucun rapport trouvé</p>
+          {/* Liste des rapports */}
+          {rapports.length === 0 ? (
+            <div className="chart-card">
+              <div className="chart-empty">
+                <FileText />
+                <div>
+                  <h4>Aucun rapport pour cette date</h4>
+                  <p>Sélectionnez une autre date pour voir les rapports</p>
+                </div>
+              </div>
             </div>
           ) : (
-            <div style={s.rapportsList}>
-              {rapportsFiltres.map(rapport => (
-                <div key={rapport._id} style={s.rapportCard}>
-                  <div style={s.rapportHeader}>
-                    <div style={s.rapportInfo}>
-                      <div style={s.rapportDate}>
-                        <Calendar style={s.rapportDateIcon} />
-                        {formatDate(rapport.date)}
-                      </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {rapports.map(rapport => (
+                <div key={rapport._id} className="chart-card" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '24px',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Gauche - Infos */}
+                  <div style={{ flex: 1, minWidth: '300px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      marginBottom: '16px',
+                      paddingBottom: '12px',
+                      borderBottom: '2px solid #F3F4F6'
+                    }}>
+                      <Clock style={{ width: '20px', height: '20px', color: '#6B7280' }} />
+                      <span style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937' }}>
+                        {new Date(rapport.date).toLocaleTimeString('fr-FR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
                       {getStatutBadge(rapport.statut)}
                     </div>
-                    <div style={s.rapportActions}>
-                      <button
-                        style={s.actionButton}
-                        onClick={() => openModal(rapport)}
-                        title="Voir détails"
-                      >
-                        <Eye style={s.actionIcon} />
-                      </button>
-                      <button
-                        style={{...s.actionButton, backgroundColor: '#dbeafe'}}
-                        onClick={() => downloadPDF(rapport)}
-                        disabled={isDownloading}
-                        title="Télécharger PDF"
-                      >
-                        <Download style={s.actionIcon} />
-                      </button>
-                      <button
-                        style={{...s.actionButton, backgroundColor: '#fee2e2'}}
-                        onClick={() => handleDelete(rapport._id)}
-                        title="Supprimer"
-                      >
-                        <Trash2 style={s.actionIcon} />
-                      </button>
-                    </div>
-                  </div>
 
-                  <div style={s.rapportContent}>
-                    <div style={s.rapportRow}>
-                      <User style={s.rapportIcon} />
-                      <div>
-                        <div style={s.rapportLabel}>Étudiant</div>
-                        <div style={s.rapportValue}>
-                          {rapport.etudiant?.nomComplet} - {rapport.niveau}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <User style={{ width: '18px', height: '18px', color: '#9CA3AF', marginTop: '2px' }} />
+                        <div>
+                          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600', marginRight: '8px' }}>
+                            Étudiant:
+                          </span>
+                          <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>
+                            {rapport.etudiant?.nomComplet}
+                          </span>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={s.rapportRow}>
-                      <User style={s.rapportIcon} />
-                      <div>
-                        <div style={s.rapportLabel}>Professeur</div>
-                        <div style={s.rapportValue}>
-                          {rapport.professeur?.nom} {rapport.professeur?.prenom}
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <User style={{ width: '18px', height: '18px', color: '#9CA3AF', marginTop: '2px' }} />
+                        <div>
+                          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600', marginRight: '8px' }}>
+                            Professeur:
+                          </span>
+                          <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>
+                            {rapport.professeur?.prenom} {rapport.professeur?.nom}
+                          </span>
                         </div>
                       </div>
-                    </div>
 
-                    <div style={s.rapportRow}>
-                      <BookOpen style={s.rapportIcon} />
-                      <div>
-                        <div style={s.rapportLabel}>Cours</div>
-                        <div style={s.rapportValue}>{rapport.cours}</div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <BookOpen style={{ width: '18px', height: '18px', color: '#9CA3AF', marginTop: '2px' }} />
+                        <div>
+                          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '600', marginRight: '8px' }}>
+                            Cours:
+                          </span>
+                          <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>
+                            {rapport.cours}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div style={s.rapportRow}>
-                      <AlertTriangle style={s.rapportIcon} />
-                      <div>
-                        <div style={s.rapportLabel}>Nature du problème</div>
-                        <div style={s.natureTags}>
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                        <AlertTriangle style={{ width: '18px', height: '18px', color: '#9CA3AF', marginTop: '2px' }} />
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                           {rapport.natureProbleme.map((nature, i) => (
-                            <span key={i} style={s.natureTag}>{nature}</span>
+                            <span key={i} style={{
+                              padding: '4px 12px',
+                              background: '#FEF3C7',
+                              color: '#92400E',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              border: '1px solid #FDE68A'
+                            }}>
+                              {nature}
+                            </span>
                           ))}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={s.rapportFooter}>
+                  {/* Droite - Actions */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    minWidth: '200px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => openModal(rapport)}
+                        style={{
+                          padding: '8px',
+                          background: '#F3F4F6',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        title="Voir détails"
+                      >
+                        <Eye style={{ width: '18px', height: '18px', color: '#374151' }} />
+                      </button>
+                      
+                      <button
+                        onClick={() => downloadPDF(rapport)}
+                        disabled={isDownloading}
+                        style={{
+                          padding: '8px',
+                          background: '#DBEAFE',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        title="Télécharger PDF"
+                      >
+                        <Download style={{ width: '18px', height: '18px', color: '#374151' }} />
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDelete(rapport._id)}
+                        style={{
+                          padding: '8px',
+                          background: '#FEE2E2',
+                          border: 'none',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          transition: 'background 0.2s'
+                        }}
+                        title="Supprimer"
+                      >
+                        <Trash2 style={{ width: '18px', height: '18px', color: '#374151' }} />
+                      </button>
+                    </div>
+
                     <select
-                      style={s.statutSelect}
                       value={rapport.statut}
                       onChange={(e) => handleChangeStatut(rapport._id, e.target.value)}
+                      style={{
+                        padding: '8px 16px',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        width: '100%'
+                      }}
                     >
                       <option value="en_attente">En attente</option>
                       <option value="traite">Traité</option>
@@ -622,16 +578,43 @@ const GestionRapports = () => {
 
                     {!rapport.visaDirection ? (
                       <button
-                        style={s.visaButton}
                         onClick={() => handleVisa(rapport._id, true)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '8px 16px',
+                          background: 'linear-gradient(135deg, #059669, #047857)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)',
+                          transition: 'transform 0.2s',
+                          width: '100%'
+                        }}
                       >
-                        <Shield style={s.visaIcon} />
+                        <Shield style={{ width: '16px', height: '16px' }} />
                         Apposer le Visa
                       </button>
                     ) : (
-                      <div style={s.visaBadge}>
-                        <CheckCircle style={s.visaBadgeIcon} />
-                        Visa apposé le {new Date(rapport.dateVisa).toLocaleDateString('fr-FR')}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        background: '#DCFCE7',
+                        color: '#166534',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        border: '1px solid #BBF7D0'
+                      }}>
+                        <CheckCircle style={{ width: '16px', height: '16px' }} />
+                        Visa apposé
                       </div>
                     )}
                   </div>
@@ -639,152 +622,288 @@ const GestionRapports = () => {
               ))}
             </div>
           )}
-        </div>
 
-        {/* Messages */}
-        {message && (
-          <div style={{
-            ...s.messageContainer,
-            backgroundColor: 
-              message.includes('success') ? '#dcfce7' : '#fee2e2',
-            borderColor: 
-              message.includes('success') ? '#16a34a' : '#dc2626',
-            color: 
-              message.includes('success') ? '#166534' : '#991b1b'
-          }}>
-            {message.includes('success') ? (
-              <>
-                <CheckCircle style={s.messageIcon} />
-                {message === 'visa_success' && 'Visa apposé avec succès'}
-                {message === 'statut_success' && 'Statut mis à jour'}
-                {message === 'delete_success' && 'Rapport supprimé'}
-                {message === 'download_success' && 'PDF téléchargé avec succès'}
-                {message === 'download_all_success' && 'Tous les PDF téléchargés'}
-              </>
-            ) : (
-              <>
-                <XCircle style={s.messageIcon} />
-                {message === 'error_download' ? 'Erreur lors du téléchargement' : 'Une erreur est survenue'}
-              </>
-            )}
-          </div>
-        )}
+          {/* Messages */}
+          {message && (
+            <div style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              border: '2px solid',
+              fontSize: '15px',
+              fontWeight: '500',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              zIndex: 1000,
+              backgroundColor: message.includes('success') ? '#DCFCE7' : '#FEE2E2',
+              borderColor: message.includes('success') ? '#16A34A' : '#DC2626',
+              color: message.includes('success') ? '#166534' : '#991B1B'
+            }}>
+              {message.includes('success') ? (
+                <>
+                  <CheckCircle style={{ width: '20px', height: '20px' }} />
+                  {message === 'visa_success' && 'Visa apposé avec succès'}
+                  {message === 'statut_success' && 'Statut mis à jour'}
+                  {message === 'delete_success' && 'Rapport supprimé'}
+                  {message === 'download_success' && 'PDF téléchargé avec succès'}
+                </>
+              ) : (
+                <>
+                  <XCircle style={{ width: '20px', height: '20px' }} />
+                  {message === 'error_download' ? 'Erreur lors du téléchargement' : 'Une erreur est survenue'}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Modal Détails */}
       {showModal && selectedRapport && (
-        <div style={s.modalOverlay} onClick={closeModal}>
-          <div style={s.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={s.modalHeader}>
-              <h2 style={s.modalTitle}>Détails du Rapport</h2>
-              <button style={s.modalClose} onClick={closeModal}>×</button>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }} onClick={closeModal}>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: '16px',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{
+              padding: '24px 32px',
+              borderBottom: '2px solid #E5E7EB',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)'
+            }}>
+              <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1F2937', margin: 0 }}>
+                Détails du Rapport
+              </h2>
+              <button
+                onClick={closeModal}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  border: 'none',
+                  background: '#F3F4F6',
+                  borderRadius: '8px',
+                  fontSize: '24px',
+                  color: '#6B7280',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >×</button>
             </div>
 
-            <div style={s.modalBody}>
-              <div style={s.modalSection}>
-                <h4 style={s.modalSectionTitle}>Informations générales</h4>
-                <div style={s.modalGrid}>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Date :</span>
-                    <span style={s.modalFieldValue}>{formatDate(selectedRapport.date)}</span>
+            <div style={{ padding: '32px', overflowY: 'auto', flex: 1 }}>
+              {/* Contenu du modal - identique au précédent */}
+              <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                  Informations générales
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Date :</span>
+                    <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>{formatDate(selectedRapport.date)}</span>
                   </div>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Statut :</span>
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Statut :</span>
                     {getStatutBadge(selectedRapport.statut)}
                   </div>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Étudiant :</span>
-                    <span style={s.modalFieldValue}>
-                      {selectedRapport.etudiant?.nomComplet}
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Étudiant :</span>
+                    <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>{selectedRapport.etudiant?.nomComplet}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Niveau :</span>
+                    <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>{selectedRapport.niveau}</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Professeur :</span>
+                    <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>
+                      {selectedRapport.professeur?.prenom} {selectedRapport.professeur?.nom}
                     </span>
                   </div>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Niveau :</span>
-                    <span style={s.modalFieldValue}>{selectedRapport.niveau}</span>
-                  </div>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Professeur :</span>
-                    <span style={s.modalFieldValue}>
-                      {selectedRapport.professeur?.nom} {selectedRapport.professeur?.prenom}
-                    </span>
-                  </div>
-                  <div style={s.modalField}>
-                    <span style={s.modalFieldLabel}>Cours :</span>
-                    <span style={s.modalFieldValue}>{selectedRapport.cours}</span>
+                  <div>
+                    <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Cours :</span>
+                    <span style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500' }}>{selectedRapport.cours}</span>
                   </div>
                 </div>
               </div>
 
-              <div style={s.modalSection}>
-                <h4 style={s.modalSectionTitle}>Nature du problème</h4>
-                <div style={s.natureTags}>
+              <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                  Nature du problème
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                   {selectedRapport.natureProbleme.map((nature, i) => (
-                    <span key={i} style={s.natureTag}>{nature}</span>
+                    <span key={i} style={{
+                      padding: '4px 12px',
+                      background: '#FEF3C7',
+                      color: '#92400E',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      border: '1px solid #FDE68A'
+                    }}>
+                      {nature}
+                    </span>
                   ))}
                 </div>
                 {selectedRapport.autreProbleme && (
-                  <p style={s.modalText}><strong>Autre :</strong> {selectedRapport.autreProbleme}</p>
+                  <p style={{ fontSize: '15px', color: '#374151', margin: '8px 0' }}>
+                    <strong>Autre :</strong> {selectedRapport.autreProbleme}
+                  </p>
                 )}
               </div>
 
-              <div style={s.modalSection}>
-                <h4 style={s.modalSectionTitle}>Description de l'incident</h4>
-                <p style={s.modalText}>{selectedRapport.descriptionIncident}</p>
+              <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                  Description de l'incident
+                </h4>
+                <p style={{ fontSize: '15px', color: '#374151', lineHeight: '1.6', margin: '8px 0' }}>
+                  {selectedRapport.descriptionIncident}
+                </p>
               </div>
 
-              <div style={s.modalSection}>
-                <h4 style={s.modalSectionTitle}>Mesures prises</h4>
-                <div style={s.natureTags}>
+              <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                  Mesures prises
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                   {selectedRapport.mesurePrise.map((mesure, i) => (
-                    <span key={i} style={{...s.natureTag, backgroundColor: '#dbeafe', color: '#1e40af'}}>
+                    <span key={i} style={{
+                      padding: '4px 12px',
+                      background: '#DBEAFE',
+                      color: '#1E40AF',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      border: '1px solid #BFDBFE'
+                    }}>
                       {mesure}
                     </span>
                   ))}
                 </div>
                 {selectedRapport.autreMesure && (
-                  <p style={s.modalText}><strong>Autre :</strong> {selectedRapport.autreMesure}</p>
+                  <p style={{ fontSize: '15px', color: '#374151', margin: '8px 0' }}>
+                    <strong>Autre :</strong> {selectedRapport.autreMesure}
+                  </p>
                 )}
               </div>
 
               {selectedRapport.observationProfesseur && (
-                <div style={s.modalSection}>
-                  <h4 style={s.modalSectionTitle}>Observations du professeur</h4>
-                  <p style={s.modalText}>{selectedRapport.observationProfesseur}</p>
+                <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                  <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                    Observations du professeur
+                  </h4>
+                  <p style={{ fontSize: '15px', color: '#374151', lineHeight: '1.6', margin: '8px 0' }}>
+                    {selectedRapport.observationProfesseur}
+                  </p>
                 </div>
               )}
 
-              <div style={s.modalSection}>
-                <h4 style={s.modalSectionTitle}>Visa de la direction</h4>
+              <div style={{ marginBottom: '28px', paddingBottom: '28px', borderBottom: '1px solid #F3F4F6' }}>
+                <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>
+                  Visa de la direction
+                </h4>
                 {selectedRapport.visaDirection ? (
-                  <div style={s.visaBadge}>
-                    <CheckCircle style={s.visaBadgeIcon} />
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    background: '#DCFCE7',
+                    color: '#166534',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    border: '1px solid #BBF7D0'
+                  }}>
+                    <CheckCircle style={{ width: '16px', height: '16px' }} />
                     Visa apposé le {new Date(selectedRapport.dateVisa).toLocaleDateString('fr-FR')}
                   </div>
                 ) : (
                   <button
-                    style={s.visaButton}
                     onClick={() => handleVisa(selectedRapport._id, true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      background: 'linear-gradient(135deg, #059669, #047857)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)'
+                    }}
                   >
-                    <Shield style={s.visaIcon} />
+                    <Shield style={{ width: '16px', height: '16px' }} />
                     Apposer le Visa
                   </button>
                 )}
               </div>
 
-              <div style={s.modalActions}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', paddingTop: '20px' }}>
                 <button
-                  style={s.downloadButton}
                   onClick={() => downloadPDF(selectedRapport)}
                   disabled={isDownloading}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #3B82F6, #2563EB)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                    transition: 'transform 0.2s'
+                  }}
                 >
                   {isDownloading ? (
                     <>
-                      <div style={s.smallSpinner} />
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderTop: '2px solid #FFFFFF',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                      }} />
                       Téléchargement...
                     </>
                   ) : (
                     <>
-                      <Download style={s.downloadButtonIcon} />
+                      <Download style={{ width: '20px', height: '20px' }} />
                       Télécharger PDF
                     </>
                   )}
@@ -798,562 +917,27 @@ const GestionRapports = () => {
   );
 };
 
-const s = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  },
-  header: {
-    background: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(10px)',
-    borderBottom: '1px solid rgba(229, 231, 235, 0.6)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-  },
-  headerContent: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: '700',
-    background: 'linear-gradient(135deg, #dc2626, #991b1b)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    margin: 0
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '12px'
-  },
-  refreshButton: {
-    padding: '10px',
-    background: '#f3f4f6',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s'
-  },
-  refreshIcon: {
-    width: '20px',
-    height: '20px',
-    color: '#374151'
-  },
-  downloadAllButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-    transition: 'transform 0.2s'
-  },
-  downloadAllIcon: {
-    width: '18px',
-    height: '18px'
-  },
-  mainContent: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '24px'
-  },
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100vh',
-    gap: '16px'
-  },
-  spinner: {
-    width: '48px',
-    height: '48px',
-    border: '4px solid rgba(59, 130, 246, 0.3)',
-    borderTop: '4px solid #3b82f6',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
-  smallSpinner: {
-    width: '16px',
-    height: '16px',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-    borderTop: '2px solid #ffffff',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite'
-  },
-  loadingText: {
-    fontSize: '16px',
-    color: '#6b7280'
-  },
-  statsContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '20px',
-    marginBottom: '24px'
-  },
-  statCard: {
-    background: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: '12px',
-    padding: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-    border: '1px solid rgba(229, 231, 235, 0.5)'
-  },
-  statIcon: {
-    width: '56px',
-    height: '56px',
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  statValue: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#1f2937'
-  },
-  statLabel: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginTop: '4px'
-  },
-  filtersCard: {
-    background: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: '16px',
-    padding: '24px',
-    marginBottom: '24px',
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-    border: '1px solid rgba(229, 231, 235, 0.5)'
-  },
-  filtersHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '20px'
-  },
-  filterIcon: {
-    width: '20px',
-    height: '20px',
-    color: '#3b82f6'
-  },
-  filtersTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: 0
-  },
-  filtersGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px'
-  },
-  filterGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px'
-  },
-  filterLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#374151'
-  },
-  filterLabelIcon: {
-    width: '14px',
-    height: '14px',
-    color: '#3b82f6'
-  },
-  filterInput: {
-    padding: '10px 14px',
-    fontSize: '14px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    outline: 'none',
-    transition: 'border-color 0.2s'
-  },
-  filterSelect: {
-    padding: '10px 14px',
-    fontSize: '14px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    outline: 'none',
-    cursor: 'pointer',
-    transition: 'border-color 0.2s'
-  },
-  rapportsCard: {
-    background: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: '16px',
-    padding: '24px',
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
-    border: '1px solid rgba(229, 231, 235, 0.5)'
-  },
-  rapportsHeader: {
-    marginBottom: '20px'
-  },
-  rapportsTitle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: 0
-  },
-  rapportsIcon: {
-    width: '24px',
-    height: '24px',
-    color: '#dc2626'
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: '#9ca3af'
-  },
-  emptyIcon: {
-    width: '64px',
-    height: '64px',
-    margin: '0 auto 16px',
-    opacity: 0.5
-  },
-  emptyText: {
-    fontSize: '16px',
-    margin: 0
-  },
-  rapportsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px'
-  },
-  rapportCard: {
-    background: '#ffffff',
-    border: '2px solid #e5e7eb',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    transition: 'all 0.2s'
-  },
-  rapportHeader: {
-    padding: '16px 20px',
-    background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-    borderBottom: '1px solid #e5e7eb',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  rapportInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    flexWrap: 'wrap'
-  },
-  rapportDate: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    fontSize: '14px',
-    color: '#6b7280',
-    fontWeight: '500'
-  },
-  rapportDateIcon: {
-    width: '16px',
-    height: '16px'
-  },
-  badge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    borderRadius: '20px',
-    fontSize: '13px',
-    fontWeight: '600',
-    border: '1px solid'
-  },
-  badgeIcon: {
-    width: '14px',
-    height: '14px'
-  },
-  rapportActions: {
-    display: 'flex',
-    gap: '8px'
-  },
-  actionButton: {
-    padding: '8px',
-    background: '#f3f4f6',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  actionIcon: {
-    width: '18px',
-    height: '18px',
-    color: '#374151'
-  },
-  rapportContent: {
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px'
-  },
-  rapportRow: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'flex-start'
-  },
-  rapportIcon: {
-    width: '20px',
-    height: '20px',
-    color: '#9ca3af',
-    marginTop: '2px',
-    flexShrink: 0
-  },
-  rapportLabel: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginBottom: '4px',
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    letterSpacing: '0.5px'
-  },
-  rapportValue: {
-    fontSize: '15px',
-    color: '#1f2937',
-    fontWeight: '500'
-  },
-  natureTags: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px'
-  },
-  natureTag: {
-    padding: '4px 12px',
-    background: '#fef3c7',
-    color: '#92400e',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '500',
-    border: '1px solid #fde68a'
-  },
-  rapportFooter: {
-    padding: '16px 20px',
-    background: '#f9fafb',
-    borderTop: '1px solid #e5e7eb',
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-    flexWrap: 'wrap'
-  },
-  statutSelect: {
-    padding: '8px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'border-color 0.2s'
-  },
-  visaButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    background: 'linear-gradient(135deg, #059669, #047857)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(5, 150, 105, 0.3)',
-    transition: 'transform 0.2s'
-  },
-  visaIcon: {
-    width: '16px',
-    height: '16px'
-  },
-  visaBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 16px',
-    background: '#dcfce7',
-    color: '#166534',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontWeight: '600',
-    border: '1px solid #bbf7d0'
-  },
-  visaBadgeIcon: {
-    width: '16px',
-    height: '16px'
-  },
-  messageContainer: {
-    position: 'fixed',
-    bottom: '24px',
-    right: '24px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px 20px',
-    borderRadius: '12px',
-    border: '2px solid',
-    fontSize: '15px',
-    fontWeight: '500',
-    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-    zIndex: 1000
-  },
-  messageIcon: {
-    width: '20px',
-    height: '20px',
-    flexShrink: 0
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    padding: '20px'
-  },
-  modalContent: {
-    background: '#ffffff',
-    borderRadius: '16px',
-    maxWidth: '800px',
-    width: '100%',
-    maxHeight: '90vh',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
-  },
-  modalHeader: {
-    padding: '24px 32px',
-    borderBottom: '2px solid #e5e7eb',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)'
-  },
-  modalTitle: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: 0
-  },
-  modalClose: {
-    width: '36px',
-    height: '36px',
-    border: 'none',
-    background: '#f3f4f6',
-    borderRadius: '8px',
-    fontSize: '24px',
-    color: '#6b7280',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s'
-  },
-  modalBody: {
-    padding: '32px',
-    overflowY: 'auto',
-    flex: 1
-  },
-  modalSection: {
-    marginBottom: '28px',
-    paddingBottom: '28px',
-    borderBottom: '1px solid #f3f4f6'
-  },
-  modalSectionTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  modalGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '16px'
-  },
-  modalField: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px'
-  },
-  modalFieldLabel: {
-    fontSize: '12px',
-    color: '#6b7280',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-  modalFieldValue: {
-    fontSize: '15px',
-    color: '#1f2937',
-    fontWeight: '500'
-  },
-  modalText: {
-    fontSize: '15px',
-    color: '#374151',
-    lineHeight: '1.6',
-    margin: '8px 0'
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '12px',
-    paddingTop: '20px'
-  },
-  downloadButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '12px 24px',
-    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '15px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-    transition: 'transform 0.2s'
-  },
-  downloadButtonIcon: {
-    width: '20px',
-    height: '20px'
+// Style tag pour le responsive
+const style = document.createElement('style');
+style.textContent = `
+  @media (min-width: 769px) {
+    .mobile-text {
+      display: none !important;
+    }
+    .desktop-text {
+      display: inline !important;
+    }
   }
-};
+
+  @media (max-width: 768px) {
+    .desktop-text {
+      display: none !important;
+    }
+    .mobile-text {
+      display: inline !important;
+    }
+  }
+`;
+document.head.appendChild(style);
 
 export default GestionRapports;

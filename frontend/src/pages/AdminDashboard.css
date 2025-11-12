@@ -779,4 +779,12 @@ body {
     box-shadow: none;
     border: 1px solid #E5E7EB;
   }
+}@media (min-width: 769px) {
+  .mobile-text { display: none !important; }
+  .desktop-text { display: inline !important; }
+}
+
+@media (max-width: 768px) {
+  .desktop-text { display: none !important; }
+  .mobile-text { display: inline !important; }
 }

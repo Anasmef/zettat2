@@ -74,6 +74,13 @@ const Sidebar = ({ onLogout }) => {
       icon: Home
     },
 
+   {
+      path: '/manager/liste-presences',
+      label: 'Liste des Présences',
+      icon: ClipboardList
+    },
+
+
    
       {
       path: '/manager/messages',

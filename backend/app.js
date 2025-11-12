@@ -3499,11 +3499,98 @@ app.get('/api/professeur/presences', authProfesseur, async (req, res) => {
   const data = await Presence.find({ creePar: req.professeurId }).populate('etudiant', 'nomComplet');
   res.json(data);
 });
+// ===== DANS VOTRE app.js =====
+// Remplacez votre route GET /api/presences existante par celle-ci :
+
 app.get('/api/presences', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
-    const data = await Presence.find().populate('etudiant', 'nomComplet');
+    const data = await Presence.find()
+      .populate({
+        path: 'etudiant',
+        select: 'nomComplet telephoneMere telephonePere email codeMassar'
+      })
+      .lean(); // Utiliser lean() pour de meilleures performances
+
     res.json(data);
   } catch (err) {
+    console.error('Erreur récupération présences:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== NOUVELLE ROUTE POUR STATISTIQUES ÉTUDIANT =====
+// Ajoutez cette nouvelle route dans app.js :
+
+app.get('/api/presences/stats/:etudiantId', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { etudiantId } = req.params;
+    
+    const allPresences = await Presence.find({ etudiant: etudiantId });
+    
+    const stats = {
+      totalSessions: allPresences.length,
+      nbAbsences: allPresences.filter(p => !p.present).length,
+      nbRetards: allPresences.filter(p => p.present && p.retardMinutes > 0).length,
+      nbPresences: allPresences.filter(p => p.present && p.retardMinutes === 0).length,
+      tauxPresence: allPresences.length > 0 
+        ? Math.round((allPresences.filter(p => p.present).length / allPresences.length) * 100) 
+        : 0
+    };
+    
+    res.json(stats);
+  } catch (err) {
+    console.error('Erreur calcul stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== NOUVELLE ROUTE POUR EXPORT OPTIMISÉ =====
+// Ajoutez cette nouvelle route dans app.js :
+
+app.get('/api/presences/export-data', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { date, professeur, periode } = req.query;
+    
+    // Construire le filtre
+    const filter = {};
+    if (date) {
+      const startDate = new Date(date);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      filter.dateSession = { $gte: startDate, $lte: endDate };
+    }
+    if (professeur) filter.nomProfesseur = professeur;
+    if (periode && periode !== 'all') filter.periode = periode;
+    
+    // Récupérer les données avec statistiques
+    const presences = await Presence.find(filter)
+      .populate({
+        path: 'etudiant',
+        select: 'nomComplet telephoneMere telephonePere email codeMassar'
+      })
+      .lean();
+    
+    // Calculer les statistiques pour chaque étudiant unique
+    const etudiantsIds = [...new Set(presences.map(p => p.etudiant?._id?.toString()))];
+    const statsMap = {};
+    
+    for (const etudiantId of etudiantsIds) {
+      const etudiantPresences = await Presence.find({ etudiant: etudiantId });
+      statsMap[etudiantId] = {
+        nbAbsences: etudiantPresences.filter(p => !p.present).length,
+        nbRetards: etudiantPresences.filter(p => p.present && p.retardMinutes > 0).length
+      };
+    }
+    
+    // Enrichir les données
+    const enrichedData = presences.map(p => ({
+      ...p,
+      stats: statsMap[p.etudiant?._id?.toString()] || { nbAbsences: 0, nbRetards: 0 }
+    }));
+    
+    res.json(enrichedData);
+  } catch (err) {
+    console.error('Erreur export data:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -4326,7 +4413,7 @@ app.get('/api/rapports/admin/rapports', authAdmin, async (req, res) => {
 
     const rapports = await Rapport.find(query)
       .populate('professeur', 'nom prenom email')
-      .populate('etudiant', 'nomComplet email niveau anneeScolaire')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire telephonePere telephoneMere') // ✅ Ajout ici
       .sort({ date: -1 });
 
     res.json(rapports);
@@ -7666,8 +7753,13 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
       return res.status(404).json({ message: 'Rapport non trouvé' });
     }
 
-    // Générer le PDF
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    // Générer le PDF avec support des caractères UTF-8
+    const doc = new PDFDocument({ 
+      margin: 50, 
+      size: 'A4',
+      bufferPages: true,
+      autoFirstPage: true
+    });
     
     // Headers pour le téléchargement
     res.setHeader('Content-Type', 'application/pdf');
@@ -7692,7 +7784,7 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
     }
 
     // Photo de l'étudiant à droite
-    if (rapport.etudiant.image) {
+    if (rapport.etudiant && rapport.etudiant.image) {
       const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
       if (fs.existsSync(photoPath)) {
         try {
@@ -7725,7 +7817,7 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
     currentY += 25;
 
     // Noms des élèves
-    const nomComplet = rapport.etudiant.nomComplet || '';
+    const nomComplet = rapport.etudiant ? rapport.etudiant.nomComplet || '' : '';
     doc.text(`Nom et prenom de l'eleve : ${nomComplet}`, 50, currentY);
     currentY += 15;
     
@@ -7740,7 +7832,12 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
     doc.text(`Date : ${dateRapport}`, 50, currentY);
     currentY += 15;
     
-    doc.text(`Professeur : ${rapport.professeur.nom} ${rapport.professeur.prenom}`, 50, currentY);
+    // ✅ CORRECTION : Afficher le nom complet du professeur
+    const nomProfesseur = rapport.professeur 
+      ? `${rapport.professeur.prenom || ''} ${rapport.professeur.nom || ''}`.trim()
+      : 'Non renseigne';
+    
+    doc.text(`Professeur : ${nomProfesseur}`, 50, currentY);
     currentY += 30;
 
     // === NATURE DU PROBLÈME ===
@@ -7761,7 +7858,7 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
     ];
 
     problemesDisponibles.forEach(prob => {
-      const isChecked = rapport.natureProbleme.some(np => 
+      const isChecked = rapport.natureProbleme && rapport.natureProbleme.some(np => 
         np.toLowerCase().includes(prob.toLowerCase().substring(0, 10))
       );
       const checkbox = isChecked ? '[X]' : '[ ]';
@@ -7813,7 +7910,7 @@ app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req,
     ];
 
     mesuresDisponibles.forEach(mes => {
-      const isChecked = rapport.mesurePrise.some(mp => 
+      const isChecked = rapport.mesurePrise && rapport.mesurePrise.some(mp => 
         mp.toLowerCase().includes(mes.toLowerCase().substring(0, 10))
       );
       const checkbox = isChecked ? '[X]' : '[ ]';

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut as LogOutIcon } from 'lucide-react';
+import SidebarProf from '../components/Sidebarmanager';
 
 const AdminQRPage = () => {
   const [qrCode, setQrCode] = useState(null);
@@ -160,29 +161,8 @@ const AdminQRPage = () => {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        
-        {/* Bouton Déconnexion */}
-        <div style={{ textAlign: 'right', marginBottom: '20px' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '12px 20px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
-            }}
-          >
-            <LogOutIcon size={18} />
-            Déconnexion
-          </button>
-        </div>
+
+        <SidebarProf />
 
         {/* Header */}
         <div style={{ 

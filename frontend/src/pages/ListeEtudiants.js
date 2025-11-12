@@ -6,6 +6,8 @@ import './ListeEtudiants.css';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 import ExportEtudiants from '../components/ExportEtudiants';
 import { Download } from 'lucide-react'; // Si pas déjà importé
+import RapportNotificationModal from '../components/RapportNotificationModal';
+
 import { 
   User, 
   CheckCircle, 
@@ -39,6 +41,7 @@ const ListeEtudiants = () => {
   const [etudiantsParPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
+const [showRapportModal, setShowRapportModal] = useState(false);
 
   // Nouveaux états pour l'authentification avant export
   const [showExportAuthModal, setShowExportAuthModal] = useState(false);
@@ -209,6 +212,43 @@ const coursPourNiveau = (liste, niveau) => {
     fetchEtudiants();
     fetchCours();
   }, []);
+useEffect(() => {
+  const checkRapportsAujourdhui = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const role = localStorage.getItem('role');
+      
+      if (!token || role !== 'admin') return;
+
+      const headers = { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+      
+      const res = await fetch('/api/rapports/admin/rapports', { headers });
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+      
+      const rapportsDuJour = data.filter(r => {
+        const dateRapport = new Date(r.date);
+        dateRapport.setHours(0, 0, 0, 0);
+        return dateRapport.getTime() === aujourdhui.getTime();
+      });
+
+      if (rapportsDuJour.length > 0) {
+        setShowRapportModal(true);
+      }
+    } catch (error) {
+      console.error('Erreur vérification rapports:', error);
+    }
+  };
+
+  checkRapportsAujourdhui();
+}, []);
 
   useEffect(() => {
     filtrerEtudiants();
@@ -2105,7 +2145,15 @@ const closeEditModal = () => {
           }}
         />
       )}
- 
+ {showRapportModal && (
+   <RapportNotificationModal 
+     show={showRapportModal}
+     onClose={() => {
+       console.log('🔴 Fermeture du modal');
+       setShowRapportModal(false);
+     }} 
+   />
+ )}
     </div>
   );
 };
