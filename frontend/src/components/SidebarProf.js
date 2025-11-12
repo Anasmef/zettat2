@@ -96,12 +96,12 @@ const SidebarProf = ({ onLogout }) => {
           icon: Clock
     
         },
-    
-    {
-      path: '/professeur/messages',
-      label: 'messages',
-      icon: MessageCircle
+       {
+      path: '/professeur/rapports',
+      label: 'Mes Rapports',
+      icon: FileText
     },
+  
     {
       path: '/ajouter-presence',
       label: 'Enregistrer une présence',
@@ -112,7 +112,11 @@ const SidebarProf = ({ onLogout }) => {
       label: 'Liste des Présences',
       icon: ClipboardList
     },
-
+   {
+      path: '/professeur/messages',
+      label: 'messages',
+      icon: MessageCircle
+    },
     {
       path: '/evenements-prof',
       label: 'Événements',

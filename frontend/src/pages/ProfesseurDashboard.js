@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Users, BookOpen, Calendar, UserX, TrendingUp, Award, Clock, Activity, AlertTriangle, User, X } from 'lucide-react';
-import './AdminDashboard.css'; // ✅ Utilisation du même fichier CSS
+import './AdminDashboard.css';
 import SidebarProf from '../components/SidebarProf';
 import { useNavigate } from 'react-router-dom';
 import HeaderProf from '../components/Headerprof';
-import ModalEmploiSemaine from '../components/ModalEmploiSemaine';
+import ModalMessageRapport from '../components/ModalMessageRapport';
 
 const ProfesseurDashboard = () => {
   const [etudiants, setEtudiants] = useState([]);
@@ -14,7 +14,9 @@ const ProfesseurDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [professeur, setProfesseur] = useState(null);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showRapportModal, setShowRapportModal] = useState(false);
+
+  const navigate = useNavigate();
 
   // Fonction pour calculer la tendance de présence par jour
   const calculerTendancePresence = () => {
@@ -46,88 +48,82 @@ const ProfesseurDashboard = () => {
 
   // Calculs des statistiques en temps réel
   const tendancePresence = calculerTendancePresence();
-const navigate = useNavigate();
 
- useEffect(() => {
-  const fetchInfos = async () => {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-
-    // ✅ Vérification de l'authentification et du rôle
-    if (!token || role !== 'prof') {
-      navigate('/'); // redirection vers la page d'accueil
-      return;
-    }
-
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const [resEt, resCours, resPre] = await Promise.all([
-        fetch('/api/professeur/etudiants', { headers }),
-        fetch('/api/professeur/mes-cours', { headers }),
-        fetch('/api/professeur/presences', { headers })
-      ]);
-
-      if (resEt.ok) {
-        const etudiantsData = await resEt.json();
-        setEtudiants(etudiantsData);
-      }
-      if (resCours.ok) {
-        const coursData = await resCours.json();
-        setCours(coursData);
-      }
-      if (resPre.ok) {
-        const presencesData = await resPre.json();
-        setPresences(presencesData);
-      }
-    } catch (err) {
-      console.error('❌ Erreur chargement:', err);
-      setError(`Erreur de connexion: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchInfos();
-}, [navigate]);
-
-useEffect(() => {
-  const fetchProf = async () => {
-    try {
+  // Charger les données
+  useEffect(() => {
+    const fetchInfos = async () => {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/professeur/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const role = localStorage.getItem('role');
 
-      if (res.ok) {
-        const data = await res.json();
-        setProfesseur(data);
-        
-        // Vérifier si le modal a déjà été affiché pour cet utilisateur
-        const modalShown = localStorage.getItem('welcomeModalShown');
-        if (!modalShown) {
-          setShowWelcomeModal(true);
-        }
+      if (!token || role !== 'prof') {
+        navigate('/');
+        return;
       }
-    } catch (err) {
-      console.error("Erreur de chargement du professeur", err);
-    }
-  };
 
-  fetchProf();
-}, []);
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [resEt, resCours, resPre] = await Promise.all([
+          fetch('/api/professeur/etudiants', { headers }),
+          fetch('/api/professeur/mes-cours', { headers }),
+          fetch('/api/professeur/presences', { headers })
+        ]);
+
+        if (resEt.ok) {
+          const etudiantsData = await resEt.json();
+          setEtudiants(etudiantsData);
+        }
+        if (resCours.ok) {
+          const coursData = await resCours.json();
+          setCours(coursData);
+        }
+        if (resPre.ok) {
+          const presencesData = await resPre.json();
+          setPresences(presencesData);
+        }
+      } catch (err) {
+        console.error('❌ Erreur chargement:', err);
+        setError(`Erreur de connexion: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInfos();
+  }, [navigate]);
+
+  // AFFICHER LE MODAL DE RAPPORTS IMMÉDIATEMENT avant même de charger les données
+  useEffect(() => {
+    // Afficher le modal des rapports IMMÉDIATEMENT
+    setShowRapportModal(true);
+    
+    const fetchProf = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/professeur/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setProfesseur(data);
+        }
+      } catch (err) {
+        console.error("Erreur de chargement du professeur", err);
+      }
+    };
+
+    fetchProf();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
-    localStorage.removeItem('welcomeModalShown'); // Réinitialiser le modal pour la prochaine connexion
     window.location.href = '/';
   };
 
-  const closeWelcomeModal = () => {
-    setShowWelcomeModal(false);
-    // Marquer que le modal a été affiché pour ne plus le montrer
-    localStorage.setItem('welcomeModalShown', 'true');
+  const closeRapportModal = () => {
+    setShowRapportModal(false);
   };
 
   // Calculs des statistiques
@@ -144,7 +140,6 @@ useEffect(() => {
     { name: 'Absents', value: absents, color: '#ef4444' }
   ];
 
-  // Utiliser les vraies données de tendance ou des données de fallback
   const tendanceData = tendancePresence.length > 0 ? tendancePresence : Array.from({ length: 7 }, (_, i) => ({
     jour: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][i],
     presence: Math.floor(Math.random() * 20) + 70
@@ -166,126 +161,6 @@ useEffect(() => {
       </div>
     </div>
   );
-
-  // Modal de bienvenue
-  const WelcomeModal = () => {
-    if (!showWelcomeModal || !professeur) return null;
-
-    const currentDate = new Date().toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    return (
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 1000
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '40px',
-          borderRadius: '20px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          textAlign: 'center',
-          maxWidth: '500px',
-          width: '90%',
-          position: 'relative',
-          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
-        }}>
-          <button
-            onClick={closeWelcomeModal}
-            style={{
-              position: 'absolute',
-              top: '15px',
-              right: '15px',
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#6b7280',
-              padding: '5px'
-            }}
-          >
-            <X size={20} />
-          </button>
-          
-          <div style={{
-            fontSize: '48px',
-            marginBottom: '20px'
-          }}>
-            👋
-          </div>
-          
-          <h2 style={{
-            color: '#1f2937',
-            marginBottom: '15px',
-            fontSize: '28px',
-            fontWeight: '600'
-          }}>
-            Bonjour {professeur.nom || professeur.prenom || 'Professeur'} !
-          </h2>
-          
-          <p style={{
-            color: '#6b7280',
-            fontSize: '16px',
-            marginBottom: '10px'
-          }}>
-            {currentDate}
-          </p>
-          
-          <div style={{
-            backgroundColor: '#10b981',
-            color: 'white',
-            padding: '12px 25px',
-            borderRadius: '25px',
-            display: 'inline-block',
-            fontSize: '16px',
-            fontWeight: '500',
-            marginBottom: '25px'
-          }}>
-            Connexion réussie
-          </div>
-          
-          <p style={{
-            color: '#6b7280',
-            fontSize: '14px',
-            marginBottom: '25px'
-          }}>
-            Bienvenue sur votre tableau de bord professeur
-          </p>
-          
-          <button
-            onClick={closeWelcomeModal}
-            style={{
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              border: 'none',
-              padding: '12px 30px',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-            }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
-          >
-            Commencer
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   if (loading) {
     return (
@@ -326,18 +201,19 @@ useEffect(() => {
   }
 
   return (
-    <div className="admin-dashboard"  style={{
-          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
-        }}> {/* ✅ Utilisation de la même classe principale */}
-    <HeaderProf />
+    <div className="admin-dashboard" style={{
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
+    }}>
+      <HeaderProf />
 
-      {/* Modal de bienvenue */}
-      <WelcomeModal />
+      {/* Modal Info Rapports - S'affiche immédiatement */}
+      <ModalMessageRapport 
+        isOpen={showRapportModal} 
+        onClose={closeRapportModal} 
+      />
+
+      <SidebarProf onLogout={handleLogout} />
       
-      {/* Modal Emploi du Temps */}
-      <ModalEmploiSemaine />
-
-      {/* Header */} <SidebarProf onLogout={handleLogout} /> {/* ✅ Utilisation du composant SidebarProfesseur */}
       <div className="dashboard-header">
         <div
           className="dashboard-header-content"
@@ -348,8 +224,6 @@ useEffect(() => {
             justifyContent: 'center'
           }}
         >
-      
-
           <div className="dashboard-title-section" style={{ textAlign: 'center' }}>
           </div>
         </div>
@@ -364,7 +238,6 @@ useEffect(() => {
         <div className="dashboard-content">
           {/* Cartes de statistiques principales */}
           <div className="stats-grid">
-        
             <StatCard
               title="Classe Actifs"
               value={totalCours}
@@ -484,9 +357,6 @@ useEffect(() => {
               </div>
             </div>
           </div>
-
-          {/* Informations de debug */}
-          
         </div>
       </div>
     </div>

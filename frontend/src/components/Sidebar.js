@@ -167,6 +167,11 @@ const Sidebar = ({ onLogout }) => {
       icon: Lock
     },
     {
+      path: '/admin/rapports',
+      label: 'Rapports',
+      icon: FileText
+    },
+    {
       path: '/admin/Bulletin',
       label: 'Bulletin',
       icon: FileText

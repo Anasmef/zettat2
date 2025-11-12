@@ -81,12 +81,16 @@ import ReclamationsProfesseur
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 import EtudiantPublic from './pages/EtudiantPublic';
+import PageProfesseurRapports from './pages/PageProfesseurRapports';
+
+import MesRapports from './pages/MesRapports';
 
 import HistoriqueEtudiant from './pages/HistoriqueEtudiant';
 import GestionPaiementManagers from './pages/GestionPaiementManagers';
 import DashboardPaiementManager from './pages/DashboardPaiementManager';
 import AdminQRGenerator
  from './pages/AdminQRGenerator';
+ import PageAdminRapports from './pages/PageAdminRapports';
 
 
  import AdminPointagesView from './pages/AdminPointagesView';
@@ -338,8 +342,10 @@ function AppContent() {
         <Route path="/prof/qr-scanner" element={<ProfQRScanner />} />
 
         <Route path="/badge-generator" element={<BadgeGeneratorModern />} />
-
+        <Route path="/professeur/mes-rapports" element={<MesRapports />} />
+        <Route path="/professeur/rapports" element={<PageProfesseurRapports />} />
         {/* Routes Admin */}
+        <Route path="/admin/rapports" element={<PageAdminRapports />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />
         <Route path="/ajouter-paiement" element={<AjouterPaiement />} />

@@ -202,7 +202,7 @@ const KastlerHomepage = () => {
     {
       icon: 'icons/telephone.png',
       title: "Téléphone",
-      content: "+212 5 22 62 81 82",
+      content: "+212 5 22 600 700",
       color: "#10b981"
     },
     {

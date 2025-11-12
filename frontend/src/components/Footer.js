@@ -137,7 +137,7 @@ background: 'linear-gradient(135deg, #e60039 0%, #8a2be2 100%)',
               <div style={{ color: 'white', marginTop: '1rem' }}>
                 <p>130, Bd Ali Yaàta</p>
                 <p>Hay Al Mohammadi, Casablanca</p>
-                <p>+212 5 22 62 81 82</p>
+                <p>+212 5 22 600 700</p>
                 <p>contact@kastler.ma</p>
               </div>
             </div>

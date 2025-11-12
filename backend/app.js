@@ -7,8 +7,11 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
 const QRCodeGen = require('qrcode');
+const PDFDocument = require('pdfkit');
+
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
+const Rapport = require('./models/Rapport'); // 👈 importe ton modèle
 
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
@@ -4187,6 +4190,273 @@ app.get('/api/documents', authEtudiant, async (req, res) => {
   }
 });
 
+// GET - Récupérer les cours du professeur
+app.get('/api/rapports/professeur/mes-cours', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    const cours = await Cours.find({ professeur: professeur.nom });
+    res.json(cours);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Récupérer les étudiants d'un cours spécifique
+app.get('/api/rapports/professeur/etudiants/:cours', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    const coursNom = req.params.cours;
+    
+    // Vérifier que le professeur enseigne ce cours
+    if (!professeur.cours.includes(coursNom)) {
+      return res.status(403).json({ message: 'Accès non autorisé à ce cours' });
+    }
+
+    const etudiants = await Etudiant.find({ 
+      cours: coursNom,
+      actif: true 
+    }).select('nomComplet email niveau anneeScolaire');
+
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST - Créer un nouveau rapport
+app.post('/api/rapports/professeur/rapports', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    const {
+      etudiant,
+      cours,
+      natureProbleme,
+      autreProbleme,
+      descriptionIncident,
+      mesurePrise,
+      autreMesure,
+      observationProfesseur
+    } = req.body;
+
+    // Vérifier que l'étudiant existe
+    const etudiantDoc = await Etudiant.findById(etudiant);
+    if (!etudiantDoc) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // Vérifier que le professeur enseigne ce cours
+    if (!professeur.cours.includes(cours)) {
+      return res.status(403).json({ message: 'Vous n\'enseignez pas ce cours' });
+    }
+
+    // Créer le rapport
+    const nouveauRapport = new Rapport({
+      professeur: professeur._id,
+      etudiant: etudiantDoc._id,
+      cours,
+      anneeScolaire: etudiantDoc.anneeScolaire,
+      niveau: etudiantDoc.niveau,
+      natureProbleme,
+      autreProbleme: natureProbleme.includes('Autre') ? autreProbleme : '',
+      descriptionIncident,
+      mesurePrise,
+      autreMesure: mesurePrise.includes('Autre') ? autreMesure : '',
+      observationProfesseur
+    });
+
+    await nouveauRapport.save();
+
+    res.status(201).json({ 
+      message: 'Rapport créé avec succès',
+      rapport: nouveauRapport
+    });
+  } catch (err) {
+    console.error('Erreur création rapport:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Récupérer tous les rapports du professeur
+app.get('/api/rapports/professeur/mes-rapports', authProfesseur, async (req, res) => {
+  try {
+    const rapports = await Rapport.find({ professeur: req.professeurId })
+      .populate('etudiant', 'nomComplet email')
+      .sort({ date: -1 });
+
+    res.json(rapports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== ROUTES ADMIN - RAPPORTS =====
+
+// GET - Récupérer tous les rapports
+app.get('/api/rapports/admin/rapports', authAdmin, async (req, res) => {
+  try {
+    const { statut, cours, dateDebut, dateFin } = req.query;
+    
+    let query = {};
+    
+    if (statut) {
+      query.statut = statut;
+    }
+    
+    if (cours) {
+      query.cours = cours;
+    }
+    
+    if (dateDebut || dateFin) {
+      query.date = {};
+      if (dateDebut) query.date.$gte = new Date(dateDebut);
+      if (dateFin) query.date.$lte = new Date(dateFin);
+    }
+
+    const rapports = await Rapport.find(query)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire')
+      .sort({ date: -1 });
+
+    res.json(rapports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Récupérer un rapport spécifique
+app.get('/api/rapports/admin/rapports/:id', authAdmin, async (req, res) => {
+  try {
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    res.json(rapport);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT - Mettre à jour le visa de direction
+app.put('/api/rapports/admin/rapports/:id/visa', authAdmin, async (req, res) => {
+  try {
+    const { visaDirection } = req.body;
+
+    const rapport = await Rapport.findByIdAndUpdate(
+      req.params.id,
+      {
+        visaDirection,
+        dateVisa: visaDirection ? new Date() : null,
+        statut: visaDirection ? 'traite' : 'en_attente'
+      },
+      { new: true }
+    ).populate('professeur', 'nom prenom email')
+     .populate('etudiant', 'nomComplet email niveau anneeScolaire');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    res.json({ 
+      message: 'Visa mis à jour avec succès',
+      rapport
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT - Changer le statut d'un rapport
+app.put('/api/rapports/admin/rapports/:id/statut', authAdmin, async (req, res) => {
+  try {
+    const { statut } = req.body;
+
+    if (!['en_attente', 'traite', 'archive'].includes(statut)) {
+      return res.status(400).json({ message: 'Statut invalide' });
+    }
+
+    const rapport = await Rapport.findByIdAndUpdate(
+      req.params.id,
+      { statut },
+      { new: true }
+    ).populate('professeur', 'nom prenom email')
+     .populate('etudiant', 'nomComplet email niveau anneeScolaire');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    res.json({ 
+      message: 'Statut mis à jour avec succès',
+      rapport
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE - Supprimer un rapport
+app.delete('/api/rapports/admin/rapports/:id', authAdmin, async (req, res) => {
+  try {
+    const rapport = await Rapport.findByIdAndDelete(req.params.id);
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    res.json({ message: 'Rapport supprimé avec succès' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Statistiques des rapports
+app.get('/api/rapports/admin/rapports/stats/general', authAdmin, async (req, res) => {
+  try {
+    const total = await Rapport.countDocuments();
+    const enAttente = await Rapport.countDocuments({ statut: 'en_attente' });
+    const traites = await Rapport.countDocuments({ statut: 'traite' });
+    const archives = await Rapport.countDocuments({ statut: 'archive' });
+
+    // Rapports par nature de problème
+    const parNature = await Rapport.aggregate([
+      { $unwind: '$natureProbleme' },
+      { $group: { _id: '$natureProbleme', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Rapports par cours
+    const parCours = await Rapport.aggregate([
+      { $group: { _id: '$cours', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.json({
+      total,
+      parStatut: { enAttente, traites, archives },
+      parNature,
+      parCours
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/professeur/documents', authProfesseur, async (req, res) => {
   try {
     const docs = await Document.find({ creePar: req.professeurId }).sort({ dateUpload: -1 });
@@ -7158,7 +7428,449 @@ app.put('/api/vie-scolaire/:id', authAdminOrPaiementManager, uploadVieScolaire.a
     });
   }
 });
+// ===== ROUTE PROFESSEUR - Télécharger PDF d'un rapport formaté =====
+app.get('/api/rapports/professeur/rapports/:id/pdf', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
 
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    // Vérifier que le rapport appartient au professeur
+    if (rapport.professeur._id.toString() !== req.professeurId.toString()) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Générer le PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    
+    // Headers pour le téléchargement
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=rapport_observation_${rapport._id}.pdf`);
+    
+    doc.pipe(res);
+
+    let currentY = 40; // Position Y de départ
+
+    // === EN-TÊTE AVEC LOGO ET PHOTO ===
+    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
+    
+    // Logo à gauche
+    if (fs.existsSync(logoPath)) {
+      try {
+        doc.image(logoPath, 50, currentY, { width: 100, height: 100 });
+      } catch (error) {
+        console.log('Erreur chargement logo:', error.message);
+      }
+    } else {
+      console.log('Logo non trouvé:', logoPath);
+    }
+
+    // Photo de l'étudiant à droite
+    if (rapport.etudiant.image) {
+      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
+      if (fs.existsSync(photoPath)) {
+        try {
+          doc.image(photoPath, 470, currentY, { width: 70, height: 90, fit: [70, 90] });
+        } catch (error) {
+          console.log('Erreur chargement photo:', error.message);
+        }
+      } else {
+        console.log('Photo non trouvée:', photoPath);
+      }
+    }
+
+    // Titre centré
+    currentY = 60;
+    doc.fontSize(16).font('Helvetica-Bold');
+    doc.text('Rapport', 150, currentY, { width: 250, align: 'center' });
+    
+    currentY += 20;
+    doc.fontSize(14).font('Helvetica');
+    doc.text("D'observation - Comportement des eleves", 150, currentY, { width: 250, align: 'center' });
+    
+    currentY = 150; // Descendre après le logo (qui fait 100px de hauteur)
+
+    // Année scolaire et niveau
+    doc.fontSize(11).font('Helvetica');
+    doc.text(`Annee scolaire : ${rapport.anneeScolaire || '2025 / 2026'}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text(`Niveau / Classe : ${rapport.niveau || '..................'}`, 50, currentY);
+    currentY += 25;
+
+    // Noms des élèves
+    const nomComplet = rapport.etudiant.nomComplet || '';
+    doc.text(`Nom et prenom de l'eleve : ${nomComplet}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text('                           ..............................   /   ..................................', 50, currentY);
+    currentY += 15;
+    
+    doc.text('                           ..............................   /   ..................................', 50, currentY);
+    currentY += 25;
+
+    // Date et professeur
+    const dateRapport = new Date(rapport.date).toLocaleDateString('fr-FR');
+    doc.text(`Date : ${dateRapport}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text(`Professeur : ${rapport.professeur.nom} ${rapport.professeur.prenom}`, 50, currentY);
+    currentY += 30;
+
+    // === NATURE DU PROBLÈME ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Nature du probleme observe :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    
+    const problemesDisponibles = [
+      'Devoirs non faits',
+      'Indiscipline en classe',
+      'Bavardage excessif',
+      "Refus d'obeir",
+      'Violence verbale / physique',
+      'Retard ou absence repetee',
+      'Autre'
+    ];
+
+    problemesDisponibles.forEach(prob => {
+      const isChecked = rapport.natureProbleme.some(np => 
+        np.toLowerCase().includes(prob.toLowerCase().substring(0, 10))
+      );
+      const checkbox = isChecked ? '[X]' : '[ ]';
+      doc.text(`${checkbox} ${prob}`, 60, currentY);
+      currentY += 13;
+    });
+
+    // Autre problème (précision)
+    if (rapport.autreProbleme) {
+      doc.text(`   (a preciser) : ${rapport.autreProbleme}`, 70, currentY);
+      currentY += 15;
+    }
+
+    currentY += 20;
+
+    // === DESCRIPTION DE L'INCIDENT ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text("Description de l'incident :", 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    const descY = currentY;
+    doc.rect(50, descY, 500, 80).stroke();
+    
+    if (rapport.descriptionIncident) {
+      doc.text(rapport.descriptionIncident, 55, descY + 5, {
+        width: 490,
+        height: 70,
+        align: 'justify'
+      });
+    }
+
+    currentY = descY + 85;
+    currentY += 20;
+
+    // === MESURES PRISES ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Mesure prise par le professeur :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    
+    const mesuresDisponibles = [
+      'Observation / remarque orale',
+      'Avertissement ecrit',
+      'Eleve exclu temporairement du cours',
+      'Communication avec les parents',
+      'Autre'
+    ];
+
+    mesuresDisponibles.forEach(mes => {
+      const isChecked = rapport.mesurePrise.some(mp => 
+        mp.toLowerCase().includes(mes.toLowerCase().substring(0, 10))
+      );
+      const checkbox = isChecked ? '[X]' : '[ ]';
+      doc.text(`${checkbox} ${mes}`, 60, currentY);
+      currentY += 13;
+    });
+
+    // Autre mesure (précision)
+    if (rapport.autreMesure) {
+      doc.text(`   ${rapport.autreMesure}`, 70, currentY);
+      currentY += 15;
+    }
+
+    currentY += 20;
+
+    // === OBSERVATIONS DU PROFESSEUR ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Observation du professeur :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    const obsY = currentY;
+    doc.rect(50, obsY, 500, 60).stroke();
+    
+    if (rapport.observationProfesseur) {
+      doc.text(rapport.observationProfesseur, 55, obsY + 5, {
+        width: 490,
+        height: 50,
+        align: 'justify'
+      });
+    }
+
+    currentY = obsY + 65;
+    currentY += 30;
+
+    // === SIGNATURES ===
+    doc.fontSize(11).font('Helvetica');
+    
+    doc.text('Signature du professeur : ..............................', 50, currentY);
+    
+    // Visa de la direction
+    if (rapport.visaDirection) {
+      doc.text(`Visa de la direction : Appose le ${new Date(rapport.dateVisa).toLocaleDateString('fr-FR')}`, 300, currentY);
+    } else {
+      doc.text('Visa de la direction : ...............................', 300, currentY);
+    }
+
+    currentY += 40;
+
+    doc.end();
+  } catch (err) {
+    console.error('Erreur generation PDF:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// ===== ROUTE ADMIN - Générer PDF d'un rapport formaté =====
+app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req, res) => {
+  try {
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    // Générer le PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    
+    // Headers pour le téléchargement
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=rapport_observation_${rapport._id}.pdf`);
+    
+    doc.pipe(res);
+
+    let currentY = 40; // Position Y de départ
+
+    // === EN-TÊTE AVEC LOGO ET PHOTO ===
+    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
+    
+    // Logo à gauche
+    if (fs.existsSync(logoPath)) {
+      try {
+        doc.image(logoPath, 50, currentY, { width: 100, height: 100 });
+      } catch (error) {
+        console.log('Erreur chargement logo:', error.message);
+      }
+    } else {
+      console.log('Logo non trouvé:', logoPath);
+    }
+
+    // Photo de l'étudiant à droite
+    if (rapport.etudiant.image) {
+      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
+      if (fs.existsSync(photoPath)) {
+        try {
+          doc.image(photoPath, 470, currentY, { width: 70, height: 90, fit: [70, 90] });
+        } catch (error) {
+          console.log('Erreur chargement photo:', error.message);
+        }
+      } else {
+        console.log('Photo non trouvée:', photoPath);
+      }
+    }
+
+    // Titre centré
+    currentY = 60;
+    doc.fontSize(16).font('Helvetica-Bold');
+    doc.text('Rapport', 150, currentY, { width: 250, align: 'center' });
+    
+    currentY += 20;
+    doc.fontSize(14).font('Helvetica');
+    doc.text("D'observation - Comportement des eleves", 150, currentY, { width: 250, align: 'center' });
+    
+    currentY = 150; // Descendre après le logo (qui fait 100px de hauteur)
+
+    // Année scolaire et niveau
+    doc.fontSize(11).font('Helvetica');
+    doc.text(`Annee scolaire : ${rapport.anneeScolaire || '2025 / 2026'}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text(`Niveau / Classe : ${rapport.niveau || '..................'}`, 50, currentY);
+    currentY += 25;
+
+    // Noms des élèves
+    const nomComplet = rapport.etudiant.nomComplet || '';
+    doc.text(`Nom et prenom de l'eleve : ${nomComplet}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text('                           ..............................   /   ..................................', 50, currentY);
+    currentY += 15;
+    
+    doc.text('                           ..............................   /   ..................................', 50, currentY);
+    currentY += 25;
+
+    // Date et professeur
+    const dateRapport = new Date(rapport.date).toLocaleDateString('fr-FR');
+    doc.text(`Date : ${dateRapport}`, 50, currentY);
+    currentY += 15;
+    
+    doc.text(`Professeur : ${rapport.professeur.nom} ${rapport.professeur.prenom}`, 50, currentY);
+    currentY += 30;
+
+    // === NATURE DU PROBLÈME ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Nature du probleme observe :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    
+    const problemesDisponibles = [
+      'Devoirs non faits',
+      'Indiscipline en classe',
+      'Bavardage excessif',
+      "Refus d'obeir",
+      'Violence verbale / physique',
+      'Retard ou absence repetee',
+      'Autre'
+    ];
+
+    problemesDisponibles.forEach(prob => {
+      const isChecked = rapport.natureProbleme.some(np => 
+        np.toLowerCase().includes(prob.toLowerCase().substring(0, 10))
+      );
+      const checkbox = isChecked ? '[X]' : '[ ]';
+      doc.text(`${checkbox} ${prob}`, 60, currentY);
+      currentY += 13;
+    });
+
+    // Autre problème (précision)
+    if (rapport.autreProbleme) {
+      doc.text(`   (a preciser) : ${rapport.autreProbleme}`, 70, currentY);
+      currentY += 15;
+    }
+
+    currentY += 20;
+
+    // === DESCRIPTION DE L'INCIDENT ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text("Description de l'incident :", 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    const descY = currentY;
+    doc.rect(50, descY, 500, 80).stroke();
+    
+    if (rapport.descriptionIncident) {
+      doc.text(rapport.descriptionIncident, 55, descY + 5, {
+        width: 490,
+        height: 70,
+        align: 'justify'
+      });
+    }
+
+    currentY = descY + 85;
+    currentY += 20;
+
+    // === MESURES PRISES ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Mesure prise par le professeur :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    
+    const mesuresDisponibles = [
+      'Observation / remarque orale',
+      'Avertissement ecrit',
+      'Eleve exclu temporairement du cours',
+      'Communication avec les parents',
+      'Autre'
+    ];
+
+    mesuresDisponibles.forEach(mes => {
+      const isChecked = rapport.mesurePrise.some(mp => 
+        mp.toLowerCase().includes(mes.toLowerCase().substring(0, 10))
+      );
+      const checkbox = isChecked ? '[X]' : '[ ]';
+      doc.text(`${checkbox} ${mes}`, 60, currentY);
+      currentY += 13;
+    });
+
+    // Autre mesure (précision)
+    if (rapport.autreMesure) {
+      doc.text(`   ${rapport.autreMesure}`, 70, currentY);
+      currentY += 15;
+    }
+
+    currentY += 20;
+
+    // === OBSERVATIONS DU PROFESSEUR ===
+    doc.fontSize(12).font('Helvetica-Bold');
+    doc.text('Observation du professeur :', 50, currentY);
+    currentY += 20;
+    
+    doc.fontSize(10).font('Helvetica');
+    const obsY = currentY;
+    doc.rect(50, obsY, 500, 60).stroke();
+    
+    if (rapport.observationProfesseur) {
+      doc.text(rapport.observationProfesseur, 55, obsY + 5, {
+        width: 490,
+        height: 50,
+        align: 'justify'
+      });
+    }
+
+    currentY = obsY + 65;
+    currentY += 30;
+
+    // === SIGNATURES ===
+    doc.fontSize(11).font('Helvetica');
+    
+    doc.text('Signature du professeur : ..............................', 50, currentY);
+    
+    // Visa de la direction
+    if (rapport.visaDirection) {
+      doc.text(`Visa de la direction : Appose le ${new Date(rapport.dateVisa).toLocaleDateString('fr-FR')}`, 300, currentY);
+    } else {
+      doc.text('Visa de la direction : ...............................', 300, currentY);
+    }
+
+    currentY += 40;
+
+    doc.end();
+  } catch (err) {
+    console.error('Erreur generation PDF:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
 app.delete('/api/vie-scolaire/:id', authAdminOrPaiementManager, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
