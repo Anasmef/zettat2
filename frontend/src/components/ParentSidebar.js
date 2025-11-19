@@ -1,45 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  GraduationCap,
-  Lock,
-  School,
-  Clock,
+  Home,
   Users,
-  BookOpen,
-  CreditCard,
-  Plus,
   AlertTriangle,
-  Wallet,
   FileText,
-  Calendar,
-  ClipboardList,
   LogOut,
   Menu,
   X,
-  MessageCircle,
-  Home,
-  User,
-  Shield,
-  QrCode,
-  Newspaper,
-  UserPlus,
-  DollarSign,
-  Settings
+  Languages
 } from 'lucide-react';
 
-const Sidebar = ({ onLogout }) => {
+const ParentSidebar = ({ onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [userRole, setUserRole] = useState('');
+  const [language, setLanguage] = useState('fr');
 
-  // Get user role from localStorage
+  // Charger la langue depuis localStorage
   useEffect(() => {
-    const role = localStorage.getItem('role');
-    setUserRole(role || '');
+    const savedLang = localStorage.getItem('parentLanguage') || 'fr';
+    setLanguage(savedLang);
   }, []);
+
+  // Sauvegarder la langue
+  const toggleLanguage = () => {
+    const newLang = language === 'fr' ? 'ar' : 'fr';
+    setLanguage(newLang);
+    localStorage.setItem('parentLanguage', newLang);
+  };
 
   // Detect mobile screen size
   useEffect(() => {
@@ -76,283 +66,52 @@ const Sidebar = ({ onLogout }) => {
     }
   };
 
-  // Navigation items for Admin
-  const adminNavigationItems = [
+  // Traductions
+  const translations = {
+    fr: {
+      title: 'Alfred Kastler',
+      role: 'Parent',
+      dashboard: 'Tableau de Bord',
+      children: 'Mes Enfants',
+      absences: 'Absences',
+      reports: 'Rapports',
+      logout: 'Déconnexion'
+    },
+    ar: {
+      title: 'Alfred Kastler',
+      role: 'ولي الأمر',
+      dashboard: 'لوحة التحكم',
+      children: 'أبنائي',
+      absences: 'الغيابات',
+      reports: 'التقارير',
+      logout: 'تسجيل الخروج'
+    }
+  };
+
+  const t = translations[language];
+
+  // Navigation items for Parent avec traductions
+  const navigationItems = [
     {
-      path: '/admin',
-      label: 'Dashboard',
+      path: '/parent/dashboard',
+      labelFr: 'Tableau de Bord',
+      labelAr: 'لوحة التحكم',
       icon: Home
     },
-    {
-      path: '/update-profil',
-      label: 'Profil',
-      icon: Shield,
-    },
-    {
-      path: '/liste-classe',
-      label: 'Classes',
-      icon: BookOpen
-    },
-    {
-      path: '/liste-etudiants',
-      label: 'Étudiants',
-      icon: Users
-    },
-    {
-      path: '/liste-professeurs',
-      label: 'Professeurs',
-      icon: User
-    },
-    {
-      path: '/admin/qr-generator',
-      label: 'QR Code Generator',
-      icon: QrCode
-    },
-    {
-      path: '/admin/pointages',
-      label: 'Gestion Professeurs',
-      icon: Users
-    },
-    
-
 
     {
-      path: '/admin/historique-etudiant',
-      label: 'Historique Étudiant',
-      icon: BookOpen
-    },
-    {
-      path: '/admin/reclamations',
-      label: 'Réclamations',
-      icon: MessageCircle
-    },
-    {
-      path: '/ajouter-paiement',
-      label: 'Nouveau Paiement',
-      icon: Plus
-    },
-    {
-      path: '/liste-paiements',
-      label: 'Paiements',
-      icon: CreditCard
-    },
-    {
-      path: '/paiements-exp',
-      label: 'Paiements Expirés',
+      path: '/parent/absences',
+      labelFr: 'Absences',
+      labelAr: 'الغيابات',
       icon: AlertTriangle
     },
     {
-      path: '/admin/seances',
-      label: 'Séances',
-      icon: Clock
-    },
-    {
-      path: '/admin/messages',
-      label: 'Messages',
-      icon: MessageCircle
-    },
-    {
-      path: '/calendrier',
-      label: 'Calendrier',
-      icon: Calendar
-    },
-    {
-      path: '/liste-presences',
-      label: 'Liste Présences',
-      icon: ClipboardList
-    },
-    {
-      path: '/admin/autorisations',
-      label: 'Autorisations',
-      icon: Lock
-    },
-    {
-      path: '/admin/rapports',
-      label: 'Rapports',
+      path: '/parent/rapports',
+      labelFr: 'Rapports',
+      labelAr: 'التقارير',
       icon: FileText
-    },
-    {
-      path: '/admin/Bulletin',
-      label: 'Bulletin',
-      icon: FileText
-    },
-    {
-      path: '/badge-generator',
-      label: 'Badge Generator',
-      icon: QrCode
-    },
-    {
-      path: '/admin/gestionnaire-paiement',
-      label: 'Manager',
-      icon: Wallet
-    },
-    {
-      path: '/admin/gestion-parents',
-      label: 'Gestion Parents',
-      icon: Users
-    },
-    {
-      path: '/admin/inscripteur',
-      label: 'Inscripteurs',
-      icon: UserPlus
     }
   ];
-
-  // Navigation items for Inscripteur (extended permissions)
-  const inscripteurNavigationItems = [
-    {
-      path: '/admin/inscripteurs',
-      label: 'Dashboard',
-      icon: Home
-    },
-    {
-      path: '/liste-classe',
-      label: 'Classes',
-      icon: BookOpen
-    },
-    {
-      path: '/liste-etudiants',
-      label: 'Étudiants',
-      icon: Users
-    },
-    {
-      path: '/liste-professeurs',
-      label: 'Professeurs',
-      icon: User
-    },
-    {
-      path: '/admin/seances',
-      label: 'Séances',
-      icon: Clock
-    },
-    {
-      path: '/calendrier',
-      label: 'Calendrier',
-      icon: Calendar
-    },
-    {
-      path: '/liste-presences',
-      label: 'Liste Présences',
-      icon: ClipboardList
-    }
-  ];
-
-  // Navigation items for Paiement Manager
-  const paiementManagerNavigationItems = [
-    {
-      path: '/manager',
-      label: 'Dashboard',
-      icon: Home
-    },
-    {
-      path: '/admin/Manager',
-      label: 'Gestion Prix',
-      icon: Settings
-    },
-    {
-      path: '/ajouter-paiement',
-      label: 'Nouveau Paiement',
-      icon: Plus
-    },
-    {
-      path: '/liste-paiements',
-      label: 'Liste Paiements',
-      icon: CreditCard
-    },
-    {
-      path: '/paiements-exp',
-      label: 'Paiements Expirés',
-      icon: AlertTriangle
-    }
-  ];
-
-  // Get navigation items based on role
-  const getNavigationItems = () => {
-    switch (userRole) {
-      case 'admin':
-        return adminNavigationItems;
-      case 'inscripteur':
-        return inscripteurNavigationItems;
-      case 'paiement_manager':
-        return paiementManagerNavigationItems;
-      default:
-        return adminNavigationItems; // Default fallback
-    }
-  };
-
-  const navigationItems = getNavigationItems();
-
-  // Get sidebar title based on role
-  const getSidebarTitle = () => {
-    switch (userRole) {
-      case 'admin':
-        return 'Alfred Kastler - Admin';
-      case 'inscripteur':
-        return 'Alfred Kastler - Inscripteur';
-      case 'prof':
-        return 'Alfred Kastler - Professeur';
-      case 'etudiant':
-        return 'Alfred Kastler - Étudiant';
-      case 'paiement_manager':
-        return 'Alfred Kastler - Manager';
-      default:
-        return 'Alfred Kastler';
-    }
-  };
-
-  // Get header color based on role
-  const getHeaderGradient = () => {
-    switch (userRole) {
-      case 'admin':
-        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
-      case 'inscripteur':
-        return 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
-      case 'prof':
-        return 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)';
-      case 'etudiant':
-        return 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)';
-      case 'paiement_manager':
-        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)'; // Même bleu que admin
-      default:
-        return 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)';
-    }
-  };
-
-  // Get role display name
-  const getRoleDisplayName = () => {
-    switch (userRole) {
-      case 'admin':
-        return 'Administrateur';
-      case 'inscripteur':
-        return 'Inscripteur';
-      case 'prof':
-        return 'Professeur';
-      case 'etudiant':
-        return 'Étudiant';
-      case 'paiement_manager':
-        return 'Gestionnaire';
-      default:
-        return 'Utilisateur';
-    }
-  };
-
-  // Get role icon
-  const getRoleIcon = () => {
-    switch (userRole) {
-      case 'admin':
-        return GraduationCap;
-      case 'inscripteur':
-        return UserPlus;
-      case 'prof':
-        return User;
-      case 'etudiant':
-        return GraduationCap;
-      case 'paiement_manager':
-        return DollarSign;
-      default:
-        return GraduationCap;
-    }
-  };
 
   const isActive = (path) => location.pathname === path;
 
@@ -363,8 +122,6 @@ const Sidebar = ({ onLogout }) => {
     closeSidebar();
   };
 
-  const RoleIcon = getRoleIcon();
-
   return (
     <div>
       <style jsx>{`
@@ -374,32 +131,36 @@ const Sidebar = ({ onLogout }) => {
           --sidebar-bg: #ffffff;
           --sidebar-border: #e5e7eb;
           --sidebar-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          --primary-color: #4f46e5; /* Couleur bleue pour tous les rôles */
+          --primary-color: #4f46e5;
           --primary-hover: #4338ca;
           --primary-light: #eef2ff;
           --text-primary: #1f2937;
           --text-secondary: #6b7280;
           --text-muted: #9ca3af;
           --hover-bg: #f9fafb;
-          --active-bg: #eef2ff; /* Couleur bleue pour tous les rôles */
+          --active-bg: #eef2ff;
           --border-radius: 12px;
           --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          --header-gradient: ${getHeaderGradient()};
+          --header-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
           --logout-color: #dc2626;
           --logout-hover: #b91c1c;
           --logout-bg: #fef2f2;
         }
 
-        /* Reset and base styles */
         * {
           box-sizing: border-box;
+        }
+
+        /* Direction RTL pour l'arabe */
+        .rtl {
+          direction: rtl;
         }
 
         /* Toggle Button */
         .sidebar-toggle {
           position: fixed;
           top: 20px;
-          left: ${isOpen ? 'calc(var(--sidebar-width) + 20px)' : '20px'};
+          ${language === 'ar' ? 'right' : 'left'}: ${isOpen ? 'calc(var(--sidebar-width) + 20px)' : '20px'};
           z-index: 1001;
           background: var(--primary-color);
           color: white;
@@ -418,14 +179,14 @@ const Sidebar = ({ onLogout }) => {
 
         @media (max-width: 768px) {
           .sidebar-toggle {
-            left: 20px !important;
+            ${language === 'ar' ? 'right' : 'left'}: 20px !important;
           }
         }
 
         .sidebar-toggle:hover {
           background: var(--primary-hover);
           transform: translateY(-2px);
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 25px 50px -12px rgba(79, 70, 229, 0.4);
         }
 
         /* Overlay pour mobile */
@@ -451,18 +212,18 @@ const Sidebar = ({ onLogout }) => {
         .sidebar {
           position: fixed;
           top: 0;
-          left: 0;
+          ${language === 'ar' ? 'right' : 'left'}: 0;
           width: var(--sidebar-width);
           height: 100vh;
           background: var(--sidebar-bg);
-          border-right: 1px solid var(--sidebar-border);
+          ${language === 'ar' ? 'border-left' : 'border-right'}: 1px solid var(--sidebar-border);
           box-shadow: var(--sidebar-shadow);
           z-index: 999;
           display: flex;
           flex-direction: column;
           transition: var(--transition);
           overflow: hidden;
-          transform: translateX(-100%);
+          transform: translateX(${language === 'ar' ? '100%' : '-100%'});
         }
 
         .sidebar.show {
@@ -482,7 +243,7 @@ const Sidebar = ({ onLogout }) => {
           content: '';
           position: absolute;
           top: -50%;
-          right: -50%;
+          ${language === 'ar' ? 'left' : 'right'}: -50%;
           width: 100px;
           height: 100px;
           background: rgba(255, 255, 255, 0.1);
@@ -494,7 +255,7 @@ const Sidebar = ({ onLogout }) => {
           content: '';
           position: absolute;
           bottom: -25%;
-          left: -25%;
+          ${language === 'ar' ? 'right' : 'left'}: -25%;
           width: 60px;
           height: 60px;
           background: rgba(255, 255, 255, 0.1);
@@ -506,7 +267,7 @@ const Sidebar = ({ onLogout }) => {
           display: flex;
           align-items: center;
           gap: 12px;
-          font-size: ${userRole === 'inscripteur' ? '18px' : '20px'};
+          font-size: 20px;
           font-weight: 700;
           color: white;
           margin: 0;
@@ -516,7 +277,7 @@ const Sidebar = ({ onLogout }) => {
           text-align: center;
         }
 
-        .sidebar-title .header-icon {
+        .header-icon {
           width: 32px;
           height: 32px;
           padding: 6px;
@@ -538,6 +299,29 @@ const Sidebar = ({ onLogout }) => {
           font-weight: 600;
           margin-top: 4px;
           backdrop-filter: blur(10px);
+        }
+
+        /* Bouton de langue */
+        .language-toggle {
+          margin-top: 12px;
+          padding: 6px 12px;
+          background: rgba(255, 255, 255, 0.2);
+          border: none;
+          border-radius: 20px;
+          color: white;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: var(--transition);
+          backdrop-filter: blur(10px);
+        }
+
+        .language-toggle:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: scale(1.05);
         }
 
         /* Navigation */
@@ -575,7 +359,7 @@ const Sidebar = ({ onLogout }) => {
           gap: 12px;
           padding: 12px 16px;
           width: 100%;
-          text-align: left;
+          text-align: ${language === 'ar' ? 'right' : 'left'};
           border: none;
           background: transparent;
           color: var(--text-secondary);
@@ -586,26 +370,26 @@ const Sidebar = ({ onLogout }) => {
           transition: var(--transition);
           position: relative;
           overflow: hidden;
-          font-family: inherit;
+          font-family: ${language === 'ar' ? 'Arial, sans-serif' : 'inherit'};
         }
 
         .nav-item::before {
           content: '';
           position: absolute;
           top: 0;
-          left: 0;
+          ${language === 'ar' ? 'right' : 'left'}: 0;
           width: 4px;
           height: 100%;
           background: var(--primary-color);
           transform: scaleY(0);
           transition: var(--transition);
-          border-radius: 0 4px 4px 0;
+          border-radius: ${language === 'ar' ? '0 4px 4px 0' : '4px 0 0 4px'};
         }
 
         .nav-item:hover {
           background: var(--hover-bg);
           color: var(--text-primary);
-          transform: translateX(4px);
+          transform: translateX(${language === 'ar' ? '-4px' : '4px'});
         }
 
         .nav-item:hover::before {
@@ -625,7 +409,6 @@ const Sidebar = ({ onLogout }) => {
           background: var(--active-bg);
           color: var(--primary-color);
           font-weight: 600;
-          border-right: 4px solid var(--primary-color);
         }
 
         .nav-item.active::before {
@@ -633,23 +416,11 @@ const Sidebar = ({ onLogout }) => {
         }
 
         .nav-item.active .nav-icon-wrapper {
-          background: #c7d2fe; /* Couleur bleue pour tous les rôles */
+          background: #c7d2fe;
         }
 
         .nav-item.active .nav-icon {
           color: var(--primary-color);
-        }
-
-        .nav-item.active::after {
-          content: '';
-          position: absolute;
-          right: 16px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 8px;
-          height: 8px;
-          background: var(--primary-color);
-          border-radius: 50%;
         }
 
         .nav-icon-wrapper {
@@ -683,7 +454,7 @@ const Sidebar = ({ onLogout }) => {
           gap: 12px;
           padding: 12px 16px;
           width: 100%;
-          text-align: left;
+          text-align: ${language === 'ar' ? 'right' : 'left'};
           border: none;
           background: transparent;
           color: var(--logout-color);
@@ -693,7 +464,7 @@ const Sidebar = ({ onLogout }) => {
           cursor: pointer;
           transition: var(--transition);
           position: relative;
-          font-family: inherit;
+          font-family: ${language === 'ar' ? 'Arial, sans-serif' : 'inherit'};
         }
 
         .logout-btn:hover {
@@ -753,10 +524,10 @@ const Sidebar = ({ onLogout }) => {
           outline-offset: 2px;
         }
 
-        /* Animations d'entrée */
-        @keyframes slideInLeft {
+        /* Animations */
+        @keyframes slideIn {
           from {
-            transform: translateX(-100%);
+            transform: translateX(${language === 'ar' ? '100%' : '-100%'});
             opacity: 0;
           }
           to {
@@ -765,21 +536,8 @@ const Sidebar = ({ onLogout }) => {
           }
         }
 
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
         .sidebar.show {
-          animation: slideInLeft 0.3s ease-out;
-        }
-
-        .sidebar-overlay.show {
-          animation: fadeIn 0.3s ease-out;
+          animation: slideIn 0.3s ease-out;
         }
       `}</style>
 
@@ -787,7 +545,7 @@ const Sidebar = ({ onLogout }) => {
       <button
         className="sidebar-toggle"
         onClick={toggleSidebar}
-        title={isOpen ? "Fermer le menu" : "Ouvrir le menu"}
+        title={isOpen ? t.logout : t.dashboard}
       >
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
@@ -801,14 +559,18 @@ const Sidebar = ({ onLogout }) => {
       )}
 
       {/* Sidebar */}
-      <div className={`sidebar ${isOpen ? 'show' : ''}`}>
+      <div className={`sidebar ${isOpen ? 'show' : ''} ${language === 'ar' ? 'rtl' : ''}`}>
         <div className="sidebar-header">
           <h3 className="sidebar-title">
-          
-            Alfred Kastler
-            <span className="role-badge">
-              {getRoleDisplayName()}
-            </span>
+            <div className="header-icon">
+              <Users size={20} />
+            </div>
+            {t.title}
+            <span className="role-badge">{t.role}</span>
+            <button className="language-toggle" onClick={toggleLanguage}>
+              <Languages size={14} />
+              {language === 'fr' ? 'عربي' : 'Français'}
+            </button>
           </h3>
         </div>
 
@@ -816,6 +578,7 @@ const Sidebar = ({ onLogout }) => {
           <div className="nav-section">
             {navigationItems.map((item) => {
               const IconComponent = item.icon;
+              const label = language === 'fr' ? item.labelFr : item.labelAr;
               return (
                 <button
                   key={item.path}
@@ -825,7 +588,7 @@ const Sidebar = ({ onLogout }) => {
                   <div className="nav-icon-wrapper">
                     <IconComponent className="nav-icon" />
                   </div>
-                  {item.label}
+                  {label}
                 </button>
               );
             })}
@@ -837,7 +600,7 @@ const Sidebar = ({ onLogout }) => {
             <div className="logout-icon-wrapper">
               <LogOut className="logout-icon" />
             </div>
-            Déconnexion
+            {t.logout}
           </button>
         </div>
       </div>
@@ -845,4 +608,4 @@ const Sidebar = ({ onLogout }) => {
   );
 };
 
-export default Sidebar;
+export default ParentSidebar;

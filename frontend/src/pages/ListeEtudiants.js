@@ -7,7 +7,6 @@ import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 import ExportEtudiants from '../components/ExportEtudiants';
 import { Download } from 'lucide-react'; // Si pas déjà importé
 import RapportNotificationModal from '../components/RapportNotificationModal';
-
 import { 
   User, 
   CheckCircle, 
@@ -69,7 +68,7 @@ const [formAjout, setFormAjout] = useState({
   telephoneMere: '',
   codeMassar: '',
   adresse: '',
-  email: '@gmail.com',
+  email: '@kastler.com',
   motDePasse: '',
   transport: false,
   cours: [],

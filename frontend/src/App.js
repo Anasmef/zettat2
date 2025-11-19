@@ -75,14 +75,17 @@ import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
 import ReclamationsProfesseur
  from './pages/ReclamationsProfesseur';
 
+import  GestionParents from './pages/GestionParents';
  import  BadgeGeneratorModern
  from './pages/BadgeGeneratorModern';
-
+        import ParentDashboard from './pages/ParentDashboard';
+import ParentAbsences from './pages/ParentAbsences';
 import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 import EtudiantPublic from './pages/EtudiantPublic';
 import PageProfesseurRapports from './pages/PageProfesseurRapports';
 
+import ParentRapports from './pages/ParentRapports';
 import MesRapports from './pages/MesRapports';
 
 import ListePresencesmanager from './pages/ListePresencesmanager';
@@ -364,10 +367,11 @@ function AppContent() {
         <Route path="/admin/seances" element={<AdminAjouterSeance />} />
         <Route path="/etudiant/seances" element={<SeancesEtudiant />} />
         <Route path="/professeur/seances" element={<SeancesProfesseur />} />
+
+<Route path="/parent/dashboard" element={<ParentDashboard />} />
         <Route path="/admin/Bulletin" element={<AdminBulletins />} />
         <Route path="/manager/messages" element={<AdminMessagesmanager />} />
-
-
+        <Route path="/admin/gestion-parents" element={<GestionParents />} />
         <Route path="/manager/liste-presences" element={<ListePresencesmanager />} />
         <Route path="/etudiant/Bulletin" element={<EtudiantBulletins />} />
         <Route path="/professeur/AjouterBulletin" element={<ProfAjouterBulletin />} />
@@ -399,6 +403,9 @@ function AppContent() {
 <Route path="/professeur/reclamations" element={<ReclamationsProfesseur />} />
 
 <Route path="/admin/qr-generator" element={<AdminQRGenerator />} />
+
+ <Route path="/parent/absences" element={< ParentAbsences />} />  
+ <Route path="/parent/rapports" element={< ParentRapports />} />  
 
 <Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
 <Route path="/admin/reclamations" element={<ReclamationsAdmin />} />

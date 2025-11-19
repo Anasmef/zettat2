@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer');
 const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
 const QRCodeGen = require('qrcode');
 const PDFDocument = require('pdfkit');
+const Parent = require('./models/Parent'); // ← AJOUTER CETTE LIGNE
 
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
@@ -78,7 +79,84 @@ const storage = multer.diskStorage({
     cb(null, file.fieldname + '-' + uniqueSuffix + ext);
   }
 });
+// ============================================
+// MIDDLEWARE D'AUTHENTIFICATION PARENT
+// ============================================
 
+// Middleware pour vérifier si c'est un parent authentifié
+const authParent = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Accès refusé. Token manquant.' });
+    }
+
+    const decoded = jwt.verify(token, 'jwt_secret_key');
+    
+    if (decoded.role !== 'parent') {
+      return res.status(403).json({ message: 'Accès réservé aux parents.' });
+    }
+
+    const parent = await Parent.findById(decoded.id);
+    
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé.' });
+    }
+
+    if (!parent.actif) {
+      return res.status(403).json({ message: 'Votre compte est désactivé.' });
+    }
+
+    req.user = parent;
+    req.userId = parent._id;
+    next();
+  } catch (err) {
+    console.error('Erreur auth parent:', err);
+    return res.status(401).json({ message: 'Token invalide.' });
+  }
+};
+
+// Middleware pour admin OU parent
+const authAdminOrParent = async (req, res, next) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'Accès refusé. Token manquant.' });
+    }
+
+    const decoded = jwt.verify(token, 'jwt_secret_key');
+    
+    if (decoded.role === 'admin') {
+      const admin = await Admin.findById(decoded.id);
+      if (!admin) {
+        return res.status(404).json({ message: 'Admin non trouvé.' });
+      }
+      req.user = admin;
+      req.userId = admin._id;
+      req.role = 'admin';
+    } else if (decoded.role === 'parent') {
+      const parent = await Parent.findById(decoded.id);
+      if (!parent) {
+        return res.status(404).json({ message: 'Parent non trouvé.' });
+      }
+      if (!parent.actif) {
+        return res.status(403).json({ message: 'Votre compte est désactivé.' });
+      }
+      req.user = parent;
+      req.userId = parent._id;
+      req.role = 'parent';
+    } else {
+      return res.status(403).json({ message: 'Accès refusé.' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('Erreur auth admin ou parent:', err);
+    return res.status(401).json({ message: 'Token invalide.' });
+  }
+};
 const upload = multer({ storage: storage });
 app.use('/uploads', express.static('uploads'));
 app.get('/api/evenements/public', async (req, res) => {
@@ -206,7 +284,6 @@ app.post('/api/documents', (req, res, next) => {
   }
 });
 
-// ✅ Login Admin
 app.post('/api/login', async (req, res) => {
   try {
     console.log('🔐 Tentative de connexion reçue');
@@ -240,7 +317,6 @@ app.post('/api/login', async (req, res) => {
         { expiresIn: '7d' }
       );
       
-      // Ne pas retourner le mot de passe
       const adminSafe = { ...admin.toObject() };
       delete adminSafe.motDePasse;
       
@@ -249,6 +325,45 @@ app.post('/api/login', async (req, res) => {
         token, 
         role: 'admin' 
       });
+    }
+
+    // ✅ Essayer comme parent
+    console.log('🔍 Recherche parent...');
+    const parent = await Parent.findOne({ email: normalizedEmail });
+    console.log('👨‍👩‍👧 Parent trouvé:', !!parent);
+    
+    if (parent) {
+      const passwordMatch = await parent.comparePassword(motDePasse);
+      console.log('✅ Password match:', passwordMatch);
+      
+      if (passwordMatch) {
+        if (!parent.actif) {
+          console.log('❌ Parent inactif');
+          return res.status(403).json({ 
+            message: '⛔ Votre compte est inactif. Contactez l\'administration.' 
+          });
+        }
+
+        console.log('✅ Parent authentifié avec succès');
+        
+        // Mise à jour de lastSeen
+        parent.lastSeen = new Date();
+        await parent.save();
+
+        const token = jwt.sign(
+          { id: parent._id, role: 'parent' }, 
+          'jwt_secret_key', 
+          { expiresIn: '7d' }
+        );
+        
+        const parentSafe = parent.toSafeObject();
+
+        return res.json({ 
+          user: parentSafe, 
+          token, 
+          role: 'parent' 
+        });
+      }
     }
 
     // ✅ Essayer comme inscripteur
@@ -266,7 +381,6 @@ app.post('/api/login', async (req, res) => {
 
       console.log('✅ Inscripteur authentifié avec succès');
       
-      // Mise à jour de lastSeen
       inscripteur.lastSeen = new Date();
       await inscripteur.save();
 
@@ -306,7 +420,6 @@ app.post('/api/login', async (req, res) => {
 
         console.log('✅ Gestionnaire authentifié avec succès');
         
-        // Mise à jour de lastSeen
         paiementManager.lastSeen = new Date();
         await paiementManager.save();
 
@@ -316,7 +429,6 @@ app.post('/api/login', async (req, res) => {
           { expiresIn: '7d' }
         );
         
-        // Utiliser la méthode toSafeObject si elle existe
         const managerSafe = paiementManager.toSafeObject ? 
           paiementManager.toSafeObject() : 
           (() => {
@@ -333,7 +445,7 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    // ✅ Essayer comme professeur (si le modèle existe)
+    // ✅ Essayer comme professeur
     if (typeof Professeur !== 'undefined') {
       console.log('🔍 Recherche professeur...');
       const professeur = await Professeur.findOne({ email: normalizedEmail });
@@ -348,7 +460,6 @@ app.post('/api/login', async (req, res) => {
 
         console.log('✅ Professeur authentifié avec succès');
 
-        // Mise à jour de lastSeen
         professeur.lastSeen = new Date();
         await professeur.save();
 
@@ -374,7 +485,7 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
-    // ✅ Essayer comme étudiant (si le modèle existe)
+    // ✅ Essayer comme étudiant
     if (typeof Etudiant !== 'undefined') {
       console.log('🔍 Recherche étudiant...');
       const etudiant = await Etudiant.findOne({ email: normalizedEmail });
@@ -389,7 +500,6 @@ app.post('/api/login', async (req, res) => {
 
         console.log('✅ Etudiant authentifié avec succès');
 
-        // Mise à jour de lastSeen
         etudiant.lastSeen = new Date();
         await etudiant.save();
 
@@ -4962,7 +5072,513 @@ app.get('/api/professeur/notifications', authProfesseur, async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
 });
+// ============================================
+// ROUTES PARENTS - CRUD ADMIN
+// ============================================
 
+// 📋 Récupérer tous les parents (Admin)
+app.get('/api/admin/parents', authAdmin, async (req, res) => {
+  try {
+    const parents = await Parent.find()
+      .populate('enfants', 'nomComplet email niveau anneeScolaire')
+      .populate('creeParAdmin', 'nom prenom email')
+      .select('-motDePasse')
+      .sort({ createdAt: -1 });
+
+    res.json(parents);
+  } catch (err) {
+    console.error('Erreur récupération parents:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔍 Récupérer un parent par ID (Admin)
+app.get('/api/admin/parents/:id', authAdmin, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.params.id)
+      .populate('enfants', 'nomComplet email niveau anneeScolaire telephoneEtudiant')
+      .populate('creeParAdmin', 'nom prenom email')
+      .select('-motDePasse');
+
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
+
+    res.json(parent);
+  } catch (err) {
+    console.error('Erreur récupération parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ➕ Créer un nouveau parent (Admin)
+app.post('/api/admin/parents', authAdmin, async (req, res) => {
+  try {
+    const { nomComplet, email, motDePasse, telephone, enfants } = req.body;
+
+    // Validation
+    if (!nomComplet || !email || !motDePasse) {
+      return res.status(400).json({ 
+        message: 'Nom complet, email et mot de passe sont requis' 
+      });
+    }
+
+    // Vérifier si l'email existe déjà
+    const existingParent = await Parent.findOne({ email: email.toLowerCase() });
+    if (existingParent) {
+      return res.status(400).json({ 
+        message: 'Un parent avec cet email existe déjà' 
+      });
+    }
+
+    // Vérifier que les enfants existent
+    if (enfants && enfants.length > 0) {
+      const etudiants = await Etudiant.find({ _id: { $in: enfants } });
+      if (etudiants.length !== enfants.length) {
+        return res.status(400).json({ 
+          message: 'Un ou plusieurs étudiants sélectionnés n\'existent pas' 
+        });
+      }
+    }
+
+    // Créer le parent
+    const parent = new Parent({
+      nomComplet,
+      email: email.toLowerCase(),
+      motDePasse,
+      telephone,
+      enfants: enfants || [],
+      creeParAdmin: req.userId,
+      actif: true
+    });
+
+    await parent.save();
+
+    // Retourner le parent sans le mot de passe
+    const parentSafe = await Parent.findById(parent._id)
+      .populate('enfants', 'nomComplet email niveau')
+      .select('-motDePasse');
+
+    res.status(201).json(parentSafe);
+  } catch (err) {
+    console.error('Erreur création parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✏️ Modifier un parent (Admin)
+app.put('/api/admin/parents/:id', authAdmin, async (req, res) => {
+  try {
+    const { nomComplet, email, telephone, enfants, actif, motDePasse } = req.body;
+
+    const parent = await Parent.findById(req.params.id);
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
+
+    // Vérifier l'unicité de l'email si modifié
+    if (email && email.toLowerCase() !== parent.email) {
+      const existingParent = await Parent.findOne({ 
+        email: email.toLowerCase(),
+        _id: { $ne: req.params.id }
+      });
+      if (existingParent) {
+        return res.status(400).json({ 
+          message: 'Un parent avec cet email existe déjà' 
+        });
+      }
+      parent.email = email.toLowerCase();
+    }
+
+    // Vérifier les enfants si modifiés
+    if (enfants && enfants.length > 0) {
+      const etudiants = await Etudiant.find({ _id: { $in: enfants } });
+      if (etudiants.length !== enfants.length) {
+        return res.status(400).json({ 
+          message: 'Un ou plusieurs étudiants sélectionnés n\'existent pas' 
+        });
+      }
+      parent.enfants = enfants;
+    }
+
+    // Mettre à jour les champs
+    if (nomComplet) parent.nomComplet = nomComplet;
+    if (telephone !== undefined) parent.telephone = telephone;
+    if (actif !== undefined) parent.actif = actif;
+    
+    // Changer le mot de passe si fourni
+    if (motDePasse && motDePasse.trim() !== '') {
+      parent.motDePasse = motDePasse;
+    }
+
+    await parent.save();
+
+    // Retourner le parent mis à jour
+    const parentUpdated = await Parent.findById(parent._id)
+      .populate('enfants', 'nomComplet email niveau anneeScolaire')
+      .select('-motDePasse');
+
+    res.json(parentUpdated);
+  } catch (err) {
+    console.error('Erreur modification parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🗑️ Supprimer un parent (Admin)
+app.delete('/api/admin/parents/:id', authAdmin, async (req, res) => {
+  try {
+    const parent = await Parent.findByIdAndDelete(req.params.id);
+    
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
+
+    res.json({ message: 'Parent supprimé avec succès', parent });
+  } catch (err) {
+    console.error('Erreur suppression parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔄 Activer/Désactiver un parent (Admin)
+app.patch('/api/admin/parents/:id/toggle-actif', authAdmin, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.params.id);
+    
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
+
+    parent.actif = !parent.actif;
+    await parent.save();
+
+    const parentUpdated = await Parent.findById(parent._id)
+      .populate('enfants', 'nomComplet email')
+      .select('-motDePasse');
+
+    res.json(parentUpdated);
+  } catch (err) {
+    console.error('Erreur toggle actif parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});// ============================================
+// ROUTES ESPACE PARENT - CONSULTATION
+// ============================================
+
+// 👤 Profil du parent connecté
+// Route pour récupérer le profil parent avec TOUTES les informations des enfants
+app.get('/api/parents/me', authParent, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.userId)
+      .populate({
+        path: 'enfants',
+        select: 'nomComplet email niveau anneeScolaire telephoneEtudiant image genre dateNaissance lieuNaissance nationalite codeMassar cours actif adresse transport nomCompletPere nomCompletMere travailPere travailMere telephonePere telephoneMere'
+      })
+      .select('-motDePasse');
+
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
+
+    res.json(parent);
+  } catch (err) {
+    console.error('Erreur récupération profil parent:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📊 Absences de tous les enfants du parent
+app.get('/api/parents/enfants/absences', authParent, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.userId).populate('enfants');
+    
+    if (!parent || !parent.enfants || parent.enfants.length === 0) {
+      return res.json([]);
+    }
+
+    const enfantsIds = parent.enfants.map(e => e._id);
+
+    // Récupérer toutes les absences des enfants
+    const absences = await Presence.find({
+      etudiant: { $in: enfantsIds },
+      present: false
+    })
+    .populate('etudiant', 'nomComplet email niveau anneeScolaire')
+    .sort({ dateSession: -1 })
+    .lean();
+
+    // Grouper par enfant
+    const absencesParEnfant = {};
+    absences.forEach(abs => {
+      const etudiantId = abs.etudiant._id.toString();
+      if (!absencesParEnfant[etudiantId]) {
+        absencesParEnfant[etudiantId] = {
+          etudiant: abs.etudiant,
+          absences: [],
+          total: 0
+        };
+      }
+      absencesParEnfant[etudiantId].absences.push(abs);
+      absencesParEnfant[etudiantId].total++;
+    });
+
+    res.json(Object.values(absencesParEnfant));
+  } catch (err) {
+    console.error('Erreur récupération absences:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// Route pour récupérer les présences d'un enfant spécifique
+app.get('/api/parents/enfants/:enfantId/presences', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    const { date } = req.query;
+
+    // Vérifier que cet enfant appartient bien au parent connecté
+    const parent = await Parent.findById(req.userId);
+    if (!parent || !parent.enfants.includes(enfantId)) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Construire la requête
+    let query = { etudiant: enfantId };
+
+    // Filtrer par date si spécifié
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      
+      query.dateSession = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    }
+
+    // Récupérer les présences
+    const presences = await Presence.find(query)
+      .sort({ dateSession: -1, heure: -1 })
+      .lean();
+
+    res.json(presences);
+  } catch (err) {
+    console.error('Erreur récupération présences:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour récupérer les présences d'aujourd'hui
+app.get('/api/parents/enfants/:enfantId/presences/today', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+
+    // Vérifier que cet enfant appartient bien au parent connecté
+    const parent = await Parent.findById(req.userId);
+    if (!parent || !parent.enfants.includes(enfantId)) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Date d'aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Récupérer les présences d'aujourd'hui
+    const presences = await Presence.find({
+      etudiant: enfantId,
+      dateSession: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    })
+    .sort({ heure: -1 })
+    .lean();
+
+    res.json(presences);
+  } catch (err) {
+    console.error('Erreur récupération présences du jour:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// 📋 Rapports de tous les enfants du parent
+app.get('/api/parents/enfants/rapports', authParent, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.userId).populate('enfants');
+    
+    if (!parent || !parent.enfants || parent.enfants.length === 0) {
+      return res.json([]);
+    }
+
+    const enfantsIds = parent.enfants.map(e => e._id);
+
+    // Récupérer tous les rapports des enfants
+    const rapports = await Rapport.find({
+      etudiant: { $in: enfantsIds }
+    })
+    .populate('etudiant', 'nomComplet email niveau anneeScolaire')
+    .populate('professeur', 'nom prenom email')
+    .sort({ date: -1 })
+    .lean();
+
+    // Grouper par enfant
+    const rapportsParEnfant = {};
+    rapports.forEach(rapport => {
+      const etudiantId = rapport.etudiant._id.toString();
+      if (!rapportsParEnfant[etudiantId]) {
+        rapportsParEnfant[etudiantId] = {
+          etudiant: rapport.etudiant,
+          rapports: [],
+          total: 0
+        };
+      }
+      rapportsParEnfant[etudiantId].rapports.push(rapport);
+      rapportsParEnfant[etudiantId].total++;
+    });
+
+    res.json(Object.values(rapportsParEnfant));
+  } catch (err) {
+    console.error('Erreur récupération rapports:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📊 Statistiques d'un enfant spécifique
+app.get('/api/parents/enfants/:enfantId/stats', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    
+    // Vérifier que l'enfant appartient bien au parent
+    const parent = await Parent.findById(req.userId);
+    if (!parent.enfants.includes(enfantId)) {
+      return res.status(403).json({ 
+        message: 'Vous n\'avez pas accès aux données de cet étudiant' 
+      });
+    }
+
+    // Statistiques de présence
+    const totalPresences = await Presence.countDocuments({ etudiant: enfantId });
+    const absences = await Presence.countDocuments({ 
+      etudiant: enfantId, 
+      present: false 
+    });
+    const presences = await Presence.countDocuments({ 
+      etudiant: enfantId, 
+      present: true 
+    });
+    const retards = await Presence.countDocuments({ 
+      etudiant: enfantId, 
+      present: true,
+      retardMinutes: { $gt: 0 }
+    });
+
+    // Statistiques de rapports
+    const totalRapports = await Rapport.countDocuments({ etudiant: enfantId });
+    const rapportsEnAttente = await Rapport.countDocuments({ 
+      etudiant: enfantId, 
+      statut: 'en_attente' 
+    });
+
+    // Taux de présence
+    const tauxPresence = totalPresences > 0 
+      ? Math.round((presences / totalPresences) * 100) 
+      : 0;
+
+    res.json({
+      presences: {
+        total: totalPresences,
+        present: presences,
+        absent: absences,
+        retards: retards,
+        tauxPresence
+      },
+      rapports: {
+        total: totalRapports,
+        enAttente: rapportsEnAttente
+      }
+    });
+  } catch (err) {
+    console.error('Erreur récupération stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📅 Absences d'un enfant spécifique avec filtres
+app.get('/api/parents/enfants/:enfantId/absences', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    const { dateDebut, dateFin } = req.query;
+    
+    // Vérifier que l'enfant appartient bien au parent
+    const parent = await Parent.findById(req.userId);
+    if (!parent.enfants.includes(enfantId)) {
+      return res.status(403).json({ 
+        message: 'Vous n\'avez pas accès aux données de cet étudiant' 
+      });
+    }
+
+    let query = { 
+      etudiant: enfantId, 
+      present: false 
+    };
+
+    // Filtres de date
+    if (dateDebut || dateFin) {
+      query.dateSession = {};
+      if (dateDebut) query.dateSession.$gte = new Date(dateDebut);
+      if (dateFin) query.dateSession.$lte = new Date(dateFin);
+    }
+
+    const absences = await Presence.find(query)
+      .sort({ dateSession: -1 })
+      .lean();
+
+    res.json(absences);
+  } catch (err) {
+    console.error('Erreur récupération absences enfant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📋 Rapports d'un enfant spécifique avec filtres
+app.get('/api/parents/enfants/:enfantId/rapports', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    const { dateDebut, dateFin, statut } = req.query;
+    
+    // Vérifier que l'enfant appartient bien au parent
+    const parent = await Parent.findById(req.userId);
+    if (!parent.enfants.includes(enfantId)) {
+      return res.status(403).json({ 
+        message: 'Vous n\'avez pas accès aux données de cet étudiant' 
+      });
+    }
+
+    let query = { etudiant: enfantId };
+
+    // Filtres
+    if (statut) {
+      query.statut = statut;
+    }
+    
+    if (dateDebut || dateFin) {
+      query.date = {};
+      if (dateDebut) query.date.$gte = new Date(dateDebut);
+      if (dateFin) query.date.$lte = new Date(dateFin);
+    }
+
+    const rapports = await Rapport.find(query)
+      .populate('professeur', 'nom prenom email')
+      .sort({ date: -1 });
+
+    res.json(rapports);
+  } catch (err) {
+    console.error('Erreur récupération rapports enfant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ✅ Route pour obtenir la liste des notifications supprimées (debug)
 app.get('/api/notifications/deleted', authAdminOrInscripteurOrPaiementManager, (req, res) => {
   try {

@@ -46,11 +46,17 @@ const RapportNotificationModal = ({ onClose, show }) => {
       const aujourdhui = new Date();
       aujourdhui.setHours(0, 0, 0, 0);
       
+      // ✅ FILTRER : Seulement les rapports du jour ET non traités
       const rapportsDuJour = data.filter(r => {
         const dateRapport = new Date(r.date);
         dateRapport.setHours(0, 0, 0, 0);
-        return dateRapport.getTime() === aujourdhui.getTime();
+        
+        // Vérifier que c'est aujourd'hui ET que le statut n'est pas "traité"
+        return dateRapport.getTime() === aujourdhui.getTime() 
+               && r.statut !== 'traite';
       });
+
+      console.log('📊 Rapports non traités aujourd\'hui:', rapportsDuJour.length);
 
       setRapportsAujourdhui(rapportsDuJour);
       setIsLoading(false);
@@ -73,6 +79,15 @@ const RapportNotificationModal = ({ onClose, show }) => {
     if (nature.includes('Devoirs')) return '#f59e0b';
     if (nature.includes('Retard')) return '#3b82f6';
     return '#6b7280';
+  };
+
+  const getStatutBadge = (statut) => {
+    const styles = {
+      en_attente: { bg: '#fef3c7', color: '#92400e', text: 'En attente' },
+      traite: { bg: '#d1fae5', color: '#065f46', text: 'Traité' },
+      archive: { bg: '#e5e7eb', color: '#374151', text: 'Archivé' }
+    };
+    return styles[statut] || styles.en_attente;
   };
 
   const handleClose = (e) => {
@@ -111,13 +126,13 @@ const RapportNotificationModal = ({ onClose, show }) => {
     );
   }
 
+  // ✅ Si aucun rapport non traité, ne pas afficher le modal
   if (rapportsAujourdhui.length === 0) {
-    console.log('⚠️ Aucun rapport trouvé, modal ne s\'affiche pas');
+    console.log('⚠️ Aucun rapport non traité aujourd\'hui');
     return null;
   }
 
-  console.log('📊 Affichage du modal avec', rapportsAujourdhui.length, 'rapports');
-  console.log('🔧 onClose type:', typeof onClose);
+  console.log('📊 Affichage du modal avec', rapportsAujourdhui.length, 'rapports non traités');
 
   return (
     <div style={s.overlay} onClick={handleOverlayClick}>
@@ -132,7 +147,7 @@ const RapportNotificationModal = ({ onClose, show }) => {
                 <div>
                   <h2 style={s.title}>Nouveaux Rapports</h2>
                   <p style={s.subtitle}>
-                    {rapportsAujourdhui.length} rapport{rapportsAujourdhui.length > 1 ? 's' : ''} aujourd'hui
+                    {rapportsAujourdhui.length} rapport{rapportsAujourdhui.length > 1 ? 's' : ''} non traité{rapportsAujourdhui.length > 1 ? 's' : ''} aujourd'hui
                   </p>
                 </div>
               </div>
@@ -259,10 +274,21 @@ const RapportNotificationModal = ({ onClose, show }) => {
                       </span>
                     </div>
                   )}
+                  <div style={s.detailItem}>
+                    <span style={s.label}>Statut</span>
+                    <span 
+                      style={{
+                        ...s.statutBadge,
+                        backgroundColor: getStatutBadge(selectedRapport.statut).bg,
+                        color: getStatutBadge(selectedRapport.statut).color
+                      }}
+                    >
+                      {getStatutBadge(selectedRapport.statut).text}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* ✅ Nouvelle section pour les contacts */}
               {(selectedRapport.etudiant?.telephonePere || selectedRapport.etudiant?.telephoneMere) && (
                 <div style={s.section}>
                   <h3 style={s.sectionTitle}>
@@ -649,6 +675,20 @@ const s = {
     fontWeight: '600',
     border: '1px solid #93c5fd'
   },
+  statutBadge: {
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600',
+    display: 'inline-block'
+  },
+  phoneLink: {
+    fontSize: '14px',
+    color: '#2563eb',
+    fontWeight: '500',
+    textDecoration: 'none',
+    cursor: 'pointer'
+  },
   footer: {
     padding: '16px',
     background: '#f9fafb',
@@ -683,7 +723,6 @@ const s = {
   }
 };
 
-// Animations CSS
 const style = document.createElement('style');
 style.textContent = `
   @keyframes fadeIn {
@@ -717,4 +756,4 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-export default RapportNotificationModal;
+export default RapportNotificationModal

@@ -54,7 +54,9 @@ const handleLogin = async () => {
       setTimeout(() => {
         if (data.role === 'admin') {
           window.location.href = '/admin';
-        } else if (data.role === 'inscripteur') { // ✅ Nouveau cas ajouté
+        } else if (data.role === 'parent') { // ✅ Nouveau cas ajouté
+          window.location.href = '/parent/dashboard';
+        }else if (data.role === 'inscripteur') { // ✅ Nouveau cas ajouté
           window.location.href = '/admin/inscripteurs';
         } else if (data.role === 'prof') {
           window.location.href = '/professeur';
