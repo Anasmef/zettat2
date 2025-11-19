@@ -124,6 +124,12 @@ const [formAjout, setFormAjout] = useState({
   const [loadingModifier, setLoadingModifier] = useState(false);
   const [etudiantAModifier, setEtudiantAModifier] = useState(null);
   
+  // États pour le modal de suppression
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteCode, setDeleteCode] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [etudiantASupprimer, setEtudiantASupprimer] = useState(null);
+  
   const navigate = useNavigate();
 
   // Niveaux disponibles mis à jour selon vos spécifications
@@ -639,18 +645,42 @@ const closeEditModal = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("🛑 Êtes-vous sûr de vouloir supprimer cet étudiant ?")) return;
+  const handleDelete = (etudiant) => {
+    setEtudiantASupprimer(etudiant);
+    setDeleteCode('');
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async (e) => {
+    e.preventDefault();
+    
+    if (deleteCode !== 'allahakbir') {
+      setDeleteError('❌ Code incorrect. Veuillez réessayer.');
+      return;
+    }
 
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`/api/etudiants/${id}`, {
+      await axios.delete(`/api/etudiants/${etudiantASupprimer._id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setEtudiants(etudiants.filter(e => e._id !== id));
+      setEtudiants(etudiants.filter(e => e._id !== etudiantASupprimer._id));
+      setShowDeleteModal(false);
+      setEtudiantASupprimer(null);
+      setDeleteCode('');
+      setDeleteError('');
     } catch (err) {
       console.error('Erreur suppression:', err);
+      setDeleteError('❌ Erreur lors de la suppression');
     }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setEtudiantASupprimer(null);
+    setDeleteCode('');
+    setDeleteError('');
   };
 
   const handleEdit = (etudiant) => {
@@ -1075,7 +1105,7 @@ const closeEditModal = () => {
                           Modifier
                         </button>
                         <button 
-                          onClick={() => handleDelete(e._id)}
+                          onClick={() => handleDelete(e)}
                           title="Supprimer"
                           style={{
                             background: '#dc2626',
@@ -1211,7 +1241,7 @@ const closeEditModal = () => {
               <RotateCcw size={16} />
             </button>
             <button 
-              onClick={() => handleDelete(e._id)}
+              onClick={() => handleDelete(e)}
               className="btn-carte btn-supprimer"
               title="Supprimer"
             >
@@ -2153,6 +2183,109 @@ const closeEditModal = () => {
      }} 
    />
  )}
+
+      {/* Modal de suppression d'étudiant */}
+      {showDeleteModal && etudiantASupprimer && (
+        <div className="modal-overlay" onClick={closeDeleteModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '400px'}}>
+            <div className="modal-header">
+              <h3>⚠️ Confirmer la suppression</h3>
+              <button className="btn-fermer-modal" onClick={closeDeleteModal}>×</button>
+            </div>
+            
+            <form onSubmit={handleConfirmDelete} className="form-delete-etudiant">
+              <div style={{marginBottom: '16px', color: '#333'}}>
+                <p style={{marginBottom: '12px'}}>
+                  <strong>Êtes-vous sûr de vouloir supprimer cet étudiant ?</strong>
+                </p>
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fca5a5',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  marginBottom: '12px'
+                }}>
+                  <p style={{margin: '0', fontSize: '14px'}}>
+                    <strong>Étudiant:</strong> {etudiantASupprimer.nomComplet}
+                  </p>
+                  <p style={{margin: '4px 0 0 0', fontSize: '14px', color: '#666'}}>
+                    <strong>Email:</strong> {etudiantASupprimer.email}
+                  </p>
+                </div>
+                <p style={{fontSize: '12px', color: '#666', marginBottom: '12px'}}>
+                  Cette action est irréversible. Entrez le code de confirmation pour continuer.
+                </p>
+              </div>
+
+              <div className="form-group" style={{marginBottom: '12px'}}>
+                <label style={{display: 'block', marginBottom: '6px', fontWeight: 'bold'}}>
+                  Code de suppression
+                </label>
+                <input
+                  type="password"
+                  value={deleteCode}
+                  onChange={(e) => setDeleteCode(e.target.value)}
+                  placeholder="Entrez le code..."
+                  required
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <small style={{display: 'block', marginTop: '4px', color: '#999'}}>
+                  Entrez le code secret pour confirmer la suppression
+                </small>
+              </div>
+
+              {deleteError && (
+                <div className="message-ajout error" style={{marginBottom: '12px'}}>
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="modal-actions" style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                <button 
+                  type="button" 
+                  onClick={closeDeleteModal} 
+                  className="btn-annuler"
+                  style={{
+                    background: '#e5e7eb',
+                    color: '#333',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-enregistrer"
+                  style={{
+                    background: '#dc2626',
+                    color: 'white',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  Supprimer
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
