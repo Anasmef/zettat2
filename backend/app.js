@@ -7,8 +7,8 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon votre structure
 const QRCodeGen = require('qrcode');
-const PDFDocument = require('pdfkit');
 const Parent = require('./models/Parent'); // ← AJOUTER CETTE LIGNE
+const pdfMake = require('pdfmake');
 
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
@@ -4366,6 +4366,368 @@ app.get('/api/dashboard/stats', authAdminOrInscripteurOrPaiementManager, async (
   }
 });
 
+const fonts = {
+  Amiri: {
+    normal: path.join(__dirname, 'fonts', 'Amiri-Regular.ttf'),
+    bold: path.join(__dirname, 'fonts', 'Amiri-Bold.ttf'),
+    italics: path.join(__dirname, 'fonts', 'Amiri-Regular.ttf'),
+    bolditalics: path.join(__dirname, 'fonts', 'Amiri-Bold.ttf')
+  }
+};
+
+const printer = new pdfMake(fonts);
+
+// ============================================
+// ROUTE PROFESSEUR - Générer PDF
+// ============================================
+
+
+// ============================================
+// ROUTE PROFESSEUR - PDF UNE SEULE PAGE
+// ============================================
+app.get('/api/rapports/professeur/rapports/:id/pdf', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    if (rapport.professeur._id.toString() !== req.professeurId.toString()) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    let logoBase64 = null;
+    let photoBase64 = null;
+
+    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = 'data:image/jpeg;base64,' + fs.readFileSync(logoPath).toString('base64');
+    }
+
+    if (rapport.etudiant && rapport.etudiant.image) {
+      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
+      if (fs.existsSync(photoPath)) {
+        const ext = path.extname(photoPath).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+        photoBase64 = `data:${mime};base64,` + fs.readFileSync(photoPath).toString('base64');
+      }
+    }
+
+    // ✅ SYMBOLES UNIVERSELS - Compatible avec toutes les polices
+    const natureProbleme = rapport.natureProbleme || [];
+    const mesurePrise = rapport.mesurePrise || [];
+
+    // Problèmes - Vérification exacte avec symboles [X] et [ ]
+    const prob1 = natureProbleme.includes('Devoirs non faits') ? '[X]' : '[ ]';
+    const prob2 = natureProbleme.includes('Indiscipline en classe') ? '[X]' : '[ ]';
+    const prob3 = natureProbleme.includes('Bavardage excessif') ? '[X]' : '[ ]';
+    const prob4 = natureProbleme.includes("Refus d'obéir") || natureProbleme.includes("Refus d'obeir") ? '[X]' : '[ ]';
+    const prob5 = natureProbleme.includes('Violence verbale / physique') || natureProbleme.includes('Violence verbale/physique') ? '[X]' : '[ ]';
+    const prob6 = natureProbleme.includes('Retard ou absence répétée') || natureProbleme.includes('Retard ou absence repetee') ? '[X]' : '[ ]';
+    const prob7 = natureProbleme.includes('Autre') ? '[X]' : '[ ]';
+
+    // Mesures - Vérification exacte avec symboles [X] et [ ]
+    const mes1 = mesurePrise.includes('Observation / remarque orale') || mesurePrise.includes('Observation/remarque orale') ? '[X]' : '[ ]';
+    const mes2 = mesurePrise.includes('Avertissement écrit') || mesurePrise.includes('Avertissement ecrit') ? '[X]' : '[ ]';
+    const mes3 = mesurePrise.includes('Élève exclu temporairement du cours') || mesurePrise.includes('Eleve exclu temporairement du cours') || mesurePrise.includes('Élève exclu temporairement') ? '[X]' : '[ ]';
+    const mes4 = mesurePrise.includes('Communication avec les parents') || mesurePrise.includes('Communication avec parents') ? '[X]' : '[ ]';
+    const mes5 = mesurePrise.includes('Autre') ? '[X]' : '[ ]';
+
+    console.log('=== VÉRIFICATION CHECKBOXES (Professeur) ===');
+    console.log('prob1 (Devoirs):', prob1);
+    console.log('prob7 (Autre):', prob7);
+    console.log('mes2 (Avertissement):', mes2);
+    console.log('==========================================');
+
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [30, 25, 30, 25],
+      defaultStyle: { font: 'Amiri', fontSize: 10 },
+      content: [
+        // EN-TÊTE
+        {
+          columns: [
+            logoBase64 ? { image: logoBase64, width: 75, height: 75 } : { text: '', width: 75 },
+            {
+              stack: [
+                { text: 'Rapport d\'observation', fontSize: 16, bold: true, alignment: 'center', margin: [0, 12, 0, 3] },
+                { text: 'Comportement des élèves', fontSize: 11, alignment: 'center' }
+              ],
+              width: '*'
+            },
+            photoBase64 ? { image: photoBase64, width: 55, height: 70 } : { text: '', width: 55 }
+          ],
+          margin: [0, 0, 0, 15]
+        },
+
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 0.5, lineColor: '#666' }], margin: [0, 0, 0, 12] },
+
+        {
+          columns: [
+            { text: [{ text: 'Année scolaire : ', bold: true }, rapport.anneeScolaire || '2025/2026'], width: '50%' },
+            { text: [{ text: 'Niveau/Classe : ', bold: true }, rapport.niveau || '...........'], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        {
+          columns: [
+            { text: [{ text: 'Élève : ', bold: true }, rapport.etudiant?.nomComplet || ''], width: '50%' },
+            { text: [{ text: 'Date : ', bold: true }, new Date(rapport.date).toLocaleDateString('fr-FR')], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        { text: [{ text: 'Professeur : ', bold: true }, `${rapport.professeur?.prenom || ''} ${rapport.professeur?.nom || ''}`], margin: [0, 0, 0, 15] },
+
+        // NATURE PROBLÈME
+        { text: 'Nature du problème observé :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: prob1 + ' Devoirs non faits', margin: [8, 0, 0, 4] },
+              { text: prob2 + ' Indiscipline en classe', margin: [8, 0, 0, 4] },
+              { text: prob3 + ' Bavardage excessif', margin: [8, 0, 0, 4] },
+              { text: prob4 + ' Refus d\'obéir', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: prob5 + ' Violence verbale/physique', margin: [8, 0, 0, 4] },
+              { text: prob6 + ' Retard/absence répétée', margin: [8, 0, 0, 4] },
+              { text: prob7 + ' Autre' + (rapport.autreProbleme ? ': ' + rapport.autreProbleme : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // DESCRIPTION
+        { text: "Description de l'incident :", bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [55], body: [[{ text: rapport.descriptionIncident || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 12]
+        },
+
+        // MESURES
+        { text: 'Mesure prise par le professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: mes1 + ' Observation/remarque orale', margin: [8, 0, 0, 4] },
+              { text: mes2 + ' Avertissement écrit', margin: [8, 0, 0, 4] },
+              { text: mes3 + ' Élève exclu temporairement', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: mes4 + ' Communication avec parents', margin: [8, 0, 0, 4] },
+              { text: mes5 + ' Autre' + (rapport.autreMesure ? ': ' + rapport.autreMesure : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // OBSERVATIONS
+        { text: 'Observation du professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [45], body: [[{ text: rapport.observationProfesseur || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 20]
+        },
+
+        // SIGNATURES
+        {
+          columns: [
+            { stack: [{ text: 'Signature du professeur :', bold: true }, { text: '\n.....................................' }], width: '50%' },
+            { stack: [
+              { text: 'Visa de la direction :', bold: true, alignment: 'right' },
+              { text: rapport.visaDirection ? '\nApposé le ' + new Date(rapport.dateVisa).toLocaleDateString('fr-FR') : '\n.....................................', alignment: 'right' }
+            ], width: '50%' }
+          ]
+        }
+      ]
+    };
+
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=rapport_' + rapport._id + '.pdf');
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+
+  } catch (err) {
+    console.error('Erreur PDF:', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================
+// ROUTE ADMIN - PDF UNE SEULE PAGE
+// ============================================
+app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req, res) => {
+  try {
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    let logoBase64 = null;
+    let photoBase64 = null;
+
+    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = 'data:image/jpeg;base64,' + fs.readFileSync(logoPath).toString('base64');
+    }
+
+    if (rapport.etudiant && rapport.etudiant.image) {
+      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
+      if (fs.existsSync(photoPath)) {
+        const ext = path.extname(photoPath).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+        photoBase64 = `data:${mime};base64,` + fs.readFileSync(photoPath).toString('base64');
+      }
+    }
+
+    const nomProf = rapport.professeur ? (rapport.professeur.prenom || '') + ' ' + (rapport.professeur.nom || '') : 'Non renseigné';
+
+    // ✅ SYMBOLES UNIVERSELS - Compatible avec toutes les polices
+    const natureProbleme = rapport.natureProbleme || [];
+    const mesurePrise = rapport.mesurePrise || [];
+
+    // Problèmes - Vérification exacte avec symboles [X] et [ ]
+    const prob1 = natureProbleme.includes('Devoirs non faits') ? '[X]' : '[ ]';
+    const prob2 = natureProbleme.includes('Indiscipline en classe') ? '[X]' : '[ ]';
+    const prob3 = natureProbleme.includes('Bavardage excessif') ? '[X]' : '[ ]';
+    const prob4 = natureProbleme.includes("Refus d'obéir") || natureProbleme.includes("Refus d'obeir") ? '[X]' : '[ ]';
+    const prob5 = natureProbleme.includes('Violence verbale / physique') || natureProbleme.includes('Violence verbale/physique') ? '[X]' : '[ ]';
+    const prob6 = natureProbleme.includes('Retard ou absence répétée') || natureProbleme.includes('Retard ou absence repetee') ? '[X]' : '[ ]';
+    const prob7 = natureProbleme.includes('Autre') ? '[X]' : '[ ]';
+
+    // Mesures - Vérification exacte avec symboles [X] et [ ]
+    const mes1 = mesurePrise.includes('Observation / remarque orale') || mesurePrise.includes('Observation/remarque orale') ? '[X]' : '[ ]';
+    const mes2 = mesurePrise.includes('Avertissement écrit') || mesurePrise.includes('Avertissement ecrit') ? '[X]' : '[ ]';
+    const mes3 = mesurePrise.includes('Élève exclu temporairement du cours') || mesurePrise.includes('Eleve exclu temporairement du cours') || mesurePrise.includes('Élève exclu temporairement') ? '[X]' : '[ ]';
+    const mes4 = mesurePrise.includes('Communication avec les parents') || mesurePrise.includes('Communication avec parents') ? '[X]' : '[ ]';
+    const mes5 = mesurePrise.includes('Autre') ? '[X]' : '[ ]';
+
+    console.log('=== VÉRIFICATION CHECKBOXES (Admin) ===');
+    console.log('prob1 (Devoirs non faits):', prob1);
+    console.log('prob7 (Autre):', prob7);
+    console.log('mes2 (Avertissement écrit):', mes2);
+    console.log('=======================================');
+
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [30, 25, 30, 25],
+      defaultStyle: { font: 'Amiri', fontSize: 10 },
+      content: [
+        // EN-TÊTE
+        {
+          columns: [
+            logoBase64 ? { image: logoBase64, width: 75, height: 75 } : { text: '', width: 75 },
+            {
+              stack: [
+                { text: 'Rapport d\'observation', fontSize: 16, bold: true, alignment: 'center', margin: [0, 12, 0, 3] },
+                { text: 'Comportement des élèves', fontSize: 11, alignment: 'center' }
+              ],
+              width: '*'
+            },
+            photoBase64 ? { image: photoBase64, width: 55, height: 70 } : { text: '', width: 55 }
+          ],
+          margin: [0, 0, 0, 15]
+        },
+
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 0.5, lineColor: '#666' }], margin: [0, 0, 0, 12] },
+
+        {
+          columns: [
+            { text: [{ text: 'Année scolaire : ', bold: true }, rapport.anneeScolaire || '2025/2026'], width: '50%' },
+            { text: [{ text: 'Niveau/Classe : ', bold: true }, rapport.niveau || '...........'], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        {
+          columns: [
+            { text: [{ text: 'Élève : ', bold: true }, rapport.etudiant?.nomComplet || ''], width: '50%' },
+            { text: [{ text: 'Date : ', bold: true }, new Date(rapport.date).toLocaleDateString('fr-FR')], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        { text: [{ text: 'Professeur : ', bold: true }, nomProf.trim()], margin: [0, 0, 0, 15] },
+
+        // NATURE PROBLÈME
+        { text: 'Nature du problème observé :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: prob1 + ' Devoirs non faits', margin: [8, 0, 0, 4] },
+              { text: prob2 + ' Indiscipline en classe', margin: [8, 0, 0, 4] },
+              { text: prob3 + ' Bavardage excessif', margin: [8, 0, 0, 4] },
+              { text: prob4 + ' Refus d\'obéir', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: prob5 + ' Violence verbale/physique', margin: [8, 0, 0, 4] },
+              { text: prob6 + ' Retard/absence répétée', margin: [8, 0, 0, 4] },
+              { text: prob7 + ' Autre' + (rapport.autreProbleme ? ': ' + rapport.autreProbleme : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // DESCRIPTION
+        { text: "Description de l'incident :", bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [55], body: [[{ text: rapport.descriptionIncident || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 12]
+        },
+
+        // MESURES
+        { text: 'Mesure prise par le professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: mes1 + ' Observation/remarque orale', margin: [8, 0, 0, 4] },
+              { text: mes2 + ' Avertissement écrit', margin: [8, 0, 0, 4] },
+              { text: mes3 + ' Élève exclu temporairement', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: mes4 + ' Communication avec parents', margin: [8, 0, 0, 4] },
+              { text: mes5 + ' Autre' + (rapport.autreMesure ? ': ' + rapport.autreMesure : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // OBSERVATIONS
+        { text: 'Observation du professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [45], body: [[{ text: rapport.observationProfesseur || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 20]
+        },
+
+        // SIGNATURES
+        {
+          columns: [
+            { stack: [{ text: 'Signature du professeur :', bold: true }, { text: '\n.....................................' }], width: '50%' },
+            { stack: [
+              { text: 'Visa de la direction :', bold: true, alignment: 'right' },
+              { text: rapport.visaDirection ? '\nApposé le ' + new Date(rapport.dateVisa).toLocaleDateString('fr-FR') : '\n.....................................', alignment: 'right' }
+            ], width: '50%' }
+          ]
+        }
+      ]
+    };
+
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=rapport_' + rapport._id + '.pdf');
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+
+  } catch (err) {
+    console.error('Erreur PDF:', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
 // ✅ Route pour marquer une notification comme lue (optionnel)
 app.post('/api/notifications/:id/mark-read', authAdminOrInscripteurOrPaiementManager, (req, res) => {
   // Dans une vraie application, vous stockeriez l'état "lu" en base
@@ -4661,7 +5023,8 @@ app.get('/api/professeur/documents', authProfesseur, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Erreur serveur', error: err.message });
   }
-});app.delete('/api/documents/:id', authProfesseur, async (req, res) => {
+});
+app.delete('/api/documents/:id', authProfesseur, async (req, res) => {
   try {
     const documentId = req.params.id;
     const professeurId = req.professeurId; // ✅ depuis le middleware authProfesseur
@@ -8131,459 +8494,7 @@ app.put('/api/vie-scolaire/:id', authAdminOrPaiementManager, uploadVieScolaire.a
     });
   }
 });
-// ===== ROUTE PROFESSEUR - Télécharger PDF d'un rapport formaté =====
-app.get('/api/rapports/professeur/rapports/:id/pdf', authProfesseur, async (req, res) => {
-  try {
-    const professeur = await Professeur.findById(req.professeurId);
-    if (!professeur) {
-      return res.status(404).json({ message: 'Professeur non trouvé' });
-    }
 
-    const rapport = await Rapport.findById(req.params.id)
-      .populate('professeur', 'nom prenom email')
-      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
-
-    if (!rapport) {
-      return res.status(404).json({ message: 'Rapport non trouvé' });
-    }
-
-    // Vérifier que le rapport appartient au professeur
-    if (rapport.professeur._id.toString() !== req.professeurId.toString()) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
-
-    // Générer le PDF
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    
-    // Headers pour le téléchargement
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=rapport_observation_${rapport._id}.pdf`);
-    
-    doc.pipe(res);
-
-    let currentY = 40; // Position Y de départ
-
-    // === EN-TÊTE AVEC LOGO ET PHOTO ===
-    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
-    
-    // Logo à gauche
-    if (fs.existsSync(logoPath)) {
-      try {
-        doc.image(logoPath, 50, currentY, { width: 100, height: 100 });
-      } catch (error) {
-        console.log('Erreur chargement logo:', error.message);
-      }
-    } else {
-      console.log('Logo non trouvé:', logoPath);
-    }
-
-    // Photo de l'étudiant à droite
-    if (rapport.etudiant.image) {
-      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
-      if (fs.existsSync(photoPath)) {
-        try {
-          doc.image(photoPath, 470, currentY, { width: 70, height: 90, fit: [70, 90] });
-        } catch (error) {
-          console.log('Erreur chargement photo:', error.message);
-        }
-      } else {
-        console.log('Photo non trouvée:', photoPath);
-      }
-    }
-
-    // Titre centré
-    currentY = 60;
-    doc.fontSize(16).font('Helvetica-Bold');
-    doc.text('Rapport', 150, currentY, { width: 250, align: 'center' });
-    
-    currentY += 20;
-    doc.fontSize(14).font('Helvetica');
-    doc.text("D'observation - Comportement des eleves", 150, currentY, { width: 250, align: 'center' });
-    
-    currentY = 150; // Descendre après le logo (qui fait 100px de hauteur)
-
-    // Année scolaire et niveau
-    doc.fontSize(11).font('Helvetica');
-    doc.text(`Annee scolaire : ${rapport.anneeScolaire || '2025 / 2026'}`, 50, currentY);
-    currentY += 15;
-    
-    doc.text(`Niveau / Classe : ${rapport.niveau || '..................'}`, 50, currentY);
-    currentY += 25;
-
-    // Noms des élèves
-    const nomComplet = rapport.etudiant.nomComplet || '';
-    doc.text(`Nom et prenom de l'eleve : ${nomComplet}`, 50, currentY);
-    currentY += 15;
-    
-    doc.text('                           ..............................   /   ..................................', 50, currentY);
-    currentY += 15;
-    
-    doc.text('                           ..............................   /   ..................................', 50, currentY);
-    currentY += 25;
-
-    // Date et professeur
-    const dateRapport = new Date(rapport.date).toLocaleDateString('fr-FR');
-    doc.text(`Date : ${dateRapport}`, 50, currentY);
-    currentY += 15;
-    
-    doc.text(`Professeur : ${rapport.professeur.nom} ${rapport.professeur.prenom}`, 50, currentY);
-    currentY += 30;
-
-    // === NATURE DU PROBLÈME ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Nature du probleme observe :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    
-    const problemesDisponibles = [
-      'Devoirs non faits',
-      'Indiscipline en classe',
-      'Bavardage excessif',
-      "Refus d'obeir",
-      'Violence verbale / physique',
-      'Retard ou absence repetee',
-      'Autre'
-    ];
-
-    problemesDisponibles.forEach(prob => {
-      const isChecked = rapport.natureProbleme.some(np => 
-        np.toLowerCase().includes(prob.toLowerCase().substring(0, 10))
-      );
-      const checkbox = isChecked ? '[X]' : '[ ]';
-      doc.text(`${checkbox} ${prob}`, 60, currentY);
-      currentY += 13;
-    });
-
-    // Autre problème (précision)
-    if (rapport.autreProbleme) {
-      doc.text(`   (a preciser) : ${rapport.autreProbleme}`, 70, currentY);
-      currentY += 15;
-    }
-
-    currentY += 20;
-
-    // === DESCRIPTION DE L'INCIDENT ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text("Description de l'incident :", 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    const descY = currentY;
-    doc.rect(50, descY, 500, 80).stroke();
-    
-    if (rapport.descriptionIncident) {
-      doc.text(rapport.descriptionIncident, 55, descY + 5, {
-        width: 490,
-        height: 70,
-        align: 'justify'
-      });
-    }
-
-    currentY = descY + 85;
-    currentY += 20;
-
-    // === MESURES PRISES ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Mesure prise par le professeur :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    
-    const mesuresDisponibles = [
-      'Observation / remarque orale',
-      'Avertissement ecrit',
-      'Eleve exclu temporairement du cours',
-      'Communication avec les parents',
-      'Autre'
-    ];
-
-    mesuresDisponibles.forEach(mes => {
-      const isChecked = rapport.mesurePrise.some(mp => 
-        mp.toLowerCase().includes(mes.toLowerCase().substring(0, 10))
-      );
-      const checkbox = isChecked ? '[X]' : '[ ]';
-      doc.text(`${checkbox} ${mes}`, 60, currentY);
-      currentY += 13;
-    });
-
-    // Autre mesure (précision)
-    if (rapport.autreMesure) {
-      doc.text(`   ${rapport.autreMesure}`, 70, currentY);
-      currentY += 15;
-    }
-
-    currentY += 20;
-
-    // === OBSERVATIONS DU PROFESSEUR ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Observation du professeur :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    const obsY = currentY;
-    doc.rect(50, obsY, 500, 60).stroke();
-    
-    if (rapport.observationProfesseur) {
-      doc.text(rapport.observationProfesseur, 55, obsY + 5, {
-        width: 490,
-        height: 50,
-        align: 'justify'
-      });
-    }
-
-    currentY = obsY + 65;
-    currentY += 30;
-
-    // === SIGNATURES ===
-    doc.fontSize(11).font('Helvetica');
-    
-    doc.text('Signature du professeur : ..............................', 50, currentY);
-    
-    // Visa de la direction
-    if (rapport.visaDirection) {
-      doc.text(`Visa de la direction : Appose le ${new Date(rapport.dateVisa).toLocaleDateString('fr-FR')}`, 300, currentY);
-    } else {
-      doc.text('Visa de la direction : ...............................', 300, currentY);
-    }
-
-    currentY += 40;
-
-    doc.end();
-  } catch (err) {
-    console.error('Erreur generation PDF:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
-
-// ===== ROUTE ADMIN - Générer PDF d'un rapport formaté =====
-app.post('/api/rapports/admin/rapports/:id/generate-pdf', authAdmin, async (req, res) => {
-  try {
-    const rapport = await Rapport.findById(req.params.id)
-      .populate('professeur', 'nom prenom email')
-      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
-
-    if (!rapport) {
-      return res.status(404).json({ message: 'Rapport non trouvé' });
-    }
-
-    // Générer le PDF avec support des caractères UTF-8
-    const doc = new PDFDocument({ 
-      margin: 50, 
-      size: 'A4',
-      bufferPages: true,
-      autoFirstPage: true
-    });
-    
-    // Headers pour le téléchargement
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=rapport_observation_${rapport._id}.pdf`);
-    
-    doc.pipe(res);
-
-    let currentY = 40; // Position Y de départ
-
-    // === EN-TÊTE AVEC LOGO ET PHOTO ===
-    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
-    
-    // Logo à gauche
-    if (fs.existsSync(logoPath)) {
-      try {
-        doc.image(logoPath, 50, currentY, { width: 100, height: 100 });
-      } catch (error) {
-        console.log('Erreur chargement logo:', error.message);
-      }
-    } else {
-      console.log('Logo non trouvé:', logoPath);
-    }
-
-    // Photo de l'étudiant à droite
-    if (rapport.etudiant && rapport.etudiant.image) {
-      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
-      if (fs.existsSync(photoPath)) {
-        try {
-          doc.image(photoPath, 470, currentY, { width: 70, height: 90, fit: [70, 90] });
-        } catch (error) {
-          console.log('Erreur chargement photo:', error.message);
-        }
-      } else {
-        console.log('Photo non trouvée:', photoPath);
-      }
-    }
-
-    // Titre centré
-    currentY = 60;
-    doc.fontSize(16).font('Helvetica-Bold');
-    doc.text('Rapport', 150, currentY, { width: 250, align: 'center' });
-    
-    currentY += 20;
-    doc.fontSize(14).font('Helvetica');
-    doc.text("D'observation - Comportement des eleves", 150, currentY, { width: 250, align: 'center' });
-    
-    currentY = 150; // Descendre après le logo (qui fait 100px de hauteur)
-
-    // Année scolaire et niveau
-    doc.fontSize(11).font('Helvetica');
-    doc.text(`Annee scolaire : ${rapport.anneeScolaire || '2025 / 2026'}`, 50, currentY);
-    currentY += 15;
-    
-    doc.text(`Niveau / Classe : ${rapport.niveau || '..................'}`, 50, currentY);
-    currentY += 25;
-
-    // Noms des élèves
-    const nomComplet = rapport.etudiant ? rapport.etudiant.nomComplet || '' : '';
-    doc.text(`Nom et prenom de l'eleve : ${nomComplet}`, 50, currentY);
-    currentY += 15;
-    
-    doc.text('                           ..............................   /   ..................................', 50, currentY);
-    currentY += 15;
-    
-    doc.text('                           ..............................   /   ..................................', 50, currentY);
-    currentY += 25;
-
-    // Date et professeur
-    const dateRapport = new Date(rapport.date).toLocaleDateString('fr-FR');
-    doc.text(`Date : ${dateRapport}`, 50, currentY);
-    currentY += 15;
-    
-    // ✅ CORRECTION : Afficher le nom complet du professeur
-    const nomProfesseur = rapport.professeur 
-      ? `${rapport.professeur.prenom || ''} ${rapport.professeur.nom || ''}`.trim()
-      : 'Non renseigne';
-    
-    doc.text(`Professeur : ${nomProfesseur}`, 50, currentY);
-    currentY += 30;
-
-    // === NATURE DU PROBLÈME ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Nature du probleme observe :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    
-    const problemesDisponibles = [
-      'Devoirs non faits',
-      'Indiscipline en classe',
-      'Bavardage excessif',
-      "Refus d'obeir",
-      'Violence verbale / physique',
-      'Retard ou absence repetee',
-      'Autre'
-    ];
-
-    problemesDisponibles.forEach(prob => {
-      const isChecked = rapport.natureProbleme && rapport.natureProbleme.some(np => 
-        np.toLowerCase().includes(prob.toLowerCase().substring(0, 10))
-      );
-      const checkbox = isChecked ? '[X]' : '[ ]';
-      doc.text(`${checkbox} ${prob}`, 60, currentY);
-      currentY += 13;
-    });
-
-    // Autre problème (précision)
-    if (rapport.autreProbleme) {
-      doc.text(`   (a preciser) : ${rapport.autreProbleme}`, 70, currentY);
-      currentY += 15;
-    }
-
-    currentY += 20;
-
-    // === DESCRIPTION DE L'INCIDENT ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text("Description de l'incident :", 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    const descY = currentY;
-    doc.rect(50, descY, 500, 80).stroke();
-    
-    if (rapport.descriptionIncident) {
-      doc.text(rapport.descriptionIncident, 55, descY + 5, {
-        width: 490,
-        height: 70,
-        align: 'justify'
-      });
-    }
-
-    currentY = descY + 85;
-    currentY += 20;
-
-    // === MESURES PRISES ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Mesure prise par le professeur :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    
-    const mesuresDisponibles = [
-      'Observation / remarque orale',
-      'Avertissement ecrit',
-      'Eleve exclu temporairement du cours',
-      'Communication avec les parents',
-      'Autre'
-    ];
-
-    mesuresDisponibles.forEach(mes => {
-      const isChecked = rapport.mesurePrise && rapport.mesurePrise.some(mp => 
-        mp.toLowerCase().includes(mes.toLowerCase().substring(0, 10))
-      );
-      const checkbox = isChecked ? '[X]' : '[ ]';
-      doc.text(`${checkbox} ${mes}`, 60, currentY);
-      currentY += 13;
-    });
-
-    // Autre mesure (précision)
-    if (rapport.autreMesure) {
-      doc.text(`   ${rapport.autreMesure}`, 70, currentY);
-      currentY += 15;
-    }
-
-    currentY += 20;
-
-    // === OBSERVATIONS DU PROFESSEUR ===
-    doc.fontSize(12).font('Helvetica-Bold');
-    doc.text('Observation du professeur :', 50, currentY);
-    currentY += 20;
-    
-    doc.fontSize(10).font('Helvetica');
-    const obsY = currentY;
-    doc.rect(50, obsY, 500, 60).stroke();
-    
-    if (rapport.observationProfesseur) {
-      doc.text(rapport.observationProfesseur, 55, obsY + 5, {
-        width: 490,
-        height: 50,
-        align: 'justify'
-      });
-    }
-
-    currentY = obsY + 65;
-    currentY += 30;
-
-    // === SIGNATURES ===
-    doc.fontSize(11).font('Helvetica');
-    
-    doc.text('Signature du professeur : ..............................', 50, currentY);
-    
-    // Visa de la direction
-    if (rapport.visaDirection) {
-      doc.text(`Visa de la direction : Appose le ${new Date(rapport.dateVisa).toLocaleDateString('fr-FR')}`, 300, currentY);
-    } else {
-      doc.text('Visa de la direction : ...............................', 300, currentY);
-    }
-
-    currentY += 40;
-
-    doc.end();
-  } catch (err) {
-    console.error('Erreur generation PDF:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: err.message });
-    }
-  }
-});
 app.delete('/api/vie-scolaire/:id', authAdminOrPaiementManager, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
