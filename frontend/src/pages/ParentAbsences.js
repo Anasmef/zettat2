@@ -316,17 +316,18 @@ const ParentAbsences = () => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   {enfant.image ? (
-                    <img 
-                      src={`http://localhost:5000${enfant.image}`} 
-                      alt={enfant.nomComplet}
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-                      }} 
-                    />
+                 // ✅ SOLUTION
+<img 
+  src={enfant.image} 
+  alt={enfant.nomComplet}
+  style={{
+    width: '48px',
+    height: '48px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+  }} 
+/>
                   ) : (
                     <div style={{
                       width: '48px',
