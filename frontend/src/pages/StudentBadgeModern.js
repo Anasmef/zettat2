@@ -6,7 +6,6 @@ import './StudentBadgeModern.css';
 const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
   const qrRef = useRef(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
-  const [imageError, setImageError] = useState(false);
 
   // Générer l'URL pour le QR code
   const baseUrl = window.location.origin;
@@ -33,11 +32,6 @@ const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
     }
   }, [qrData]);
 
-  // Reset imageError when etudiant changes
-  useEffect(() => {
-    setImageError(false);
-  }, [etudiant._id]);
-
   return (
     <div className="badge-modern-wrapper">
       <div className="badge-modern-card print-card">
@@ -61,22 +55,17 @@ const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
             <p className="badge-modern-card-year">2025/2026</p>
           </div>
 
-          {/* Photo étudiant - VERSION CORRIGÉE */}
+        {/* Photo étudiant */}
           <div className="badge-modern-photo-container print-photo">
-            {etudiant.image && !imageError ? (
+            {etudiant.image ? (
               <img 
-                src={etudiant.image.startsWith('http') 
-                  ? etudiant.image 
-                  : etudiant.image.startsWith('/') 
-                    ? etudiant.image 
-                    : `/${etudiant.image}`
-                }
+                src={etudiant.image.startsWith('http') ? etudiant.image : `${window.location.origin}${etudiant.image}`}
                 alt={etudiant.nomComplet}
                 className="badge-modern-photo"
                 onError={(e) => {
-                  console.error('❌ Image non trouvée:', etudiant.image);
-                  console.error('❌ URL complète:', e.target.src);
-                  setImageError(true);
+                  console.error('Erreur chargement image:', etudiant.image);
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<div class="badge-modern-photo-placeholder"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>';
                 }}
               />
             ) : (
