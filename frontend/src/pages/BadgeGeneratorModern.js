@@ -155,7 +155,6 @@ const BadgeGeneratorModern = () => {
 
   const etudiantsAfficher = etudiantsFiltres.filter(e => selectedIds.includes(e._id));
 
-  // 🔐 Afficher le formulaire de mot de passe si non authentifié
   if (!isAuthenticated) {
     return (
       <div style={styles.container}>

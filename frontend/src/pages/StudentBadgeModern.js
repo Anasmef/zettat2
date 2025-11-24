@@ -55,21 +55,21 @@ const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
             <p className="badge-modern-card-year">2025/2026</p>
           </div>
 
-    {/* Photo étudiant */}
+        {/* Photo étudiant */}
 <div className="badge-modern-photo-container print-photo">
   {etudiant.image ? (
     <img 
       src={etudiant.image.startsWith('http') 
         ? etudiant.image 
-        : etudiant.image.startsWith('/api') || etudiant.image.startsWith('/uploads')
-          ? etudiant.image
-          : `/uploads/${etudiant.image}`
+        : etudiant.image.startsWith('/') 
+          ? etudiant.image 
+          : `/${etudiant.image}`
       }
       alt={etudiant.nomComplet}
       className="badge-modern-photo"
       onError={(e) => {
         console.error('❌ Image non trouvée:', etudiant.image);
-        console.error('❌ URL complète tentée:', e.target.src);
+        console.error('❌ URL complète:', e.target.src);
       }}
     />
   ) : (
