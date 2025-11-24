@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 
 // Import des pages
+import ParentBulletins from './pages/ParentBulletins';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
@@ -62,6 +63,8 @@ import CollegePage from './pages/CollegePage';
 import LyceePage from './pages/LyceePage';
 import AdminActualites from './pages/AdminActualites';
 import PaiementManagerPage from './pages/PaiementManagerPage';
+        import ParentEmploiDuTemps from './pages/ParentEmploiDuTemps';
+
 import AdminMessagesmanager from './pages/AdminMessagesmanager';
 import AdminVieScolairemanager from './pages/AdminVieScolairemanager';
 import AdminActualitesmanager from './pages/AdminActualitesmanager';
@@ -349,6 +352,9 @@ function AppContent() {
         <Route path="/professeur/mes-rapports" element={<MesRapports />} />
         <Route path="/professeur/rapports" element={<PageProfesseurRapports />} />
         {/* Routes Admin */}
+
+<Route path="/parent/bulletins" element={<ParentBulletins />} />
+<Route path="/parent/emploi-du-temps" element={<ParentEmploiDuTemps />} />
         <Route path="/admin/rapports" element={<PageAdminRapports />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />

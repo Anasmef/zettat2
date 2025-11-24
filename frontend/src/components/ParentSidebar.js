@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   FileText,
   LogOut,
+  Calendar,
   Menu,
   X,
   Languages
@@ -109,6 +110,19 @@ const ParentSidebar = ({ onLogout }) => {
       path: '/parent/rapports',
       labelFr: 'Rapports',
       labelAr: 'التقارير',
+      icon: FileText
+    },
+    {
+      path: '/parent/emploi-du-temps',
+      labelFr: 'Emploi du Temps',
+      labelAr: 'جدول الحصص',
+      icon: Calendar
+    },
+
+    {
+      path: '/parent/bulletins',
+      labelFr: 'Bulletins',
+      labelAr: 'البيانات',
       icon: FileText
     }
   ];

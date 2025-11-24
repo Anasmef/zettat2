@@ -55,20 +55,20 @@ const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
             <p className="badge-modern-card-year">2025/2026</p>
           </div>
 
-          {/* Photo étudiant */}
-          <div className="badge-modern-photo-container print-photo">
-            {etudiant.image ? (
-              <img 
-                src={etudiant.image} 
-                alt={etudiant.nomComplet}
-                className="badge-modern-photo"
-              />
-            ) : (
-              <div className="badge-modern-photo-placeholder">
-                <User size={34} color="#ffffff" strokeWidth={1.5} />
-              </div>
-            )}
-          </div>
+       {/* Photo étudiant */}
+<div className="badge-modern-photo-container print-photo">
+  {etudiant.image ? (
+    <img 
+      src={`${etudiant.image}`}
+      alt={etudiant.nomComplet}
+      className="badge-modern-photo"
+    />
+  ) : (
+    <div className="badge-modern-photo-placeholder">
+      <User size={34} color="#ffffff" strokeWidth={1.5} />
+    </div>
+  )}
+</div>
         </div>
 
         {/* Corps de la carte */}

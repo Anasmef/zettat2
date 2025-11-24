@@ -535,6 +535,9 @@ app.post('/api/login', async (req, res) => {
     });
   }
 });
+// ===== ROUTES BULLETINS AMÉLIORÉES =====
+
+
 app.get('/api/etudiant/notifications', authEtudiant, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.etudiantId);
@@ -755,7 +758,73 @@ app.get('/api/etudiants/public/:id', async (req, res) => {
 
 console.log('✅ Route publique QR code ajoutée');
 
+// 📌 Route pour récupérer les bulletins d'un enfant (Parent)
+app.get('/api/bulletins/etudiant/:enfantId', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    const { semestre, anneeScolaire, cours } = req.query;
+    
+    // Vérifier que cet enfant appartient bien au parent connecté
+    const parent = await Parent.findById(req.userId);
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
 
+    const isParentOfChild = parent.enfants.some(
+      e => e.toString() === enfantId
+    );
+
+    if (!isParentOfChild) {
+      return res.status(403).json({ message: 'Accès non autorisé à cet enfant' });
+    }
+
+    // Récupérer les bulletins
+    const bulletins = await Bulletin.find({ 
+      etudiant: enfantId,
+      ...(cours && { cours }),
+      ...(semestre && { semestre }),
+      ...(anneeScolaire && { anneeScolaire: anneeScolaire || '2025/2026' })
+    })
+      .populate('professeur', 'nom matiere')
+      .sort({ cours: 1, semestre: 1, matiere: 1 });
+    
+    // Calculer les moyennes par cours
+    const coursUniques = [...new Set(bulletins.map(b => b.cours))];
+    const moyennesParCours = {};
+    
+    for (const c of coursUniques) {
+      const bulletinsCours = bulletins.filter(b => b.cours === c);
+      
+      // Grouper par semestre
+      const s1 = bulletinsCours.filter(b => b.semestre === 'S1');
+      const s2 = bulletinsCours.filter(b => b.semestre === 'S2');
+      const annee = bulletinsCours.filter(b => b.semestre === 'Année');
+      
+      const calculMoyenne = (bulletinsArray) => {
+        if (bulletinsArray.length === 0) return null;
+        const somme = bulletinsArray.reduce((acc, b) => acc + (b.moyenneMatiere || 0), 0);
+        return (somme / bulletinsArray.length).toFixed(2);
+      };
+      
+      moyennesParCours[c] = {
+        moyenneS1: calculMoyenne(s1),
+        moyenneS2: calculMoyenne(s2),
+        moyenneAnnee: calculMoyenne(annee),
+        moyenneFinale: (s1.length > 0 && s2.length > 0) 
+          ? ((parseFloat(calculMoyenne(s1)) + parseFloat(calculMoyenne(s2))) / 2).toFixed(2)
+          : null
+      };
+    }
+    
+    res.json({ 
+      bulletins, 
+      moyennesParCours
+    });
+  } catch (err) {
+    console.error('Erreur récupération bulletins enfant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // Ajouter un étudiant
 app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'),checkFieldPermissions, async (req, res) => {
   try {
@@ -1757,7 +1826,434 @@ app.post('/api/professeur/sortie', authProfesseur, async (req, res) => {
     });
   }
 });
+// ==========================================
+// 📚 ROUTES BULLETINS - AVEC COURS ET MATIÈRES
+// ==========================================
 
+// 📌 Créer/Mettre à jour un bulletin (Professeur)
+
+
+
+
+
+// 📌 Récupérer tous les bulletins (Admin) - Groupés par cours
+app.get('/api/bulletins', authAdmin, async (req, res) => {
+  try {
+    const bulletins = await Bulletin.find()
+      .populate('etudiant', 'nomComplet email niveau')
+      .populate('professeur', 'nom matiere')
+      .sort({ cours: 1, anneeScolaire: -1, createdAt: -1 });
+
+    res.json(bulletins);
+  } catch (err) {
+    console.error('Erreur récupération bulletins admin:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Créer/Mettre à jour un bulletin (Professeur)
+app.post('/api/bulletins', authProfesseur, async (req, res) => {
+  try {
+    const { 
+      etudiant, 
+      cours, 
+      semestre,
+      noteControleContinu, 
+      noteExamen,
+      remarque,
+      nombreAbsences 
+    } = req.body;
+
+    // Validation
+    if (!etudiant || !cours || !semestre) {
+      return res.status(400).json({ 
+        message: 'Données manquantes: etudiant, cours, semestre requis' 
+      });
+    }
+
+    // Récupérer le professeur pour obtenir sa matière
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // ✅ Récupérer l'étudiant pour obtenir son année scolaire
+    const etudiantData = await Etudiant.findById(etudiant);
+    if (!etudiantData) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // ✅ Vérifier que l'étudiant a une année scolaire
+    if (!etudiantData.anneeScolaire) {
+      return res.status(400).json({ 
+        message: 'L\'étudiant n\'a pas d\'année scolaire définie' 
+      });
+    }
+
+    // ✅ Utiliser l'année scolaire de l'étudiant
+    const anneeScolaire = etudiantData.anneeScolaire;
+
+    // ✅ Chercher un bulletin existant pour CE PROFESSEUR et CETTE MATIÈRE
+    let bulletin = await Bulletin.findOne({
+      etudiant,
+      cours,
+      matiere: professeur.matiere,
+      semestre,
+      anneeScolaire // Utilise l'année scolaire de l'étudiant
+    });
+
+    if (bulletin) {
+      // Mettre à jour le bulletin existant
+      bulletin.noteControleContinu = noteControleContinu || 0;
+      bulletin.noteExamen = noteExamen || 0;
+      bulletin.remarque = remarque || '';
+      bulletin.nombreAbsences = nombreAbsences || 0;
+      
+      await bulletin.save();
+    } else {
+      // Créer un nouveau bulletin
+      bulletin = new Bulletin({
+        etudiant,
+        professeur: req.professeurId,
+        cours,
+        matiere: professeur.matiere,
+        semestre,
+        anneeScolaire, // ✅ Année scolaire de l'étudiant
+        noteControleContinu: noteControleContinu || 0,
+        noteExamen: noteExamen || 0,
+        remarque: remarque || '',
+        nombreAbsences: nombreAbsences || 0
+      });
+
+      await bulletin.save();
+    }
+
+    const bulletinPopulated = await Bulletin.findById(bulletin._id)
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire')
+      .populate('professeur', 'nom matiere');
+
+    res.json(bulletinPopulated);
+  } catch (err) {
+    console.error('Erreur création bulletin:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// 📌 Récupérer tous les bulletins d'un professeur (SA MATIÈRE uniquement)
+app.get('/api/bulletins/professeur', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    const bulletins = await Bulletin.find({ 
+      professeur: req.professeurId,
+      matiere: professeur.matiere 
+    })
+      .populate('etudiant', 'nomComplet email niveau')
+      .populate('professeur', 'nom matiere')
+      .sort({ cours: 1, createdAt: -1 });
+
+    res.json(bulletins);
+  } catch (err) {
+    console.error('Erreur récupération bulletins:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer le bulletin COMPLET d'un étudiant (toutes les matières)
+app.get('/api/bulletins/etudiant/me', authEtudiant, async (req, res) => {
+  try {
+    const { semestre, anneeScolaire, cours } = req.query;
+    
+    const bulletins = await Bulletin.find({ 
+      etudiant: req.utilisateur.id,
+      ...(cours && { cours }),
+      ...(semestre && { semestre }),
+      ...(anneeScolaire && { anneeScolaire })
+    })
+      .populate('professeur', 'nom matiere')
+      .sort({ cours: 1, matiere: 1 });
+    
+    // ✅ Calculer la moyenne générale pour chaque cours
+    const coursUniques = [...new Set(bulletins.map(b => b.cours))];
+    const moyennesParCours = {};
+    
+    for (const c of coursUniques) {
+      const bulletinsCours = bulletins.filter(b => b.cours === c);
+      
+      // Grouper par semestre
+      const s1 = bulletinsCours.filter(b => b.semestre === 'S1');
+      const s2 = bulletinsCours.filter(b => b.semestre === 'S2');
+      const annee = bulletinsCours.filter(b => b.semestre === 'Année');
+      
+      const calculMoyenne = (bulletinsArray) => {
+        if (bulletinsArray.length === 0) return null;
+        const somme = bulletinsArray.reduce((acc, b) => acc + (b.moyenneMatiere || 0), 0);
+        return (somme / bulletinsArray.length).toFixed(2);
+      };
+      
+      moyennesParCours[c] = {
+        moyenneS1: calculMoyenne(s1),
+        moyenneS2: calculMoyenne(s2),
+        moyenneAnnee: calculMoyenne(annee),
+        // ✅ Moyenne finale (S1 + S2) / 2 si les deux existent
+        moyenneFinale: (s1.length > 0 && s2.length > 0) 
+          ? ((parseFloat(calculMoyenne(s1)) + parseFloat(calculMoyenne(s2))) / 2).toFixed(2)
+          : null
+      };
+    }
+    
+    res.json({ 
+      bulletins, 
+      moyennesParCours
+    });
+  } catch (err) {
+    console.error('Erreur récupération bulletins étudiant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer le bulletin d'un cours complet (Admin) - TOUTES LES MATIÈRES
+app.get('/api/bulletins/cours/:cours', authAdmin, async (req, res) => {
+  try {
+    const { cours } = req.params;
+    const { semestre, anneeScolaire } = req.query;
+
+    const bulletins = await Bulletin.find({
+      cours,
+      ...(semestre && { semestre }),
+      ...(anneeScolaire && { anneeScolaire })
+    })
+      .populate('etudiant', 'nomComplet')
+      .populate('professeur', 'nom matiere')
+      .sort({ 'etudiant.nomComplet': 1, matiere: 1 });
+
+    // ✅ Grouper par étudiant avec TOUTES ses matières
+    const parEtudiant = {};
+    
+    bulletins.forEach(b => {
+      const etudiantId = b.etudiant._id.toString();
+      
+      if (!parEtudiant[etudiantId]) {
+        parEtudiant[etudiantId] = {
+          etudiant: b.etudiant,
+          matieresS1: [],
+          matieresS2: [],
+          matieresAnnee: [],
+          moyenneS1: 0,
+          moyenneS2: 0,
+          moyenneAnnee: 0,
+          moyenneFinale: 0,
+          admis: false
+        };
+      }
+      
+      const matiereData = {
+        matiere: b.matiere,
+        professeur: b.professeur.nom,
+        noteCC: b.noteControleContinu,
+        noteExamen: b.noteExamen,
+        moyenne: b.moyenneMatiere,
+        remarque: b.remarque,
+        absences: b.nombreAbsences
+      };
+      
+      // Séparer par semestre
+      if (b.semestre === 'S1') {
+        parEtudiant[etudiantId].matieresS1.push(matiereData);
+      } else if (b.semestre === 'S2') {
+        parEtudiant[etudiantId].matieresS2.push(matiereData);
+      } else if (b.semestre === 'Année') {
+        parEtudiant[etudiantId].matieresAnnee.push(matiereData);
+      }
+    });
+
+    // ✅ Calculer les moyennes pour chaque étudiant
+    Object.keys(parEtudiant).forEach(etudiantId => {
+      const etudiant = parEtudiant[etudiantId];
+      
+      // Moyenne S1
+      if (etudiant.matieresS1.length > 0) {
+        const sommeS1 = etudiant.matieresS1.reduce((acc, m) => acc + parseFloat(m.moyenne || 0), 0);
+        etudiant.moyenneS1 = (sommeS1 / etudiant.matieresS1.length).toFixed(2);
+      }
+      
+      // Moyenne S2
+      if (etudiant.matieresS2.length > 0) {
+        const sommeS2 = etudiant.matieresS2.reduce((acc, m) => acc + parseFloat(m.moyenne || 0), 0);
+        etudiant.moyenneS2 = (sommeS2 / etudiant.matieresS2.length).toFixed(2);
+      }
+      
+      // Moyenne Année
+      if (etudiant.matieresAnnee.length > 0) {
+        const sommeAnnee = etudiant.matieresAnnee.reduce((acc, m) => acc + parseFloat(m.moyenne || 0), 0);
+        etudiant.moyenneAnnee = (sommeAnnee / etudiant.matieresAnnee.length).toFixed(2);
+      }
+      
+      // ✅ Moyenne FINALE (S1 + S2) / 2
+      if (etudiant.moyenneS1 > 0 && etudiant.moyenneS2 > 0) {
+        etudiant.moyenneFinale = ((parseFloat(etudiant.moyenneS1) + parseFloat(etudiant.moyenneS2)) / 2).toFixed(2);
+        etudiant.admis = parseFloat(etudiant.moyenneFinale) >= 10;
+      }
+    });
+
+    res.json(Object.values(parEtudiant));
+  } catch (err) {
+    console.error('Erreur récupération bulletin cours:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// 📌 Mettre à jour un bulletin
+app.put('/api/bulletins/:id', authProfesseur, async (req, res) => {
+  try {
+    const { noteControleContinu, noteExamen, remarque, nombreAbsences } = req.body;
+
+    const bulletin = await Bulletin.findById(req.params.id);
+
+    if (!bulletin) {
+      return res.status(404).json({ message: 'Bulletin non trouvé' });
+    }
+
+    if (bulletin.professeur.toString() !== req.professeurId) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    if (noteControleContinu !== undefined) bulletin.noteControleContinu = noteControleContinu;
+    if (noteExamen !== undefined) bulletin.noteExamen = noteExamen;
+    if (remarque !== undefined) bulletin.remarque = remarque;
+    if (nombreAbsences !== undefined) bulletin.nombreAbsences = nombreAbsences;
+
+    await bulletin.save();
+
+    const bulletinUpdated = await Bulletin.findById(bulletin._id)
+      .populate('etudiant', 'nomComplet email')
+      .populate('professeur', 'nom matiere');
+
+    res.json(bulletinUpdated);
+  } catch (err) {
+    console.error('Erreur mise à jour bulletin:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Supprimer un bulletin (Admin ou Professeur propriétaire)
+app.delete('/api/bulletins/:id', async (req, res) => {
+  try {
+    const bulletin = await Bulletin.findById(req.params.id);
+
+    if (!bulletin) {
+      return res.status(404).json({ message: 'Bulletin non trouvé' });
+    }
+
+    // Vérifier si c'est un admin ou le professeur propriétaire
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    if (decoded.role !== 'admin' && bulletin.professeur.toString() !== decoded.id) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    await Bulletin.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Bulletin supprimé avec succès' });
+  } catch (err) {
+    console.error('Erreur suppression bulletin:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/fix-index', async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const bulletins = db.collection('bulletins');
+    
+    await bulletins.dropIndex('etudiant_1_cours_1_semestre_1');
+    await bulletins.createIndex(
+      { etudiant: 1, cours: 1, matiere: 1, semestre: 1, anneeScolaire: 1 },
+      { unique: true }
+    );
+    
+    res.json({ message: 'Index corrigé!' });
+  } catch (error) {
+    res.json({ error: error.message });
+  }
+});
+// 📌 Récupérer les cours d'un professeur (où il enseigne)
+app.get('/api/professeur/mes-cours', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Les cours où ce professeur enseigne (depuis professeur.cours)
+    const cours = await Cours.find({ 
+      nom: { $in: professeur.cours }
+    });
+
+    res.json(cours);
+  } catch (err) {
+    console.error('Erreur récupération cours:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer les étudiants d'un cours spécifique
+app.get('/api/professeur/etudiants/cours/:cours', authProfesseur, async (req, res) => {
+  try {
+    const { cours } = req.params;
+    
+    const etudiants = await Etudiant.find({
+      cours: cours, // L'étudiant a ce cours dans son tableau
+      actif: true
+    }).select('nomComplet email niveau cours');
+
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur récupération étudiants:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer les statistiques des bulletins (Admin)
+app.get('/api/bulletins/stats', authAdmin, async (req, res) => {
+  try {
+    const totalBulletins = await Bulletin.countDocuments();
+    
+    const bulletinsParCours = await Bulletin.aggregate([
+      {
+        $group: {
+          _id: '$cours',
+          count: { $sum: 1 },
+          moyenneGenerale: { $avg: '$moyenneMatiere' }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    const bulletinsParMatiere = await Bulletin.aggregate([
+      {
+        $group: {
+          _id: '$matiere',
+          count: { $sum: 1 },
+          moyenneGenerale: { $avg: '$moyenneMatiere' }
+        }
+      },
+      { $sort: { moyenneGenerale: -1 } }
+    ]);
+
+    res.json({
+      total: totalBulletins,
+      parCours: bulletinsParCours,
+      parMatiere: bulletinsParMatiere
+    });
+  } catch (err) {
+    console.error('Erreur statistiques:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ✅ 4. ROUTE - Statut du professeur aujourd'hui
 app.get('/api/professeur/statut-aujourd-hui', authProfesseur, async (req, res) => {
   try {
@@ -1928,155 +2424,12 @@ app.delete('/api/admin/qr-code/:qrId', authAdminOrInscripteurOrPaiementManager, 
     });
   }
 });
-app.put('/api/bulletins/:id', authProfesseur, async (req, res) => {
-  try {
-    const { etudiant, cours, semestre, notes, remarque } = req.body;
-    
-    // Calcul de la moyenne
-    let total = 0;
-    let coefTotal = 0;
-    for (let n of notes) {
-      total += n.note * n.coefficient;
-      coefTotal += n.coefficient;
-    }
-    const moyenne = coefTotal > 0 ? (total / coefTotal).toFixed(2) : null;
-    
-    const bulletin = await Bulletin.findOneAndUpdate(
-      { _id: req.params.id, professeur: req.professeurId },
-      {
-        etudiant,
-        cours,
-        semestre,
-        notes,
-        remarque,
-        moyenneFinale: moyenne
-      },
-      { new: true }
-    );
-    
-    if (!bulletin) {
-      return res.status(404).json({ message: 'Bulletin non trouvé' });
-    }
-    
-    res.json({ message: '✅ Bulletin modifié', bulletin });
-  } catch (err) {
-    res.status(500).json({ message: '❌ Erreur serveur', error: err.message });
-  }
-});
-
-// Route DELETE pour supprimer un bulletin
-app.delete('/api/bulletins/:id', authProfesseur, async (req, res) => {
-  try {
-    const bulletin = await Bulletin.findOneAndDelete({
-      _id: req.params.id,
-      professeur: req.professeurId
-    });
-    
-    if (!bulletin) {
-      return res.status(404).json({ message: 'Bulletin non trouvé' });
-    }
-    
-    res.json({ message: '✅ Bulletin supprimé' });
-  } catch (err) {
-    res.status(500).json({ message: '❌ Erreur serveur', error: err.message });
-  }
-});
 
 
 
-app.post('/api/bulletins', authProfesseur, async (req, res) => {
-  try {
-    const { etudiant, cours, semestre, notes, remarque } = req.body;
 
-    // ✅ Calcul de la moyenne finale
-    let total = 0;
-    let coefTotal = 0;
-    for (let n of notes) {
-      total += n.note * n.coefficient;
-      coefTotal += n.coefficient;
-    }
 
-    const moyenne = coefTotal > 0 ? (total / coefTotal).toFixed(2) : null;
 
-    const bulletin = new Bulletin({
-      etudiant,
-      professeur: req.professeurId,
-      cours,
-      semestre,
-      notes,
-      remarque,
-      moyenneFinale: moyenne
-    });
-
-    await bulletin.save();
-    res.status(201).json({ message: '✅ Bulletin créé', bulletin });
-
-  } catch (err) {
-    res.status(500).json({ message: '❌ Erreur serveur', error: err.message });
-  }
-});
-
-app.get('/api/bulletins/etudiant/me', authEtudiant, async (req, res) => {
-  try {
-    // 1. Vérifier que l'étudiant existe toujours
-    const etudiantExists = await Etudiant.findById(req.etudiantId);
-    if (!etudiantExists) {
-      return res.status(404).json({
-        success: false,
-        message: "Étudiant non trouvé"
-      });
-    }
-
-    // 2. Récupérer les bulletins avec une structure garantie
-    const bulletins = await Bulletin.find({ etudiant: req.etudiantId })
-      .populate('etudiant', 'prenom nomDeFamille')
-      .populate('professeur', 'nom prenom')
-      .lean(); // Convertit en objet JS simple
-
-    // 3. Formater la réponse de manière fiable
-    const response = {
-      success: true,
-      count: bulletins.length,
-      bulletins: bulletins.map(b => ({
-        _id: b._id,
-        cours: b.cours || 'Non spécifié',
-        semestre: b.semestre || 'Année',
-        notes: Array.isArray(b.notes) ? b.notes : [],
-        moyenneFinale: b.moyenneFinale ?? null,
-        remarque: b.remarque || '',
-        createdAt: b.createdAt,
-        etudiant: {
-          _id: b.etudiant?._id,
-          nomComplet: b.etudiant 
-            ? `${b.etudiant.prenom || ''} ${b.etudiant.nomDeFamille || ''}`.trim() 
-            : 'N/A'
-        },
-        professeur: {
-          _id: b.professeur?._id,
-          nomComplet: b.professeur
-            ? `${b.professeur.prenom || ''} ${b.professeur.nom || ''}`.trim()
-            : 'N/A'
-        }
-      }))
-    };
-
-    // 4. Renvoyer même si tableau vide (pour éviter les erreurs front)
-    res.json(response);
-
-  } catch (err) {
-    console.error('Erreur bulletins:', {
-      error: err.message,
-      etudiantId: req.etudiantId,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
-
-    res.status(500).json({
-      success: false,
-      message: "Erreur serveur",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-  }
-});
 // ✅ ROUTE CORRECTE - Pointages sans paramètre (défaut aujourd'hui)
 app.get('/api/admin/pointages', authAdmin, async (req, res) => {
   try {
@@ -2219,63 +2572,6 @@ app.get('/api/admin/pointages/:date', authAdmin, async (req, res) => {
     });
   }
 });
-app.get('/api/bulletins/professeur', authProfesseur, async (req, res) => {
-  try {
-    const bulletins = await Bulletin.find({ professeur: req.professeurId })
-      .populate({
-        path: 'etudiant',
-        select: 'prenom nomDeFamille nomComplet', // Sélection multiple
-        transform: doc => doc ? {
-          _id: doc._id,
-          nomComplet: doc.nomComplet || `${doc.prenom || ''} ${doc.nomDeFamille || ''}`.trim(),
-          prenom: doc.prenom,
-          nomDeFamille: doc.nomDeFamille
-        } : null
-      })
-      .sort({ createdAt: -1 });
-    
-    res.json(bulletins);
-  } catch (error) {
-    console.error('Erreur:', error);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-app.get('/api/bulletins', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
-  try {
-    const bulletins = await Bulletin.find()
-      .populate({
-        path: 'etudiant',
-        select: 'prenom nomDeFamille nomComplet',
-        transform: doc => doc ? {
-          _id: doc._id,
-          nomComplet: doc.nomComplet || `${doc.prenom || ''} ${doc.nomDeFamille || ''}`.trim()
-        } : null
-      })
-      .populate({
-        path: 'professeur',
-        select: 'nomComplet',
-        transform: doc => doc ? {
-          _id: doc._id,
-          nomComplet: `${doc.prenom || ''} ${doc.nom || ''}`.trim()
-        } : null
-      })
-      .sort({ createdAt: -1 });
-
-    res.json(bulletins.map(b => ({
-      ...b.toObject(),
-      // Formatage cohérent
-      etudiantNom: b.etudiant?.nomComplet || 'N/A',
-      professeurNom: b.professeur?.nomComplet || 'N/A'
-    })));
-  } catch (error) {
-    console.error('Erreur admin:', error);
-    res.status(500).json({ 
-      message: 'Erreur lors de la récupération des bulletins',
-      details: error.message 
-    });
-  }
-});
-// Lister tous les étudiants
 
 
 
@@ -4167,76 +4463,184 @@ app.get('/api/professeur/absences', authProfesseur, async (req, res) => {
 });
 // ==================== BULLETINS ====================
 
-// 📌 Récupérer tous les bulletins (Admin uniquement)
-app.get('/api/bulletins', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+
+
+
+
+
+
+
+// 📌 Récupérer un bulletin spécifique
+app.get('/api/bulletins/:id', authProfesseur, async (req, res) => {
   try {
-    const bulletins = await Bulletin.find()
-      .populate('etudiant', 'nomComplet email')
-      .populate('professeur', 'nomComplet email');
-    res.json(bulletins);
+    const bulletin = await Bulletin.findById(req.params.id)
+      .populate('etudiant', 'nomDeFamille prenom nomComplet email')
+      .populate('professeur', 'nom prenom email');
+
+    if (!bulletin) {
+      return res.status(404).json({ message: 'Bulletin non trouvé' });
+    }
+
+    // Vérifier que le professeur est bien celui qui a créé le bulletin
+    if (bulletin.professeur._id.toString() !== req.professeurId) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    res.json(bulletin);
   } catch (err) {
+    console.error('Erreur récupération bulletin:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📌 Créer un nouveau bulletin (Professeur)
-app.post('/api/bulletins', authProfesseur, async (req, res) => {
+// 📌 Mettre à jour un bulletin
+app.put('/api/bulletins/:id', authProfesseur, async (req, res) => {
   try {
-    const { etudiant, cours, semestre, notes, remarque, moyenneFinale } = req.body;
+    const { noteFinale, remarque, semestre } = req.body;
 
-    const nouveauBulletin = new Bulletin({
-      etudiant,
-      professeur: req.utilisateur.id, // récupéré via le token
-      cours,
-      semestre,
-      notes,
-      remarque,
-      moyenneFinale
-    });
+    const bulletin = await Bulletin.findById(req.params.id);
 
-    await nouveauBulletin.save();
-    res.status(201).json(nouveauBulletin);
+    if (!bulletin) {
+      return res.status(404).json({ message: 'Bulletin non trouvé' });
+    }
+
+    // Vérifier que le professeur est bien celui qui a créé le bulletin
+    if (bulletin.professeur.toString() !== req.professeurId) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
+
+    // Mettre à jour les champs
+    if (noteFinale !== undefined) {
+      if (noteFinale < 0 || noteFinale > 20) {
+        return res.status(400).json({ message: 'La note doit être entre 0 et 20' });
+      }
+      bulletin.noteFinale = noteFinale;
+    }
+    
+    if (remarque !== undefined) bulletin.remarque = remarque;
+    if (semestre) bulletin.semestre = semestre;
+
+    await bulletin.save();
+
+    const bulletinUpdated = await Bulletin.findById(bulletin._id)
+      .populate('etudiant', 'nomDeFamille prenom nomComplet email')
+      .populate('professeur', 'nom prenom email');
+
+    res.json(bulletinUpdated);
   } catch (err) {
+    console.error('Erreur mise à jour bulletin:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📌 Supprimer un bulletin (Admin ou Professeur qui l’a créé)
-app.delete('/api/bulletins/:id', authAdminOrPaiementManager, async (req, res) => {
+// 📌 Supprimer un bulletin
+app.delete('/api/bulletins/:id', authProfesseur, async (req, res) => {
   try {
     const bulletin = await Bulletin.findById(req.params.id);
-    if (!bulletin) return res.status(404).json({ message: 'Bulletin introuvable' });
+
+    if (!bulletin) {
+      return res.status(404).json({ message: 'Bulletin non trouvé' });
+    }
+
+    // Vérifier que le professeur est bien celui qui a créé le bulletin
+    if (bulletin.professeur.toString() !== req.professeurId) {
+      return res.status(403).json({ message: 'Accès non autorisé' });
+    }
 
     await Bulletin.findByIdAndDelete(req.params.id);
+
     res.json({ message: 'Bulletin supprimé avec succès' });
   } catch (err) {
+    console.error('Erreur suppression bulletin:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📌 Récupérer les bulletins d’un professeur connecté
-app.get('/api/bulletins/professeur', authProfesseur, async (req, res) => {
+// 📌 Récupérer les cours d'un professeur
+app.get('/api/professeur/mes-cours', authProfesseur, async (req, res) => {
   try {
-    const bulletins = await Bulletin.find({ professeur: req.utilisateur.id })
-      .populate('etudiant', 'nomComplet email');
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Chercher les cours où ce professeur enseigne
+    const cours = await Cours.find({ 
+      professeur: { $in: [professeur.nom, professeur._id] }
+    });
+
+    res.json(cours);
+  } catch (err) {
+    console.error('Erreur récupération cours:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer les étudiants d'un professeur
+app.get('/api/professeur/etudiants', authProfesseur, async (req, res) => {
+  try {
+    const professeur = await Professeur.findById(req.professeurId);
+    if (!professeur) {
+      return res.status(404).json({ message: 'Professeur non trouvé' });
+    }
+
+    // Récupérer les cours du professeur
+    const cours = await Cours.find({ 
+      professeur: { $in: [professeur.nom, professeur._id] }
+    });
+
+    const nomsDesCours = cours.map(c => c.nom);
+
+    // Récupérer les étudiants inscrits à ces cours
+    const etudiants = await Etudiant.find({
+      cours: { $in: nomsDesCours }
+    }).select('nomDeFamille prenom nomComplet email cours');
+
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur récupération étudiants:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📌 Récupérer tous les bulletins (Admin)
+app.get('/api/bulletins', authAdmin, async (req, res) => {
+  try {
+    const bulletins = await Bulletin.find()
+      .populate('etudiant', 'nomDeFamille prenom nomComplet email cours')
+      .populate('professeur', 'nom nomComplet email matiere')  // ✅ Ajout de 'matiere'
+      .sort({ createdAt: -1 });
+
     res.json(bulletins);
   } catch (err) {
+    console.error('Erreur récupération bulletins admin:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📌 Récupérer les bulletins d’un étudiant connecté
-app.get('/api/bulletins/etudiant/me', authEtudiant, async (req, res) => {
+// 📌 Récupérer les statistiques des bulletins (Admin)
+app.get('/api/bulletins/stats', authAdmin, async (req, res) => {
   try {
-    const bulletins = await Bulletin.find({ etudiant: req.utilisateur.id })
-      .populate('professeur', 'nomComplet email');
-    res.json(bulletins);
+    const totalBulletins = await Bulletin.countDocuments();
+    const bulletinsParSemestre = await Bulletin.aggregate([
+      {
+        $group: {
+          _id: '$semestre',
+          count: { $sum: 1 },
+          moyenneGenerale: { $avg: '$noteFinale' }
+        }
+      }
+    ]);
+
+    res.json({
+      total: totalBulletins,
+      parSemestre: bulletinsParSemestre
+    });
   } catch (err) {
+    console.error('Erreur statistiques:', err);
     res.status(500).json({ error: err.message });
   }
 });
-
-
 // ✅ فقط الكورسات التي يدرسها هذا الأستاذ
 app.get('/api/professeur/mes-cours', authProfesseur, async (req, res) => {
   try {
@@ -5650,7 +6054,78 @@ app.get('/api/parents/me', authParent, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Route pour récupérer l'emploi du temps d'un enfant spécifique
+app.get('/api/parents/enfants/:enfantId/seances', authParent, async (req, res) => {
+  try {
+    const { enfantId } = req.params;
+    
+    // Vérifier que cet enfant appartient bien au parent connecté
+    const parent = await Parent.findById(req.userId);
+    if (!parent) {
+      return res.status(404).json({ message: 'Parent non trouvé' });
+    }
 
+    const isParentOfChild = parent.enfants.some(
+      e => e.toString() === enfantId
+    );
+
+    if (!isParentOfChild) {
+      return res.status(403).json({ message: 'Accès non autorisé à cet enfant' });
+    }
+
+    // Récupérer l'enfant avec son cours
+    const enfant = await Etudiant.findById(enfantId);
+    if (!enfant) {
+      return res.status(404).json({ message: 'Enfant non trouvé' });
+    }
+
+    // Récupérer toutes les séances correspondant au cours de l'enfant
+    const seances = await Seance.find({ cours: enfant.cours })
+      .populate('professeur', 'nom prenom email')
+      .sort({ jour: 1, heureDebut: 1 })
+      .lean();
+
+    res.json(seances);
+  } catch (err) {
+    console.error('Erreur récupération séances enfant:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour récupérer les séances de tous les enfants (optionnel)
+app.get('/api/parents/enfants/seances/tous', authParent, async (req, res) => {
+  try {
+    const parent = await Parent.findById(req.userId).populate('enfants');
+    
+    if (!parent || !parent.enfants || parent.enfants.length === 0) {
+      return res.json([]);
+    }
+
+    const seancesParEnfant = {};
+
+    for (const enfant of parent.enfants) {
+      const seances = await Seance.find({ cours: enfant.cours })
+        .populate('professeur', 'nom prenom email')
+        .sort({ jour: 1, heureDebut: 1 })
+        .lean();
+
+      seancesParEnfant[enfant._id] = {
+        enfant: {
+          _id: enfant._id,
+          nomComplet: enfant.nomComplet,
+          niveau: enfant.niveau,
+          cours: enfant.cours
+        },
+        seances: seances
+      };
+    }
+
+    res.json(seancesParEnfant);
+  } catch (err) {
+    console.error('Erreur récupération séances:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // 📊 Absences de tous les enfants du parent
 app.get('/api/parents/enfants/absences', authParent, async (req, res) => {
   try {
