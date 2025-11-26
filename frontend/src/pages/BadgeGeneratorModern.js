@@ -31,7 +31,7 @@ const BadgeGeneratorModern = () => {
   const [showConfig, setShowConfig] = useState(false);
 
   const handlePasswordSubmit = () => {
-    const correctPassword = 'abdoraki2001';
+    const correctPassword = 'abdoraki2002';
     
     if (passwordInput === correctPassword) {
       setIsAuthenticated(true);

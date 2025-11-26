@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download, Edit, Trash2, Save } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx-js-style';
-import Sidebar from '../components/Sidebarmanager'; // ✅ استيراد صحيح
+import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 
 const ListePresences = () => {
   const [presences, setPresences] = useState([]);
@@ -101,6 +101,8 @@ const key = `${new Date(p.dateSession).toDateString()}_${p.cours}_${p.matiere ||
     const role = localStorage.getItem('role');
     setUserRole(role);
   }, []);
+const canEdit = () => true;  // Tous les utilisateurs peuvent modifier
+const canDelete = () => true;
 
   // Fonction de filtrage
   useEffect(() => {
@@ -363,6 +365,22 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
     return;
   }
 
+  // 🆕 Déterminer le titre selon le filtre
+  const getMainTitle = () => {
+    if (statusFilter === 'absent') return 'ABSENCES';
+    if (statusFilter === 'retard') return 'RETARDS';
+    if (statusFilter === 'absent_retard') return 'ABSENCES ET RETARDS';
+    return 'PRÉSENCES';
+  };
+
+  // 🆕 Message pour les classes vides
+  const getEmptyMessage = () => {
+    if (statusFilter === 'absent') return 'Aucune absence';
+    if (statusFilter === 'retard') return 'Aucun retard';
+    if (statusFilter === 'absent_retard') return 'Aucune absence ni retard';
+    return 'Aucune donnée';
+  };
+
   const classes = {};
   sessionsOfDay.forEach(s => {
     if (!classes[s.cours]) classes[s.cours] = [];
@@ -478,7 +496,7 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
   const merges = [];
   const colsCount = header.length;
 
-  const bigTitle = `PRÉSENCES — ${formatDate(date)}${professorName ? ' — ' + professorName : ''}${!isAllPeriode ? ' — ' + periodeFilter : ''}`;
+  const bigTitle = `${getMainTitle()} — ${formatDate(date)}${professorName ? ' — ' + professorName : ''}${!isAllPeriode ? ' — ' + periodeFilter : ''}`;
   aoa.push([bigTitle, ...Array(colsCount - 1).fill('')]);
   merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: colsCount - 1 } });
   aoa.push(Array(colsCount).fill(''));
@@ -488,6 +506,7 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
   const titleRows = [0];
   const classRows = [];
   const subTitleRows = [];
+  const emptyMessageRows = []; // 🆕 Pour tracker les lignes "Aucune absence"
 
   // ===== FONCTION POUR RÉCUPÉRER LES STATISTIQUES D'UN ÉTUDIANT =====
   const calculateStudentStats = async (etudiantId) => {
@@ -554,7 +573,11 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
         merges.push({ s: { r: currentRow, c: 0 }, e: { r: currentRow, c: colsCount - 1 } });
         currentRow++;
 
-        // ===== HEADER DES COLONNES =====
+        // 🆕 Compter les étudiants qui correspondent au filtre
+        let studentsAddedCount = 0;
+        const headerRowIndex = currentRow; // Sauvegarder l'index du header
+
+        // ===== HEADER DES COLONNES (ajouté provisoirement) =====
         aoa.push([...header]);
         headerRows.push(currentRow);
         currentRow++;
@@ -566,6 +589,8 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
             if (statusFilter === 'absent' && p.present) continue;
             if (statusFilter === 'retard' && (!p.present || (p.retardMinutes || 0) === 0)) continue;
             if (statusFilter === 'absent_retard' && (p.present && (p.retardMinutes || 0) === 0)) continue;
+
+            studentsAddedCount++; // 🆕 Incrémenter le compteur
 
             // ===== RÉCUPÉRER LES STATISTIQUES =====
             const stats = await calculateStudentStats(p.etudiant?._id);
@@ -597,6 +622,20 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
             ]);
             currentRow++;
           }
+        }
+
+        // 🆕 Si aucun étudiant n'a été ajouté, remplacer le header par le message
+        if (studentsAddedCount === 0) {
+          // Supprimer le header
+          aoa.splice(headerRowIndex, 1);
+          headerRows.pop(); // Retirer de la liste des headers
+          currentRow--;
+
+          // Ajouter le message "Aucune absence"
+          aoa.splice(headerRowIndex, 0, [getEmptyMessage(), ...Array(colsCount - 1).fill('')]);
+          emptyMessageRows.push(headerRowIndex);
+          merges.push({ s: { r: headerRowIndex, c: 0 }, e: { r: headerRowIndex, c: colsCount - 1 } });
+          currentRow++;
         }
 
         aoa.push(Array(colsCount).fill(''));
@@ -648,6 +687,13 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
       }
     };
 
+    // 🆕 Style pour les messages "Aucune absence"
+    const emptyMessageStyle = {
+      font: { italic: true, sz: 10, color: { rgb: "666666" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      fill: { fgColor: { rgb: "F9F9F9" } }
+    };
+
     // ===== APPLICATION DES STYLES =====
     for (let rowIndex = 0; rowIndex < aoa.length; rowIndex++) {
       for (let colIndex = 0; colIndex < colsCount; colIndex++) {
@@ -663,6 +709,8 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
           ws[cellAddress].s = classStyle;
         } else if (subTitleRows.includes(rowIndex)) {
           ws[cellAddress].s = subTitleStyle;
+        } else if (emptyMessageRows.includes(rowIndex)) { // 🆕 Style pour "Aucune absence"
+          ws[cellAddress].s = emptyMessageStyle;
         } else if (headerRows.includes(rowIndex)) {
           ws[cellAddress].s = headerStyle;
         } else if (aoa[rowIndex][0] && aoa[rowIndex][0] !== '') {
@@ -2066,7 +2114,8 @@ const exportByProfessor = (professorName) => {
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Statut</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Retard</th>
                           <th style={{ ...styles.th, padding: '12px 16px' }}>Remarque</th>
-                          {userRole === 'admin' && <th style={{ ...styles.th, padding: '12px 16px' }}>Actions</th>}
+                          {canEdit() && <th style={{ ...styles.th, padding: '12px 16px' }}>Actions</th>}
+
                         </tr>
                       </thead>
                       <tbody style={{ backgroundColor: 'white' }}>
@@ -2140,73 +2189,81 @@ const exportByProfessor = (professorName) => {
                                 <span style={{ color: '#6b7280' }}>{p.remarque || '—'}</span>
                               )}
                             </td>
-                            {userRole === 'admin' && (
-                              <td style={{ ...styles.td, padding: '12px 16px' }}>
-                                {editingPresence === p._id ? (
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                      onClick={() => handleSaveEdit(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
-                                      style={{
-                                        padding: '4px 8px',
-                                        backgroundColor: '#10b981',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                      }}
-                                    >
-                                      <Save size={12} />
-                                    </button>
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      style={{
-                                        padding: '4px 8px',
-                                        backgroundColor: '#6b7280',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                      }}
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                      onClick={() => handleEditPresence(p)}
-                                      style={{
-                                        padding: '4px 8px',
-                                        backgroundColor: '#3b82f6',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                      }}
-                                    >
-                                      <Edit size={12} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeletePresence(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
-                                      style={{
-                                        padding: '4px 8px',
-                                        backgroundColor: '#dc2626',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                      }}
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            )}
+                       {canEdit() && (
+  <td style={{ ...styles.td, padding: '12px 16px' }}>
+    {editingPresence === p._id ? (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          onClick={() => handleSaveEdit(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: '#10b981',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+          title="Sauvegarder"
+        >
+          <Save size={12} />
+        </button>
+        <button
+          onClick={handleCancelEdit}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: '#6b7280',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+          title="Annuler"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    ) : (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          onClick={() => handleEditPresence(p)}
+          style={{
+            padding: '4px 8px',
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+          title="Modifier"
+        >
+          <Edit size={12} />
+        </button>
+        
+        {/* ✅ Bouton Supprimer visible UNIQUEMENT pour admin */}
+        {canDelete() && (
+          <button
+            onClick={() => handleDeletePresence(p._id, filteredSessions.findIndex(s => s === sessionActive), presenceIndex)}
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px'
+            }}
+            title="Supprimer"
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
+      </div>
+    )}
+  </td>
+)}
                         </tr>
                       ))}
                     </tbody>
