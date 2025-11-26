@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 
 // Import des pages
+import PrintSingleBadge from './pages/PrintSingleBadge';
+
 import ParentBulletins from './pages/ParentBulletins';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -412,6 +414,7 @@ function AppContent() {
 
  <Route path="/parent/absences" element={< ParentAbsences />} />  
  <Route path="/parent/rapports" element={< ParentRapports />} />  
+      <Route path="/print-badge/:id" element={<PrintSingleBadge />} />
 
 <Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
 <Route path="/admin/reclamations" element={<ReclamationsAdmin />} />

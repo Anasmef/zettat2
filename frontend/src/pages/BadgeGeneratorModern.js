@@ -10,27 +10,18 @@ const BadgeGeneratorModern = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // États pour les filtres
   const [recherche, setRecherche] = useState('');
   const [filtreNiveau, setFiltreNiveau] = useState('');
-  
-  // État pour la sélection
   const [selectedIds, setSelectedIds] = useState([]);
   
-  // État pour gérer les étudiants avec autorisation de sortie
-  const [autorisationIds, setAutorisationIds] = useState([]);
-  
-  // 🔐 État pour la protection par mot de passe
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('badgeAccess') === 'true';
   });
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   
-  // Configuration du logo et année scolaire
   const [logoUrl, setLogoUrl] = useState(() => {
-    const logoParDefaut = '/images/logo-ecole.jpg';
-    return localStorage.getItem('schoolLogo') || logoParDefaut;
+    return localStorage.getItem('schoolLogo') || '/images/logo-ecole.jpg';
   });
   
   const [anneeScolaire, setAnneeScolaire] = useState(() => {
@@ -39,9 +30,7 @@ const BadgeGeneratorModern = () => {
   
   const [showConfig, setShowConfig] = useState(false);
 
-  // 🔐 Vérification du mot de passe
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
+  const handlePasswordSubmit = () => {
     const correctPassword = 'abdoraki2001';
     
     if (passwordInput === correctPassword) {
@@ -51,6 +40,12 @@ const BadgeGeneratorModern = () => {
     } else {
       setPasswordError('❌ Mot de passe incorrect');
       setPasswordInput('');
+    }
+  };
+
+  const handlePasswordKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handlePasswordSubmit();
     }
   };
 
@@ -132,20 +127,85 @@ const BadgeGeneratorModern = () => {
     );
   };
 
-  const handleToggleAutorisation = (id) => {
-    setAutorisationIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(autoId => autoId !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (selectedIds.length === 0) {
       alert('Veuillez sélectionner au moins une carte à imprimer');
       return;
     }
-    window.print();
+    
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    document.head.appendChild(script);
+    
+    await new Promise(resolve => {
+      script.onload = resolve;
+    });
+    
+    const printGrid = document.querySelector('.print-grid');
+    printGrid.style.display = 'block';
+    printGrid.style.position = 'fixed';
+    printGrid.style.left = '-9999px';
+    printGrid.style.top = '0';
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const cards = printGrid.querySelectorAll('.print-card-wrapper');
+    
+    for (let i = 0; i < cards.length; i++) {
+      const cardWrapper = cards[i];
+      
+      cardWrapper.style.width = '856px';
+      cardWrapper.style.height = '540px';
+      cardWrapper.style.overflow = 'hidden';
+      cardWrapper.style.border = 'none';
+      cardWrapper.style.borderRadius = '0';
+      cardWrapper.style.margin = '0';
+      cardWrapper.style.padding = '0';
+      
+      const cardContent = cardWrapper.firstChild;
+      if (cardContent) {
+        cardContent.style.width = '856px';
+        cardContent.style.height = '540px';
+        cardContent.style.border = 'none';
+        cardContent.style.borderRadius = '0';
+        cardContent.style.margin = '0';
+        cardContent.style.padding = '0';
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      try {
+        const canvas = await window.html2canvas(cardWrapper, {
+          scale: 4,
+          backgroundColor: null,
+          logging: false,
+          useCORS: true,
+          allowTaint: true,
+          width: 856,
+          height: 540,
+          windowWidth: 856,
+          windowHeight: 540,
+          x: 0,
+          y: 0,
+        });
+        
+        const link = document.createElement('a');
+        const etudiantNom = etudiantsAfficher[i]?.nomComplet || `carte-${i+1}`;
+        link.download = `carte-${etudiantNom.replace(/\s+/g, '-')}.png`;
+        link.href = canvas.toDataURL('image/png', 1.0);
+        link.click();
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (err) {
+        console.error('Erreur génération PNG:', err);
+      }
+    }
+    
+    printGrid.style.display = 'none';
+    printGrid.style.position = '';
+    printGrid.style.left = '';
+    
+    alert(`✅ ${cards.length} carte(s) téléchargée(s) en PNG haute qualité`);
   };
 
   const handleLogout = () => {
@@ -154,21 +214,22 @@ const BadgeGeneratorModern = () => {
   };
 
   const etudiantsAfficher = etudiantsFiltres.filter(e => selectedIds.includes(e._id));
+  const countAutorisations = etudiants.filter(e => e.autorise).length;
 
   if (!isAuthenticated) {
     return (
-      <div style={styles.container}>
+      <div className="badge-container">
         <Sidebar />
-        <div style={styles.mainContent}>
-          <div style={styles.passwordContainer}>
-            <div style={styles.passwordBox}>
-              <div style={styles.lockIcon}>🔒</div>
-              <h2 style={styles.passwordTitle}>Accès Protégé</h2>
-              <p style={styles.passwordSubtitle}>
+        <div className="badge-main-content">
+          <div className="password-container">
+            <div className="password-box">
+              <div className="lock-icon">🔒</div>
+              <h2 className="password-title">Accès Protégé</h2>
+              <p className="password-subtitle">
                 Veuillez entrer le mot de passe pour accéder aux cartes étudiants
               </p>
               
-              <form onSubmit={handlePasswordSubmit} style={styles.passwordForm}>
+              <div className="password-form">
                 <input
                   type="password"
                   value={passwordInput}
@@ -176,19 +237,20 @@ const BadgeGeneratorModern = () => {
                     setPasswordInput(e.target.value);
                     setPasswordError('');
                   }}
+                  onKeyPress={handlePasswordKeyPress}
                   placeholder="Mot de passe"
-                  style={styles.passwordInput}
+                  className="password-input"
                   autoFocus
                 />
                 
                 {passwordError && (
-                  <p style={styles.passwordErrorText}>{passwordError}</p>
+                  <p className="password-error-text">{passwordError}</p>
                 )}
                 
-                <button type="submit" style={styles.passwordButton}>
+                <button onClick={handlePasswordSubmit} className="password-button">
                   Accéder
                 </button>
-              </form>
+              </div>
             </div>
           </div>
         </div>
@@ -198,12 +260,12 @@ const BadgeGeneratorModern = () => {
 
   if (loading) {
     return (
-      <div style={styles.container}>
+      <div className="badge-container">
         <Sidebar />
-        <div style={styles.mainContent}>
-          <div style={styles.loadingContainer}>
-            <div style={styles.spinner}></div>
-            <p style={styles.loadingText}>Chargement des étudiants...</p>
+        <div className="badge-main-content">
+          <div className="loading-container">
+            <div className="spinner"></div>
+            <p className="loading-text">Chargement des étudiants...</p>
           </div>
         </div>
       </div>
@@ -212,19 +274,17 @@ const BadgeGeneratorModern = () => {
 
   if (error) {
     return (
-      <div style={styles.container}>
+      <div className="badge-container">
         <Sidebar />
-        <div style={styles.mainContent}>
-          <div style={styles.loadingContainer}>
-            <p style={{ color: '#ef4444', fontSize: '18px', fontWeight: '600' }}>
-              ❌ {error}
-            </p>
+        <div className="badge-main-content">
+          <div className="loading-container">
+            <p className="error-text">❌ {error}</p>
             {error.includes('connecté') || error.includes('Session') ? (
-              <button onClick={handleLogout} style={styles.btnRetry}>
+              <button onClick={handleLogout} className="btn-retry">
                 Se reconnecter
               </button>
             ) : (
-              <button onClick={fetchEtudiants} style={styles.btnRetry}>
+              <button onClick={fetchEtudiants} className="btn-retry">
                 Réessayer
               </button>
             )}
@@ -235,41 +295,38 @@ const BadgeGeneratorModern = () => {
   }
 
   return (
-    <div style={styles.container}>
+    <div className="badge-container">
       <Sidebar />
       
-      <div style={styles.mainContent}>
-        {/* En-tête */}
-        <div style={styles.header} className="no-print">
-          <div style={styles.headerContent}>
-            <h1 style={styles.title}>🎓 Cartes Étudiants</h1>
-            <p style={styles.subtitle}>
+      <div className="badge-main-content">
+        <div className="badge-header no-print">
+          <div className="header-content">
+            <h1 className="badge-title">🎓 Cartes Étudiants</h1>
+            <p className="badge-subtitle">
               {selectedIds.length} carte(s) sélectionnée(s) sur {etudiantsFiltres.length}
-              {autorisationIds.length > 0 && ` • ${autorisationIds.length} avec autorisation de sortie`}
+              {countAutorisations > 0 && ` • ${countAutorisations} avec autorisation de sortie`}
             </p>
           </div>
         </div>
 
-        {/* Barre d'outils */}
-        <div style={styles.toolbar} className="no-print">
-          <div style={styles.toolbarContent}>
-            {/* Filtres */}
-            <div style={styles.filtresRow}>
-              <div style={styles.filtreGroupe}>
+        <div className="badge-toolbar no-print">
+          <div className="toolbar-content">
+            <div className="filtres-row">
+              <div className="filtre-groupe">
                 <input
                   type="text"
                   placeholder="🔍 Rechercher par nom ou code Massar..."
                   value={recherche}
                   onChange={(e) => setRecherche(e.target.value)}
-                  style={styles.inputRecherche}
+                  className="input-recherche"
                 />
               </div>
 
-              <div style={styles.filtreGroupe}>
+              <div className="filtre-groupe">
                 <select
                   value={filtreNiveau}
                   onChange={(e) => setFiltreNiveau(e.target.value)}
-                  style={styles.selectFiltre}
+                  className="select-filtre"
                 >
                   <option value="">Tous les niveaux</option>
                   {niveauxUniques.map(niveau => (
@@ -279,11 +336,10 @@ const BadgeGeneratorModern = () => {
               </div>
             </div>
 
-            {/* Actions */}
-            <div style={styles.actions}>
+            <div className="actions">
               <button 
                 onClick={() => setShowConfig(true)}
-                style={styles.btnConfig}
+                className="btn-config"
               >
                 <Settings size={18} />
                 Configuration
@@ -291,7 +347,7 @@ const BadgeGeneratorModern = () => {
 
               <button 
                 onClick={handleSelectAll}
-                style={styles.btnSelect}
+                className="btn-select"
                 disabled={etudiantsFiltres.length === 0}
               >
                 Tout sélectionner
@@ -300,7 +356,7 @@ const BadgeGeneratorModern = () => {
               {selectedIds.length > 0 && (
                 <button 
                   onClick={handleDeselectAll}
-                  style={styles.btnDeselect}
+                  className="btn-deselect"
                 >
                   <X size={18} />
                   Désélectionner ({selectedIds.length})
@@ -309,25 +365,23 @@ const BadgeGeneratorModern = () => {
 
               <button 
                 onClick={handlePrint}
-                style={styles.btnPrint}
+                className="btn-print"
                 disabled={selectedIds.length === 0}
               >
                 <Printer size={18} />
-                Imprimer ({selectedIds.length})
+                Télécharger PNG ({selectedIds.length})
               </button>
             </div>
           </div>
         </div>
 
-        {/* Zone de contenu */}
-        <div style={styles.contentArea}>
-          {/* Grille écran */}
-          <div className="screen-grid no-print" style={styles.grid}>
+        <div className="content-area">
+          <div className="screen-grid no-print">
             {etudiantsFiltres.map(etudiant => (
-              <div key={etudiant._id} style={styles.cardWrapper}>
-                <div style={styles.checkboxContainer}>
+              <div key={etudiant._id} className="card-wrapper">
+                <div className="checkbox-container">
                   <div 
-                    style={styles.checkbox}
+                    className="checkbox"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggleSelect(etudiant._id);
@@ -340,56 +394,40 @@ const BadgeGeneratorModern = () => {
                       <Square size={24} color="#9ca3af" />
                     )}
                   </div>
-                  
-                  <button
-                    style={{
-                      ...styles.btnAutorisation,
-                      ...(autorisationIds.includes(etudiant._id) ? styles.btnAutorisationActive : {})
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAutorisation(etudiant._id);
-                    }}
-                    title="Activer l'autorisation de sortie"
-                  >
-                    {autorisationIds.includes(etudiant._id) ? '🔴 Sortie' : '⚪ Sortie'}
-                  </button>
                 </div>
                 
                 <StudentBadge 
                   etudiant={etudiant} 
                   logoUrl={logoUrl} 
                   anneeScolaire={anneeScolaire}
-                  showAutorisation={autorisationIds.includes(etudiant._id)}
+                  showAutorisation={etudiant.autorise}
                 />
               </div>
             ))}
           </div>
 
-          {/* Grille impression */}
           <div className="print-grid" style={{ display: 'none' }}>
             {etudiantsAfficher.map(etudiant => (
-              <div key={etudiant._id}>
+              <div key={etudiant._id} className="print-card-wrapper" data-student-id={etudiant._id}>
                 <StudentBadge 
                   etudiant={etudiant} 
                   logoUrl={logoUrl}
                   anneeScolaire={anneeScolaire}
-                  showAutorisation={autorisationIds.includes(etudiant._id)}
+                  showAutorisation={etudiant.autorise}
                 />
               </div>
             ))}
           </div>
 
           {etudiantsFiltres.length === 0 && (
-            <div style={styles.emptyState}>
+            <div className="empty-state">
               <User size={64} color="#cbd5e1" />
-              <p style={styles.emptyText}>Aucun étudiant trouvé</p>
+              <p className="empty-text">Aucun étudiant trouvé</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal Configuration */}
       {showConfig && (
         <ConfigModal 
           logoUrl={logoUrl}
@@ -400,68 +438,10 @@ const BadgeGeneratorModern = () => {
           setShowConfig={setShowConfig}
         />
       )}
-
-      {/* Styles CSS pour l'impression */}
-      <style>{`
-        * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-
-        @media screen {
-          .print-grid {
-            display: none !important;
-          }
-        }
-
-        @media print {
-          body {
-            background: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
-          .no-print {
-            display: none !important;
-          }
-
-          .screen-grid {
-            display: none !important;
-          }
-
-          .print-grid {
-            display: flex !important;
-            flex-direction: column;
-            align-items: center;
-            gap: 20mm;
-            padding: 15mm;
-          }
-
-          .print-grid > div {
-            page-break-inside: avoid;
-          }
-
-          .print-grid > div:nth-child(3n) {
-            page-break-after: always;
-          }
-
-          @page {
-            size: A4 portrait;
-            margin: 15mm;
-          }
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };
 
-// Composant Configuration (Logo + Année Scolaire)
 const ConfigModal = ({ logoUrl, setLogoUrl, anneeScolaire, setAnneeScolaire, showConfig, setShowConfig }) => {
   const [tempUrl, setTempUrl] = useState(logoUrl);
   const [tempAnnee, setTempAnnee] = useState(anneeScolaire);
@@ -477,508 +457,61 @@ const ConfigModal = ({ logoUrl, setLogoUrl, anneeScolaire, setAnneeScolaire, sho
   if (!showConfig) return null;
 
   return (
-    <div style={modalStyles.overlay}>
-      <div style={modalStyles.modal}>
-        <h3 style={modalStyles.title}>⚙️ Configuration des Cartes</h3>
-        <div style={modalStyles.content}>
-          {/* Logo */}
-          <div style={modalStyles.section}>
-            <label style={modalStyles.label}>URL du logo de l'école:</label>
+    <div className="modal-overlay">
+      <div className="modal">
+        <h3 className="modal-title">⚙️ Configuration des Cartes</h3>
+        <div className="modal-content">
+          <div className="modal-section">
+            <label className="modal-label">URL du logo de l'école:</label>
             <input
               type="text"
               value={tempUrl}
               onChange={(e) => setTempUrl(e.target.value)}
               placeholder="/images/logo-ecole.jpg"
-              style={modalStyles.input}
+              className="modal-input"
             />
             {tempUrl && (
-              <div style={modalStyles.preview}>
-                <p style={modalStyles.previewLabel}>Aperçu:</p>
+              <div className="preview">
+                <p className="preview-label">Aperçu:</p>
                 <img 
                   src={tempUrl} 
                   alt="Logo" 
-                  style={modalStyles.previewImg}
+                  className="preview-img"
                   onError={(e) => {
                     e.target.style.display = 'none';
                     e.target.nextSibling.style.display = 'block';
                   }}
                 />
-                <p style={{...modalStyles.previewLabel, display: 'none', color: '#dc2626'}}>
+                <p className="preview-label error-preview" style={{display: 'none'}}>
                   ❌ Logo introuvable
                 </p>
               </div>
             )}
           </div>
 
-          {/* Année Scolaire */}
-          <div style={modalStyles.section}>
-            <label style={modalStyles.label}>Année scolaire:</label>
+          <div className="modal-section">
+            <label className="modal-label">Année scolaire:</label>
             <input
               type="text"
               value={tempAnnee}
               onChange={(e) => setTempAnnee(e.target.value)}
               placeholder="2024-2025"
-              style={modalStyles.input}
+              className="modal-input"
             />
-            <p style={modalStyles.hint}>Format recommandé: 2024-2025</p>
+            <p className="modal-hint">Format recommandé: 2024-2025</p>
           </div>
         </div>
-        <div style={modalStyles.actions}>
-          <button onClick={() => setShowConfig(false)} style={modalStyles.btnCancel}>
+        <div className="modal-actions">
+          <button onClick={() => setShowConfig(false)} className="btn-cancel">
             Annuler
           </button>
-          <button onClick={handleSave} style={modalStyles.btnSave}>
+          <button onClick={handleSave} className="btn-save">
             Enregistrer
           </button>
         </div>
       </div>
     </div>
   );
-};
-
-// Styles
-const styles = {
-  container: {
-    display: 'flex',
-    minHeight: '100vh',
-    backgroundColor: '#f8fafc',
-  },
-
-  mainContent: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-
-  header: {
-    background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)',
-    padding: '24px 0',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-  },
-
-  headerContent: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '0 24px',
-  },
-
-  title: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#ffffff',
-    margin: '0 0 8px 0',
-  },
-
-  subtitle: {
-    fontSize: '16px',
-    color: '#ffffff',
-    opacity: 0.9,
-    margin: 0,
-  },
-
-  toolbar: {
-    backgroundColor: '#ffffff',
-    borderBottom: '1px solid #e5e7eb',
-    padding: '20px 0',
-  },
-
-  toolbarContent: {
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '0 24px',
-  },
-
-  filtresRow: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '16px',
-    flexWrap: 'wrap',
-  },
-
-  filtreGroupe: {
-    flex: '1',
-    minWidth: '200px',
-  },
-
-  inputRecherche: {
-    width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '10px',
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  },
-
-  selectFiltre: {
-    width: '100%',
-    padding: '12px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '10px',
-    fontSize: '14px',
-    backgroundColor: '#ffffff',
-    outline: 'none',
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-  },
-
-  actions: {
-    display: 'flex',
-    gap: '12px',
-    flexWrap: 'wrap',
-  },
-
-  btnConfig: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-
-  btnSelect: {
-    padding: '10px 20px',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-
-  btnDeselect: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
-    border: '2px solid #fecaca',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-
-  btnPrint: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 24px',
-    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
-  },
-
-  contentArea: {
-    flex: 1,
-    maxWidth: '1400px',
-    margin: '0 auto',
-    padding: '32px 24px',
-    width: '100%',
-  },
-
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(450px, 1fr))',
-    gap: '32px',
-    justifyContent: 'center',
-  },
-
-  cardWrapper: {
-    position: 'relative',
-  },
-
-  checkboxContainer: {
-    position: 'absolute',
-    top: '-12px',
-    right: '-12px',
-    zIndex: 10,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-    alignItems: 'flex-end',
-  },
-
-  checkbox: {
-    backgroundColor: '#ffffff',
-    borderRadius: '6px',
-    padding: '4px',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-  },
-
-  btnAutorisation: {
-    padding: '6px 12px',
-    backgroundColor: '#ffffff',
-    color: '#6b7280',
-    border: '2px solid #e5e7eb',
-    borderRadius: '6px',
-    fontSize: '11px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    transition: 'all 0.2s ease',
-  },
-
-  btnAutorisationActive: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    borderColor: '#dc2626',
-  },
-
-  loadingContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '60vh',
-    gap: '16px',
-  },
-
-  spinner: {
-    width: '48px',
-    height: '48px',
-    border: '4px solid #e2e8f0',
-    borderTop: '4px solid #6366f1',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  },
-
-  loadingText: {
-    fontSize: '16px',
-    color: '#64748b',
-    fontWeight: '500',
-    margin: 0,
-  },
-
-  btnRetry: {
-    padding: '12px 24px',
-    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-
-  emptyState: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '60px 20px',
-    gap: '16px',
-  },
-
-  emptyText: {
-    fontSize: '18px',
-    color: '#64748b',
-    fontWeight: '500',
-  },
-
-  // 🔐 Styles pour la protection par mot de passe
-  passwordContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
-
-  passwordBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: '16px',
-    padding: '48px 40px',
-    width: '90%',
-    maxWidth: '420px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-    textAlign: 'center',
-  },
-
-  lockIcon: {
-    fontSize: '64px',
-    marginBottom: '24px',
-  },
-
-  passwordTitle: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#1e293b',
-    margin: '0 0 12px 0',
-  },
-
-  passwordSubtitle: {
-    fontSize: '14px',
-    color: '#64748b',
-    margin: '0 0 32px 0',
-    lineHeight: '1.5',
-  },
-
-  passwordForm: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
-  },
-
-  passwordInput: {
-    width: '100%',
-    padding: '14px 16px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '10px',
-    fontSize: '16px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.2s ease',
-  },
-
-  passwordButton: {
-    width: '100%',
-    padding: '14px 24px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '16px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
-  },
-
-  passwordErrorText: {
-    color: '#dc2626',
-    fontSize: '14px',
-    fontWeight: '600',
-    margin: '0',
-  },
-};
-
-const modalStyles = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-
-  modal: {
-    backgroundColor: '#ffffff',
-    borderRadius: '12px',
-    padding: '24px',
-    width: '90%',
-    maxWidth: '500px',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-  },
-
-  title: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#1e293b',
-    margin: '0 0 20px 0',
-  },
-
-  content: {
-    marginBottom: '24px',
-  },
-
-  section: {
-    marginBottom: '24px',
-  },
-
-  label: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: '8px',
-  },
-
-  input: {
-    width: '100%',
-    padding: '12px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  },
-
-  hint: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginTop: '4px',
-    fontStyle: 'italic',
-  },
-
-  preview: {
-    marginTop: '16px',
-    textAlign: 'center',
-  },
-
-  previewLabel: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginBottom: '8px',
-  },
-
-  previewImg: {
-    width: '100px',
-    height: '100px',
-    objectFit: 'contain',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    padding: '8px',
-  },
-
-  actions: {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'flex-end',
-  },
-
-  btnCancel: {
-    padding: '10px 20px',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
-
-  btnSave: {
-    padding: '10px 20px',
-    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-    color: '#ffffff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-  },
 };
 
 export default BadgeGeneratorModern;

@@ -1,0 +1,426 @@
+/* ===========================
+   VUE IMPRESSION UNIQUE - GRANDE CARTE À L'ÉCRAN
+   =========================== */
+
+* {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+.print-single-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barre d'outils */
+.print-single-toolbar {
+  background: white;
+  padding: 20px 40px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.btn-back {
+  padding: 10px 20px;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: #e5e7eb;
+}
+
+.toolbar-info {
+  flex: 1;
+  text-align: center;
+}
+
+.toolbar-info h2 {
+  margin: 0 0 5px 0;
+  color: #1e293b;
+  font-size: 20px;
+}
+
+.toolbar-info span {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.autorisation-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+}
+
+.autorisation-toggle input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.btn-print {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transition: transform 0.2s;
+}
+
+.btn-print:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.btn-export-pdf {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  transition: transform 0.2s;
+}
+
+.btn-export-pdf:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+}
+
+.btn-export-pdf:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 🆕 INDICATEUR DE TAILLE PVC */
+.pvc-size-indicator {
+  background: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.pvc-size-indicator h3 {
+  margin: 0 0 8px 0;
+  color: #1e293b;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pvc-size-indicator p {
+  margin: 4px 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.pvc-size-indicator .size-highlight {
+  display: inline-block;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 700;
+  margin: 0 4px;
+}
+
+/* Zone de la carte */
+.print-single-badge {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 20px;
+}
+
+/* 🔥 CARTE TRÈS GRANDE À L'ÉCRAN */
+.badge-wrapper {
+  width: 90% !important;
+  max-width: 1200px !important;
+  aspect-ratio: 85.6 / 53.98 !important;
+  background: white !important;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.4);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.badge-wrapper:hover {
+  transform: scale(1.02);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5);
+}
+
+/* S'assurer que StudentBadge remplit tout l'espace */
+.badge-wrapper > * {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: white !important;
+}
+
+/* États de chargement */
+.print-single-loading,
+.print-single-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===========================
+   MODE IMPRESSION - FORMAT CR80 EXACT
+   85.6mm × 53.98mm
+   =========================== */
+
+@media print {
+  @page {
+    size: 85.6mm 53.98mm;
+    margin: 0;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: white !important;
+  }
+
+  /* Cacher tout sauf la carte */
+  .print-single-toolbar,
+  .pvc-size-indicator,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Container principal */
+  .print-single-container {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    display: block !important;
+    overflow: hidden !important;
+  }
+
+  /* Zone du badge */
+  .print-single-badge {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+  }
+
+  /* Wrapper aux dimensions exactes PVC */
+  .badge-wrapper {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    max-width: 85.6mm !important;
+    max-height: 53.98mm !important;
+    min-width: 85.6mm !important;
+    min-height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    display: block !important;
+    overflow: hidden !important;
+    position: relative !important;
+    background: white !important;
+  }
+
+  /* La carte remplit 100% du wrapper */
+  .badge-wrapper > * {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    max-width: 85.6mm !important;
+    max-height: 53.98mm !important;
+    min-width: 85.6mm !important;
+    min-height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    transform: none !important;
+    background: white !important;
+  }
+
+  /* Tous les enfants respectent les dimensions */
+  .badge-wrapper * {
+    box-sizing: border-box !important;
+  }
+}
+
+/* Responsive pour écran */
+@media screen and (max-width: 1400px) {
+  .badge-wrapper {
+    width: 90% !important;
+    max-width: 1000px !important;
+    aspect-ratio: 85.6 / 53.98 !important;
+  }
+  
+  .badge-wrapper > * {
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+  }
+}
+
+@media screen and (max-width: 1200px) {
+  .badge-wrapper {
+    width: 90% !important;
+    max-width: 900px !important;
+    aspect-ratio: 85.6 / 53.98 !important;
+  }
+  
+  .badge-wrapper > * {
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+  }
+  
+  .badge-wrapper:hover {
+    transform: scale(1.03);
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .badge-wrapper {
+    width: 85% !important;
+    max-width: 700px !important;
+    aspect-ratio: 85.6 / 53.98 !important;
+  }
+  
+  .badge-wrapper > * {
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .print-single-toolbar {
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+  }
+
+  .toolbar-info {
+    text-align: left;
+    width: 100%;
+  }
+
+  .toolbar-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-print,
+  .btn-export-pdf,
+  .autorisation-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .badge-wrapper {
+    width: 90% !important;
+    max-width: 500px !important;
+    aspect-ratio: 85.6 / 53.98 !important;
+  }
+  
+  .badge-wrapper > * {
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+  }
+  
+  .pvc-size-indicator {
+    padding: 12px 16px;
+  }
+  
+  .pvc-size-indicator h3 {
+    font-size: 16px;
+  }
+  
+  .pvc-size-indicator p {
+    font-size: 12px;
+  }
+}
+
+@media screen and (max-width: 500px) {
+  .badge-wrapper {
+    width: 90% !important;
+    max-width: 350px !important;
+    aspect-ratio: 85.6 / 53.98 !important;
+  }
+  
+  .badge-wrapper > * {
+    width: 100% !important;
+    height: 100% !important;
+    background: white !important;
+  }
+}
