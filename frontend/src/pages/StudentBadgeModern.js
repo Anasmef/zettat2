@@ -1,27 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { User, ImageIcon } from 'lucide-react';
 import './StudentBadgeModern.css';
 
-const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
+const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAutorisation = false }) => {
   const qrRef = useRef(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
 
-  // Générer l'URL pour le QR code
   const baseUrl = window.location.origin;
   const qrData = `${baseUrl}/etudiant/${etudiant._id}`;
 
-  // Générer le QR code
   useEffect(() => {
     if (qrData) {
       QRCode.toDataURL(qrData, {
         width: 200,
-        margin: 2,
+        margin: 1,
         color: {
           dark: '#000000',
           light: '#FFFFFF'
         },
-        errorCorrectionLevel: 'H'
+        errorCorrectionLevel: 'M'
       })
         .then(url => {
           setQrDataUrl(url);
@@ -33,101 +30,97 @@ const StudentBadge = ({ etudiant, logoUrl, showAutorisation = false }) => {
   }, [qrData]);
 
   return (
-    <div className="badge-modern-wrapper">
-      <div className="badge-modern-card print-card">
-        {/* En-tête avec dégradé rose-violet-indigo */}
-        <div className="badge-modern-header print-header">
-          {/* Logo */}
-          <div className="badge-modern-logo-container">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="badge-modern-logo" />
-            ) : (
-              <div className="badge-modern-logo-placeholder">
-                <ImageIcon size={44} color="#ffffff" />
-              </div>
-            )}
+    <div className="card-wrapper-pvc">
+      <div className="card-container-pvc">
+        <div className="header-pvc">
+          <div className="logo-section-pvc">
+            <div className="logo-pvc">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="logo-img-pvc" />
+              ) : (
+                'AK'
+              )}
+            </div>
+            <div className="company-name-pvc">
+              <h1>ALFRED KASTLER</h1>
+              <p>{anneeScolaire}</p>
+            </div>
           </div>
-
-          {/* Titre */}
-          <div className="badge-modern-header-text">
-            <p className="badge-modern-card-type-main">CARTE ÉTUDIANT</p>
-            <p className="badge-modern-card-subtype-year">ANNÉE SCOLAIRE</p>
-            <p className="badge-modern-card-year">2025/2026</p>
-          </div>
-
-        {/* Photo étudiant */}
-          <div className="badge-modern-photo-container print-photo">
-            {etudiant.image ? (
-              <img 
-                src={etudiant.image.startsWith('http') ? etudiant.image : `${window.location.origin}${etudiant.image}`}
-                alt={etudiant.nomComplet}
-                className="badge-modern-photo"
-                onError={(e) => {
-                  console.error('Erreur chargement image:', etudiant.image);
-                  e.target.style.display = 'none';
-                  e.target.parentElement.innerHTML = '<div class="badge-modern-photo-placeholder"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>';
-                }}
-              />
-            ) : (
-              <div className="badge-modern-photo-placeholder">
-                <User size={34} color="#ffffff" strokeWidth={1.5} />
-              </div>
-            )}
-          </div>
+          <div className="header-accent-pvc"></div>
         </div>
 
-        {/* Corps de la carte */}
-        <div className="badge-modern-body">
-          <div className="badge-modern-content-grid">
-            {/* Colonne gauche - Informations */}
-            <div className="badge-modern-info-section">
-              <div className="badge-modern-info-row-name">
-                <span className="badge-modern-label">NOM COMPLET:</span>
-                <span className={`badge-modern-value-name ${etudiant.nomComplet?.length > 20 ? 'long-name' : ''}`}>
-                  {etudiant.nomComplet?.toUpperCase()}
-                </span>
+        <div className="card-body-pvc">
+          <div className="decorative-circles-pvc">
+            {[...Array(9)].map((_, i) => (
+              <div key={i} className="circle-pvc"></div>
+            ))}
+          </div>
+
+          <div className="content-wrapper-pvc">
+            <div className="photo-section-pvc">
+              <div className="student-photo-pvc">
+                {etudiant.image ? (
+                  <img 
+                    src={etudiant.image.startsWith('http') ? etudiant.image : `${window.location.origin}${etudiant.image}`}
+                    alt={etudiant.nomComplet}
+                    className="photo-img-pvc"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = '<div class="photo-placeholder-pvc">👤</div>';
+                    }}
+                  />
+                ) : (
+                  <div className="photo-placeholder-pvc">👤</div>
+                )}
+              </div>
+            </div>
+
+            <div className="info-section-pvc">
+              <h2 className="card-title-pvc">CARTE D'ÉTUDIANT</h2>
+              
+              <div className="info-row-pvc">
+                <span className="info-label-pvc">Nom</span>
+                <span className="info-value-pvc">: {etudiant.nomComplet || 'N/A'}</span>
               </div>
               
-              <div className="badge-modern-info-row">
-                <span className="badge-modern-label">NIVEAU:</span>
-                <span className="badge-modern-value-highlight print-gradient">
-                  {etudiant.niveau || 'N/A'}
-                </span>
-              </div>
-
-              {etudiant.codeMassar && (
-                <div className="badge-modern-info-row-massar">
-                  <span className="badge-modern-label">CODE MASSAR:</span>
-                  <span className="badge-modern-value-massar">
-                    {etudiant.codeMassar}
-                  </span>
+              {/* Section avec QR Code à côté */}
+              <div className="info-with-qr-pvc">
+                <div className="info-left-pvc">
+                  <div className="info-row-pvc">
+                    <span className="info-label-pvc">ID Étudiant</span>
+                    <span className="info-value-pvc">: {etudiant.codeMassar || 'N/A'}</span>
+                  </div>
+                  
+                  <div className="info-row-pvc">
+                    <span className="info-label-pvc">Niveau</span>
+                    <span className="info-value-pvc">: {etudiant.niveau || 'N/A'}</span>
+                  </div>
+                  
+                  {showAutorisation && (
+                    <div className="info-row-pvc">
+                      <p className="autorisation-text-pvc">✓ Autorisé de sortir</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Colonne droite - QR Code (toujours présent) */}
-            <div className="badge-modern-qr-compact">
-              {qrDataUrl ? (
-                <img 
-                  src={qrDataUrl} 
-                  alt="QR Code" 
-                  className="badge-modern-qr-small"
-                />
-              ) : (
-                <div className="badge-modern-qr-placeholder-small">...</div>
-              )}
-              
-              {/* Texte sous le QR : soit "Scanner" soit "AUTORISATION DE SORTIE" en rouge */}
-              {showAutorisation ? (
-                <p className="badge-modern-autorisation-text">
-                  AUTORISATION<br/>DE SORTIE
-                </p>
-              ) : (
-                <p className="badge-modern-qr-label-small"></p>
-              )}
+                {/* QR Code à droite */}
+                <div className="qr-side-pvc">
+                  {qrDataUrl ? (
+                    <img 
+                      src={qrDataUrl} 
+                      alt="QR Code" 
+                      className="qrcode-small-pvc"
+                    />
+                  ) : (
+                    <div className="qr-placeholder-small-pvc">QR</div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        <div className="footer-accent-pvc"></div>
       </div>
     </div>
   );

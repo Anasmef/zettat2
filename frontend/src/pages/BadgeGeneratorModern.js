@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { User, Printer, X, CheckSquare, Square, Settings } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Download, X, CheckSquare, Square, Settings } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import StudentBadge from './StudentBadgeModern';
 import './BadgeGeneratorModern.css';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const BadgeGeneratorModern = () => {
   const [etudiants, setEtudiants] = useState([]);
   const [etudiantsFiltres, setEtudiantsFiltres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [downloadingId, setDownloadingId] = useState(null);
   
   const [recherche, setRecherche] = useState('');
   const [filtreNiveau, setFiltreNiveau] = useState('');
@@ -29,6 +32,9 @@ const BadgeGeneratorModern = () => {
   });
   
   const [showConfig, setShowConfig] = useState(false);
+  
+  // Ref pour le rendu invisible
+  const hiddenCardRef = useRef(null);
 
   const handlePasswordSubmit = () => {
     const correctPassword = 'abdoraki2002';
@@ -111,6 +117,87 @@ const BadgeGeneratorModern = () => {
 
   const niveauxUniques = [...new Set(etudiants.map(e => e.niveau).filter(Boolean))].sort();
 
+  // ========================================
+  // 🎯 Télécharger UNE carte en PDF (format PVC exact)
+  // ========================================
+  const handleDownloadPDF = async (etudiant) => {
+    try {
+      setDownloadingId(etudiant._id);
+
+      // Attendre un peu que les images se chargent
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Trouver le conteneur de la carte dans le DOM
+      const cardElement = document.querySelector(`[data-student-id="${etudiant._id}"] .card-container-pvc`);
+      
+      if (!cardElement) {
+        alert('❌ Impossible de trouver la carte');
+        return;
+      }
+
+      // Capturer UNIQUEMENT la carte (sans margin/padding)
+      const canvas = await html2canvas(cardElement, {
+        scale: 3, // Haute qualité
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        removeContainer: false,
+        imageTimeout: 0,
+        width: 324, // Taille exacte de la carte
+        height: 204
+      });
+
+      // Dimensions carte PVC standard en mm
+      const pvcWidth = 85.6;  // mm
+      const pvcHeight = 54;   // mm
+
+      // Créer PDF avec dimensions exactes
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [pvcWidth, pvcHeight]
+      });
+
+      // Convertir canvas en image
+      const imgData = canvas.toDataURL('image/png', 1.0);
+
+      // Ajouter l'image au PDF (remplir toute la page)
+      pdf.addImage(imgData, 'PNG', 0, 0, pvcWidth, pvcHeight, '', 'FAST');
+
+      // Télécharger
+      const nomFichier = `Carte_${etudiant.nomComplet?.replace(/\s+/g, '_') || etudiant._id}.pdf`;
+      pdf.save(nomFichier);
+
+    } catch (err) {
+      console.error('Erreur PDF:', err);
+      alert('❌ Erreur lors de la génération du PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // ========================================
+  // 🎯 Télécharger PLUSIEURS cartes sélectionnées
+  // ========================================
+  const handleDownloadSelected = async () => {
+    if (selectedIds.length === 0) {
+      alert('Veuillez sélectionner au moins une carte');
+      return;
+    }
+
+    for (const id of selectedIds) {
+      const etudiant = etudiants.find(e => e._id === id);
+      if (etudiant) {
+        await handleDownloadPDF(etudiant);
+        // Pause entre chaque téléchargement
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    }
+
+    alert(`✅ ${selectedIds.length} carte(s) téléchargée(s)`);
+  };
+
   const handleSelectAll = () => {
     setSelectedIds(etudiantsFiltres.map(e => e._id));
   };
@@ -127,93 +214,11 @@ const BadgeGeneratorModern = () => {
     );
   };
 
-  const handlePrint = async () => {
-    if (selectedIds.length === 0) {
-      alert('Veuillez sélectionner au moins une carte à imprimer');
-      return;
-    }
-    
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    document.head.appendChild(script);
-    
-    await new Promise(resolve => {
-      script.onload = resolve;
-    });
-    
-    const printGrid = document.querySelector('.print-grid');
-    printGrid.style.display = 'block';
-    printGrid.style.position = 'fixed';
-    printGrid.style.left = '-9999px';
-    printGrid.style.top = '0';
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const cards = printGrid.querySelectorAll('.print-card-wrapper');
-    
-    for (let i = 0; i < cards.length; i++) {
-      const cardWrapper = cards[i];
-      
-      cardWrapper.style.width = '856px';
-      cardWrapper.style.height = '540px';
-      cardWrapper.style.overflow = 'hidden';
-      cardWrapper.style.border = 'none';
-      cardWrapper.style.borderRadius = '0';
-      cardWrapper.style.margin = '0';
-      cardWrapper.style.padding = '0';
-      
-      const cardContent = cardWrapper.firstChild;
-      if (cardContent) {
-        cardContent.style.width = '856px';
-        cardContent.style.height = '540px';
-        cardContent.style.border = 'none';
-        cardContent.style.borderRadius = '0';
-        cardContent.style.margin = '0';
-        cardContent.style.padding = '0';
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      try {
-        const canvas = await window.html2canvas(cardWrapper, {
-          scale: 4,
-          backgroundColor: null,
-          logging: false,
-          useCORS: true,
-          allowTaint: true,
-          width: 856,
-          height: 540,
-          windowWidth: 856,
-          windowHeight: 540,
-          x: 0,
-          y: 0,
-        });
-        
-        const link = document.createElement('a');
-        const etudiantNom = etudiantsAfficher[i]?.nomComplet || `carte-${i+1}`;
-        link.download = `carte-${etudiantNom.replace(/\s+/g, '-')}.png`;
-        link.href = canvas.toDataURL('image/png', 1.0);
-        link.click();
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } catch (err) {
-        console.error('Erreur génération PNG:', err);
-      }
-    }
-    
-    printGrid.style.display = 'none';
-    printGrid.style.position = '';
-    printGrid.style.left = '';
-    
-    alert(`✅ ${cards.length} carte(s) téléchargée(s) en PNG haute qualité`);
-  };
-
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/';
   };
 
-  const etudiantsAfficher = etudiantsFiltres.filter(e => selectedIds.includes(e._id));
   const countAutorisations = etudiants.filter(e => e.autorise).length;
 
   if (!isAuthenticated) {
@@ -301,7 +306,7 @@ const BadgeGeneratorModern = () => {
       <div className="badge-main-content">
         <div className="badge-header no-print">
           <div className="header-content">
-            <h1 className="badge-title">🎓 Cartes Étudiants</h1>
+            <h1 className="badge-title">🎓 Cartes Étudiants PVC</h1>
             <p className="badge-subtitle">
               {selectedIds.length} carte(s) sélectionnée(s) sur {etudiantsFiltres.length}
               {countAutorisations > 0 && ` • ${countAutorisations} avec autorisation de sortie`}
@@ -354,23 +359,25 @@ const BadgeGeneratorModern = () => {
               </button>
 
               {selectedIds.length > 0 && (
-                <button 
-                  onClick={handleDeselectAll}
-                  className="btn-deselect"
-                >
-                  <X size={18} />
-                  Désélectionner ({selectedIds.length})
-                </button>
+                <>
+                  <button 
+                    onClick={handleDeselectAll}
+                    className="btn-deselect"
+                  >
+                    <X size={18} />
+                    Désélectionner ({selectedIds.length})
+                  </button>
+                  
+                  <button 
+                    onClick={handleDownloadSelected}
+                    className="btn-print"
+                    disabled={downloadingId !== null}
+                  >
+                    <Download size={18} />
+                    {downloadingId ? 'Téléchargement...' : `Télécharger PDF (${selectedIds.length})`}
+                  </button>
+                </>
               )}
-
-              <button 
-                onClick={handlePrint}
-                className="btn-print"
-                disabled={selectedIds.length === 0}
-              >
-                <Printer size={18} />
-                Télécharger PNG ({selectedIds.length})
-              </button>
             </div>
           </div>
         </div>
@@ -378,15 +385,33 @@ const BadgeGeneratorModern = () => {
         <div className="content-area">
           <div className="screen-grid no-print">
             {etudiantsFiltres.map(etudiant => (
-              <div key={etudiant._id} className="card-wrapper">
+              <div key={etudiant._id} className="card-wrapper" data-student-id={etudiant._id}>
                 <div className="checkbox-container">
+                  {/* Bouton télécharger individuel */}
+                  <button
+                    className="btn-download-single"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadPDF(etudiant);
+                    }}
+                    disabled={downloadingId === etudiant._id}
+                    title="Télécharger cette carte en PDF"
+                  >
+                    {downloadingId === etudiant._id ? (
+                      <div className="mini-spinner"></div>
+                    ) : (
+                      <Download size={20} />
+                    )}
+                  </button>
+                  
+                  {/* Checkbox pour sélection multiple */}
                   <div 
                     className="checkbox"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleToggleSelect(etudiant._id);
                     }}
-                    title="Sélectionner pour impression"
+                    title="Sélectionner pour téléchargement multiple"
                   >
                     {selectedIds.includes(etudiant._id) ? (
                       <CheckSquare size={24} color="#6366f1" />
@@ -399,19 +424,6 @@ const BadgeGeneratorModern = () => {
                 <StudentBadge 
                   etudiant={etudiant} 
                   logoUrl={logoUrl} 
-                  anneeScolaire={anneeScolaire}
-                  showAutorisation={etudiant.autorise}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="print-grid" style={{ display: 'none' }}>
-            {etudiantsAfficher.map(etudiant => (
-              <div key={etudiant._id} className="print-card-wrapper" data-student-id={etudiant._id}>
-                <StudentBadge 
-                  etudiant={etudiant} 
-                  logoUrl={logoUrl}
                   anneeScolaire={anneeScolaire}
                   showAutorisation={etudiant.autorise}
                 />

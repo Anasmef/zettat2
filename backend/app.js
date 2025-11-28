@@ -825,136 +825,83 @@ app.get('/api/bulletins/etudiant/:enfantId', authParent, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-// Ajouter un étudiant
-app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'),checkFieldPermissions, async (req, res) => {
+app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.single('image'), checkFieldPermissions, async (req, res) => {
+  console.log('🔍 === DÉBUT ROUTE POST ===');
+  
   try {
     const {
-      // Identité
-      nomComplet,
-      genre,
-      dateNaissance,
-      lieuNaissance,
-      nationalite,
-
-      // Parents
-      nomCompletPere,
-      nomCompletMere,
-      travailPere,
-      travailMere,
-
-      // Contact
-      telephoneEtudiant,
-      telephonePere,
-      telephoneMere,
-
-      // Scolarité
-      codeMassar,
-      adresse,
-      email,
-      motDePasse,
-      niveau,
-      transport,
-
-      // Paiements
-      prixTotal,
-      paye,
-      pourcentageBourse,
-      typePaiement,
-      anneeScolaire
+      nomComplet, genre, dateNaissance, lieuNaissance, nationalite,
+      nomCompletPere, nomCompletMere, travailPere, travailMere,
+      telephoneEtudiant, telephonePere, telephoneMere,
+      codeMassar, cin, adresse, email, motDePasse, niveau, transport, // 🆕 cin ajouté
+      prixTotal, paye, pourcentageBourse, typePaiement, anneeScolaire
     } = req.body;
 
     let { cours, actif } = req.body;
 
-    // ===== VALIDATION DU CHAMP OBLIGATOIRE =====
+    // ===== VALIDATION DU SEUL CHAMP OBLIGATOIRE =====
     if (!nomComplet || nomComplet.toString().trim() === '') {
       return res.status(400).json({
         message: 'Le nom complet est obligatoire'
       });
     }
 
-    // Trouver l'étudiant existant
-    const etudiantExistant = await Etudiant.findById(req.params.id);
-    if (!etudiantExistant) {
-      return res.status(404).json({ message: 'Étudiant non trouvé' });
-    }
-
     // ===== VALIDATION DES FORMATS (SEULEMENT SI LES CHAMPS SONT FOURNIS) =====
     
-    // Email (validation seulement si fourni)
-    if (email && email.trim() !== '') {
+    // 🆕 Validation du CIN (seulement si fourni)
+    if (cin && cin.trim()) {
+      // Format CIN marocain: 1-2 lettres suivies de 6-8 chiffres
+      const cinRegex = /^[A-Z]{1,2}\d{6,8}$/i;
+      if (!cinRegex.test(cin.trim().toUpperCase())) {
+        return res.status(400).json({ 
+          message: 'Format de CIN invalide (ex: AB123456)' 
+        });
+      }
+    }
+
+    // Email - validation seulement si fourni
+    if (email && email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
         return res.status(400).json({ message: 'Format d\'email invalide' });
       }
     }
 
-    // Mot de passe (seulement si fourni)
-    if (motDePasse && motDePasse.trim() !== '' && motDePasse.length < 6) {
-      return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
-    }
+    // ... autres validations (mot de passe, année scolaire, genre, téléphones, nationalité)
 
-    // Année scolaire (validation seulement si fournie)
-    if (anneeScolaire && anneeScolaire.trim() !== '') {
-      const anneeScolaireRegex = /^\d{4}\/\d{4}$/;
-      if (!anneeScolaireRegex.test(anneeScolaire.trim())) {
-        return res.status(400).json({ message: 'L\'année scolaire doit être au format YYYY/YYYY (ex: 2025/2026)' });
-      }
-    }
-
-    // Genre (validation seulement si fourni)
-    if (genre && !['Homme', 'Femme'].includes(genre)) {
-      return res.status(400).json({ message: 'Le genre doit être "Homme" ou "Femme"' });
-    }
-
-    // Téléphones (validation seulement si fournis)
-    const phoneRegex = /^[0-9+\-\s]{8,15}$/;
-    if (telephoneEtudiant && telephoneEtudiant.trim() !== '' && !phoneRegex.test(telephoneEtudiant.trim())) {
-      return res.status(400).json({ message: 'Format de téléphone étudiant invalide' });
-    }
-    if (telephonePere && telephonePere.trim() !== '' && !phoneRegex.test(telephonePere.trim())) {
-      return res.status(400).json({ message: 'Format de téléphone père invalide' });
-    }
-    if (telephoneMere && telephoneMere.trim() !== '' && !phoneRegex.test(telephoneMere.trim())) {
-      return res.status(400).json({ message: 'Format de téléphone mère invalide' });
-    }
-
-    // Nationalité (validation seulement si fournie)
-    if (nationalite && nationalite.trim() !== '' && nationalite.trim().length < 2) {
-      return res.status(400).json({ message: 'Nationalité invalide' });
-    }
-
-    // ===== VÉRIFICATION D'UNICITÉ (SEULEMENT SI LES CHAMPS SONT FOURNIS) =====
-    const checks = [];
+    // ===== VÉRIFICATION D'UNICITÉ =====
+    const verifications = [];
     
-    if (email && email.trim() !== '') {
-      checks.push(
-        Etudiant.findOne({ 
-          email: email.toLowerCase().trim(),
-          _id: { $ne: req.params.id }
-        })
-      );
+    if (email && email.trim()) {
+      verifications.push(Etudiant.findOne({ email: email.toLowerCase().trim() }));
     } else {
-      checks.push(Promise.resolve(null));
+      verifications.push(Promise.resolve(null));
+    }
+    
+    if (codeMassar && codeMassar.trim()) {
+      verifications.push(Etudiant.findOne({ codeMassar: codeMassar.trim() }));
+    } else {
+      verifications.push(Promise.resolve(null));
     }
 
-    if (codeMassar && codeMassar.trim() !== '') {
-      checks.push(
-        Etudiant.findOne({ 
-          codeMassar: codeMassar.trim(),
-          _id: { $ne: req.params.id }
-        })
-      );
+    // 🆕 Vérification CIN
+    if (cin && cin.trim()) {
+      verifications.push(Etudiant.findOne({ cin: cin.trim().toUpperCase() }));
     } else {
-      checks.push(Promise.resolve(null));
+      verifications.push(Promise.resolve(null));
     }
 
-    const [emailExistant, massarExistant] = await Promise.all(checks);
-
+    const [emailExistant, massarExistant, cinExistant] = await Promise.all(verifications);
+    
     if (emailExistant) {
       return res.status(400).json({ message: 'Email déjà utilisé par un autre étudiant' });
     }
     if (massarExistant) {
       return res.status(400).json({ message: 'Code Massar déjà utilisé par un autre étudiant' });
+    }
+    // 🆕 Vérification CIN
+    if (cinExistant) {
+      return res.status(400).json({ message: 'CIN déjà utilisé par un autre étudiant' });
     }
 
     // ===== TRAITEMENT / CONVERSIONS =====
@@ -981,161 +928,55 @@ app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.si
       return isNaN(date.getTime()) ? null : date;
     };
 
-    const prixTotalNum = toNumber(prixTotal);
-    const pourcentageBourseNum = toNumber(pourcentageBourse);
-    
-    if (prixTotal !== undefined && prixTotalNum < 0) {
-      return res.status(400).json({ message: 'Le prix total ne peut pas être négatif' });
-    }
-    if (pourcentageBourse !== undefined && (pourcentageBourseNum < 0 || pourcentageBourseNum > 100)) {
-      return res.status(400).json({ message: 'Le pourcentage de bourse doit être entre 0 et 100' });
-    }
+    // ... conversions numériques, type paiement, date de naissance, etc.
 
-    // Type de paiement
-    const typesValides = ['Cash', 'Virement', 'Chèque', 'En ligne'];
-    let typePaySelected = etudiantExistant.typePaiement || 'Cash'; // Garder l'ancien si non fourni
-    if (typePaiement) {
-      if (!typesValides.includes(typePaiement)) {
-        return res.status(400).json({
-          message: `Type de paiement invalide. Types valides: ${typesValides.join(', ')}`
-        });
-      }
-      typePaySelected = typePaiement;
-    }
-
-    // Date de naissance
-    let dateNaissanceFormatted = etudiantExistant.dateNaissance;
-    if (dateNaissance) {
-      dateNaissanceFormatted = toDate(dateNaissance);
-      if (!dateNaissanceFormatted) {
-        return res.status(400).json({ message: 'Format de date de naissance invalide' });
-      }
-
-      // Validation de l'âge seulement si une nouvelle date est fournie
-      const aujourdHui = new Date();
-      let age = aujourdHui.getFullYear() - dateNaissanceFormatted.getFullYear();
-      const m = aujourdHui.getMonth() - dateNaissanceFormatted.getMonth();
-      if (m < 0 || (m === 0 && aujourdHui.getDate() < dateNaissanceFormatted.getDate())) age--;
-      if (age < 10 || age > 25) {
-        return res.status(400).json({ message: 'L\'âge de l\'étudiant doit être entre 10 et 25 ans' });
-      }
-    }
-
-    // Cours
-    let coursArray = etudiantExistant.cours || [];
-    if (cours !== undefined) {
-      if (typeof cours === 'string') {
-        coursArray = cours.split(',').map(c => c.trim()).filter(Boolean);
-      } else if (Array.isArray(cours)) {
-        coursArray = cours;
-      }
-    }
-
-    // Conversions booléennes
-    const actifBool = actif !== undefined ? toBool(actif) : etudiantExistant.actif;
-    const payeBool = paye !== undefined ? toBool(paye) : etudiantExistant.paye;
-    const transportBool = transport !== undefined ? toBool(transport) : etudiantExistant.transport;
-
-    console.log('✅ PUT - Données reçues et converties:', {
-      transport: { original: transport, converti: transportBool },
-      actif: { original: actif, converti: actifBool },
-      paye: { original: paye, converti: payeBool }
-    });
-
-    // Image (garder l'ancienne si pas de nouvelle)
-    let imagePath = etudiantExistant.image;
-    if (req.file) {
-      imagePath = `/uploads/${req.file.filename}`;
-    }
-
-    // Hash MDP seulement si un nouveau mot de passe est fourni
-    let hashedPassword = etudiantExistant.motDePasse;
-    if (motDePasse && motDePasse.trim() !== '') {
-      hashedPassword = await bcrypt.hash(motDePasse.trim(), 12);
-    }
-
-    // ===== MISE À JOUR DE L'ÉTUDIANT =====
+    // ===== CRÉATION DE L'ÉTUDIANT =====
     const etudiantData = {
-      // Identité (seulement les champs fournis)
       nomComplet: nomComplet.trim(),
-      ...(genre && { genre }),
-      ...(dateNaissanceFormatted && { dateNaissance: dateNaissanceFormatted }),
-      ...(lieuNaissance && { lieuNaissance: lieuNaissance.trim() }),
-      ...(nationalite && { nationalite: nationalite.trim() }),
-
-      // Parents (seulement les champs fournis)
-      ...(nomCompletPere && { nomCompletPere: nomCompletPere.trim() }),
-      ...(nomCompletMere && { nomCompletMere: nomCompletMere.trim() }),
-      ...(travailPere !== undefined && { travailPere: (travailPere || '').trim() }),
-      ...(travailMere !== undefined && { travailMere: (travailMere || '').trim() }),
-
-      // Contact (seulement les champs fournis)
-      ...(telephoneEtudiant && { telephoneEtudiant: telephoneEtudiant.trim() }),
-      ...(telephonePere !== undefined && { telephonePere: (telephonePere || '').trim() }),
-      ...(telephoneMere !== undefined && { telephoneMere: (telephoneMere || '').trim() }),
-
-      // Scolarité (seulement les champs fournis)
-      ...(codeMassar && { codeMassar: codeMassar.trim() }),
-      ...(adresse !== undefined && { adresse: (adresse || '').trim() }),
-      ...(email && { email: email.toLowerCase().trim() }),
+      genre: genre || '',
+      dateNaissance: dateNaissanceFormatted,
+      lieuNaissance: (lieuNaissance || '').trim(),
+      nationalite: (nationalite || '').trim(),
+      cin: cin ? cin.trim().toUpperCase() : undefined, // 🆕 CIN en majuscules si fourni
+      nomCompletPere: (nomCompletPere || '').trim(),
+      nomCompletMere: (nomCompletMere || '').trim(),
+      travailPere: (travailPere || '').trim(),
+      travailMere: (travailMere || '').trim(),
+      telephoneEtudiant: (telephoneEtudiant || '').trim(),
+      telephonePere: (telephonePere || '').trim(),
+      telephoneMere: (telephoneMere || '').trim(),
+      codeMassar: (codeMassar || '').trim(),
+      adresse: (adresse || '').trim(),
+      email: email ? email.toLowerCase().trim() : '',
       motDePasse: hashedPassword,
-      ...(niveau && { niveau: niveau.trim() }),
+      niveau: (niveau || '').trim(),
       transport: transportBool,
-
-      // Divers
-      cours: coursArray,
+      cours,
       image: imagePath,
       actif: actifBool,
-
-      // Paiement (seulement les champs fournis)
-      ...(prixTotal !== undefined && { prixTotal: prixTotalNum }),
+      creeParAdmin: req.adminId,
+      prixTotal: prixTotalNum,
       paye: payeBool,
-      ...(pourcentageBourse !== undefined && { pourcentageBourse: pourcentageBourseNum }),
+      pourcentageBourse: pourcentageBourseNum,
       typePaiement: typePaySelected,
-      ...(anneeScolaire && { anneeScolaire: anneeScolaire.trim() })
+      anneeScolaire: (anneeScolaire || '').trim()
     };
 
-    console.log('✅ Données finales avant modification:', {
-      transport: etudiantData.transport,
-      actif: etudiantData.actif,
-      paye: etudiantData.paye
-    });
+    const etudiant = new Etudiant(etudiantData);
+    const etudiantSauve = await etudiant.save();
 
-    const etudiantModifie = await Etudiant.findByIdAndUpdate(
-      req.params.id,
-      etudiantData,
-      { new: true, runValidators: true }
-    );
-
-    // Réponse (sans mot de passe)
-    const etudiantResponse = etudiantModifie.toObject();
+    // Réponse
+    const etudiantResponse = etudiantSauve.toObject();
     delete etudiantResponse.motDePasse;
 
-    const montantBourse = (etudiantModifie.prixTotal * etudiantModifie.pourcentageBourse) / 100;
-    const montantAPayer = etudiantModifie.prixTotal - montantBourse;
-
-    res.json({
-      message: 'Étudiant modifié avec succès',
+    res.status(201).json({
+      message: 'Étudiant créé avec succès',
       etudiant: etudiantResponse,
-      infosPaiement: {
-        montantTotal: etudiantModifie.prixTotal,
-        montantBourse: montantBourse,
-        montantAPayer: montantAPayer,
-        pourcentageBourse: etudiantModifie.pourcentageBourse,
-        typePaiement: etudiantModifie.typePaiement,
-        statutPaiement: etudiantModifie.paye ? 'Payé' : (etudiantModifie.prixTotal === 0 ? 'Gratuit' : 'En attente')
-      },
-      metadata: {
-        anneeScolaire: etudiantModifie.anneeScolaire,
-        niveau: etudiantModifie.niveau,
-        transport: etudiantModifie.transport,
-        nombreCours: etudiantModifie.cours.length,
-        dateModification: new Date()
-      }
+      // ... reste de la réponse
     });
 
   } catch (err) {
-    console.error('❌ Erreur modification étudiant:', err);
+    console.error('❌ Erreur:', err);
 
     if (err.name === 'ValidationError') {
       const errors = Object.values(err.errors).map(e => e.message);
@@ -1144,14 +985,14 @@ app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.si
 
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
-      const fieldNames = { email: 'Email', codeMassar: 'Code Massar' };
+      const fieldNames = { 
+        email: 'Email', 
+        codeMassar: 'Code Massar',
+        cin: 'CIN' // 🆕
+      };
       return res.status(400).json({
         message: `${fieldNames[field] || field} déjà utilisé par un autre étudiant`
       });
-    }
-
-    if (err.name === 'CastError') {
-      return res.status(400).json({ message: `Format invalide pour le champ ${err.path}` });
     }
 
     res.status(500).json({
@@ -1159,9 +1000,7 @@ app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.si
       error: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
     });
   }
-});
-// ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
-// ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
+});// ===== ROUTE POST - CRÉATION D'UN ÉTUDIANT =====
 app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.single('image'), checkFieldPermissions, async (req, res) => {
   console.log('🔍 === DÉBUT ROUTE POST ===');
   console.log('🔍 req.body reçu:', req.body);
@@ -1172,7 +1011,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
       nomComplet, genre, dateNaissance, lieuNaissance, nationalite,
       nomCompletPere, nomCompletMere, travailPere, travailMere,
       telephoneEtudiant, telephonePere, telephoneMere,
-      codeMassar, adresse, email, motDePasse, niveau, transport,
+      codeMassar, cin, adresse, email, motDePasse, niveau, transport,
       prixTotal, paye, pourcentageBourse, typePaiement, anneeScolaire
     } = req.body;
 
@@ -1180,6 +1019,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
 
     console.log('🔍 Variables extraites:');
     console.log('🔍 nomComplet:', nomComplet);
+    console.log('🔍 cin:', cin);
     console.log('🔍 transport:', transport, typeof transport);
     console.log('🔍 actif:', actif, typeof actif);
 
@@ -1194,6 +1034,18 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
     console.log('✅ Validation champ obligatoire passée');
 
     // ===== VALIDATION DES FORMATS (SEULEMENT SI LES CHAMPS SONT FOURNIS) =====
+    
+    // CIN - validation seulement si fourni
+    if (cin && cin.trim()) {
+      const cinRegex = /^[A-Z]{1,2}\d{6,8}$/i;
+      if (!cinRegex.test(cin.trim().toUpperCase())) {
+        console.log('❌ CIN invalide:', cin);
+        return res.status(400).json({ 
+          message: 'Format de CIN invalide (ex: AB123456)' 
+        });
+      }
+    }
+
     // Email - validation seulement si fourni
     if (email && email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1263,7 +1115,13 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
       verifications.push(Promise.resolve(null));
     }
 
-    const [emailExistant, massarExistant] = await Promise.all(verifications);
+    if (cin && cin.trim()) {
+      verifications.push(Etudiant.findOne({ cin: cin.trim().toUpperCase() }));
+    } else {
+      verifications.push(Promise.resolve(null));
+    }
+
+    const [emailExistant, massarExistant, cinExistant] = await Promise.all(verifications);
     
     if (emailExistant) {
       console.log('❌ Email déjà utilisé:', email);
@@ -1272,6 +1130,10 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
     if (massarExistant) {
       console.log('❌ Code Massar déjà utilisé:', codeMassar);
       return res.status(400).json({ message: 'Code Massar déjà utilisé par un autre étudiant' });
+    }
+    if (cinExistant) {
+      console.log('❌ CIN déjà utilisé:', cin);
+      return res.status(400).json({ message: 'CIN déjà utilisé par un autre étudiant' });
     }
 
     console.log('✅ Vérification unicité passée');
@@ -1383,6 +1245,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
       dateNaissance: dateNaissanceFormatted,
       lieuNaissance: (lieuNaissance || '').trim(),
       nationalite: (nationalite || '').trim(),
+      cin: cin ? cin.trim().toUpperCase() : undefined,
       nomCompletPere: (nomCompletPere || '').trim(),
       nomCompletMere: (nomCompletMere || '').trim(),
       travailPere: (travailPere || '').trim(),
@@ -1400,7 +1263,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
       image: imagePath,
       actif: actifBool,
       creeParAdmin: req.adminId,
-      
+      creeParInscripteur: req.inscripteurId,
       prixTotal: prixTotalNum,
       paye: payeBool,
       pourcentageBourse: pourcentageBourseNum,
@@ -1409,6 +1272,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
     };
 
     console.log('🔍 === DONNÉES AVANT SAUVEGARDE ===');
+    console.log('🔍 etudiantData.cin:', etudiantData.cin);
     console.log('🔍 etudiantData.transport:', etudiantData.transport);
     console.log('🔍 etudiantData.actif:', etudiantData.actif);
     console.log('🔍 etudiantData.paye:', etudiantData.paye);
@@ -1420,6 +1284,7 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
     const etudiantSauve = await etudiant.save();
 
     console.log('✅ Étudiant sauvegardé avec succès!');
+    console.log('🔍 etudiantSauve.cin:', etudiantSauve.cin);
     console.log('🔍 etudiantSauve.transport:', etudiantSauve.transport);
 
     // Réponse (sans mot de passe)
@@ -1463,7 +1328,11 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
 
     if (err.code === 11000) {
       const field = Object.keys(err.keyPattern)[0];
-      const fieldNames = { email: 'Email', codeMassar: 'Code Massar' };
+      const fieldNames = { 
+        email: 'Email', 
+        codeMassar: 'Code Massar',
+        cin: 'CIN'
+      };
       console.error('❌ Doublon détecté:', field);
       return res.status(400).json({
         message: `${fieldNames[field] || field} déjà utilisé par un autre étudiant`
@@ -1472,6 +1341,373 @@ app.post('/api/etudiants', authAdminOrInscripteurOrPaiementManager, upload.singl
 
     if (err.name === 'CastError') {
       console.error('❌ Erreur de cast:', err.path);
+      return res.status(400).json({ message: `Format invalide pour le champ ${err.path}` });
+    }
+
+    res.status(500).json({
+      message: 'Erreur interne du serveur',
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Une erreur est survenue'
+    });
+  }
+});
+// ===== ROUTE PUT - MODIFICATION D'UN ÉTUDIANT (COMPLÈTE AVEC CIN) =====
+app.put('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, upload.single('image'), checkFieldPermissions, async (req, res) => {
+  try {
+    const {
+      // Identité
+      nomComplet,
+      genre,
+      dateNaissance,
+      lieuNaissance,
+      nationalite,
+      cin,
+
+      // Parents
+      nomCompletPere,
+      nomCompletMere,
+      travailPere,
+      travailMere,
+
+      // Contact
+      telephoneEtudiant,
+      telephonePere,
+      telephoneMere,
+
+      // Scolarité
+      codeMassar,
+      adresse,
+      email,
+      motDePasse,
+      niveau,
+      transport,
+
+      // Paiements
+      prixTotal,
+      paye,
+      pourcentageBourse,
+      typePaiement,
+      anneeScolaire
+    } = req.body;
+
+    let { cours, actif } = req.body;
+
+    // ===== VALIDATION DU CHAMP OBLIGATOIRE =====
+    if (!nomComplet || nomComplet.toString().trim() === '') {
+      return res.status(400).json({
+        message: 'Le nom complet est obligatoire'
+      });
+    }
+
+    // Trouver l'étudiant existant
+    const etudiantExistant = await Etudiant.findById(req.params.id);
+    if (!etudiantExistant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // ===== VALIDATION DES FORMATS (SEULEMENT SI LES CHAMPS SONT FOURNIS) =====
+    
+    // CIN (validation seulement si fourni)
+    if (cin && cin.trim() !== '') {
+      const cinRegex = /^[A-Z]{1,2}\d{6,8}$/i;
+      if (!cinRegex.test(cin.trim().toUpperCase())) {
+        return res.status(400).json({ 
+          message: 'Format de CIN invalide (ex: AB123456)' 
+        });
+      }
+    }
+
+    // Email (validation seulement si fourni)
+    if (email && email.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: 'Format d\'email invalide' });
+      }
+    }
+
+    // Mot de passe (seulement si fourni)
+    if (motDePasse && motDePasse.trim() !== '' && motDePasse.length < 6) {
+      return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caractères' });
+    }
+
+    // Année scolaire (validation seulement si fournie)
+    if (anneeScolaire && anneeScolaire.trim() !== '') {
+      const anneeScolaireRegex = /^\d{4}\/\d{4}$/;
+      if (!anneeScolaireRegex.test(anneeScolaire.trim())) {
+        return res.status(400).json({ message: 'L\'année scolaire doit être au format YYYY/YYYY (ex: 2025/2026)' });
+      }
+    }
+
+    // Genre (validation seulement si fourni)
+    if (genre && !['Homme', 'Femme'].includes(genre)) {
+      return res.status(400).json({ message: 'Le genre doit être "Homme" ou "Femme"' });
+    }
+
+    // Téléphones (validation seulement si fournis)
+    const phoneRegex = /^[0-9+\-\s]{8,15}$/;
+    if (telephoneEtudiant && telephoneEtudiant.trim() !== '' && !phoneRegex.test(telephoneEtudiant.trim())) {
+      return res.status(400).json({ message: 'Format de téléphone étudiant invalide' });
+    }
+    if (telephonePere && telephonePere.trim() !== '' && !phoneRegex.test(telephonePere.trim())) {
+      return res.status(400).json({ message: 'Format de téléphone père invalide' });
+    }
+    if (telephoneMere && telephoneMere.trim() !== '' && !phoneRegex.test(telephoneMere.trim())) {
+      return res.status(400).json({ message: 'Format de téléphone mère invalide' });
+    }
+
+    // Nationalité (validation seulement si fournie)
+    if (nationalite && nationalite.trim() !== '' && nationalite.trim().length < 2) {
+      return res.status(400).json({ message: 'Nationalité invalide' });
+    }
+
+    // ===== VÉRIFICATION D'UNICITÉ (SEULEMENT SI LES CHAMPS SONT FOURNIS) =====
+    const checks = [];
+    
+    if (email && email.trim() !== '') {
+      checks.push(
+        Etudiant.findOne({ 
+          email: email.toLowerCase().trim(),
+          _id: { $ne: req.params.id }
+        })
+      );
+    } else {
+      checks.push(Promise.resolve(null));
+    }
+
+    if (codeMassar && codeMassar.trim() !== '') {
+      checks.push(
+        Etudiant.findOne({ 
+          codeMassar: codeMassar.trim(),
+          _id: { $ne: req.params.id }
+        })
+      );
+    } else {
+      checks.push(Promise.resolve(null));
+    }
+
+    if (cin && cin.trim() !== '') {
+      checks.push(
+        Etudiant.findOne({ 
+          cin: cin.trim().toUpperCase(),
+          _id: { $ne: req.params.id }
+        })
+      );
+    } else {
+      checks.push(Promise.resolve(null));
+    }
+
+    const [emailExistant, massarExistant, cinExistant] = await Promise.all(checks);
+
+    if (emailExistant) {
+      return res.status(400).json({ message: 'Email déjà utilisé par un autre étudiant' });
+    }
+    if (massarExistant) {
+      return res.status(400).json({ message: 'Code Massar déjà utilisé par un autre étudiant' });
+    }
+    if (cinExistant) {
+      return res.status(400).json({ message: 'CIN déjà utilisé par un autre étudiant' });
+    }
+
+    // ===== TRAITEMENT / CONVERSIONS =====
+    const toBool = (v) => {
+      if (typeof v === 'string') {
+        const lowerV = v.toLowerCase().trim();
+        if (lowerV === 'true') return true;
+        if (lowerV === 'false') return false;
+        return Boolean(v);
+      }
+      if (typeof v === 'boolean') return v;
+      return Boolean(v);
+    };
+
+    const toNumber = (v) => {
+      if (v === undefined || v === null || v === '') return 0;
+      const n = parseFloat(v);
+      return isNaN(n) ? 0 : n;
+    };
+
+    const toDate = (d) => {
+      if (!d) return null;
+      const date = new Date(d);
+      return isNaN(date.getTime()) ? null : date;
+    };
+
+    const prixTotalNum = toNumber(prixTotal);
+    const pourcentageBourseNum = toNumber(pourcentageBourse);
+    
+    if (prixTotal !== undefined && prixTotalNum < 0) {
+      return res.status(400).json({ message: 'Le prix total ne peut pas être négatif' });
+    }
+    if (pourcentageBourse !== undefined && (pourcentageBourseNum < 0 || pourcentageBourseNum > 100)) {
+      return res.status(400).json({ message: 'Le pourcentage de bourse doit être entre 0 et 100' });
+    }
+
+    // Type de paiement
+    const typesValides = ['Cash', 'Virement', 'Chèque', 'En ligne'];
+    let typePaySelected = etudiantExistant.typePaiement || 'Cash';
+    if (typePaiement) {
+      if (!typesValides.includes(typePaiement)) {
+        return res.status(400).json({
+          message: `Type de paiement invalide. Types valides: ${typesValides.join(', ')}`
+        });
+      }
+      typePaySelected = typePaiement;
+    }
+
+    // Date de naissance
+    let dateNaissanceFormatted = etudiantExistant.dateNaissance;
+    if (dateNaissance) {
+      dateNaissanceFormatted = toDate(dateNaissance);
+      if (!dateNaissanceFormatted) {
+        return res.status(400).json({ message: 'Format de date de naissance invalide' });
+      }
+
+      // Validation de l'âge seulement si une nouvelle date est fournie
+      const aujourdHui = new Date();
+      let age = aujourdHui.getFullYear() - dateNaissanceFormatted.getFullYear();
+      const m = aujourdHui.getMonth() - dateNaissanceFormatted.getMonth();
+      if (m < 0 || (m === 0 && aujourdHui.getDate() < dateNaissanceFormatted.getDate())) age--;
+      if (age < 10 || age > 25) {
+        return res.status(400).json({ message: 'L\'âge de l\'étudiant doit être entre 10 et 25 ans' });
+      }
+    }
+
+    // Cours
+    let coursArray = etudiantExistant.cours || [];
+    if (cours !== undefined) {
+      if (typeof cours === 'string') {
+        coursArray = cours.split(',').map(c => c.trim()).filter(Boolean);
+      } else if (Array.isArray(cours)) {
+        coursArray = cours;
+      }
+    }
+
+    // Conversions booléennes
+    const actifBool = actif !== undefined ? toBool(actif) : etudiantExistant.actif;
+    const payeBool = paye !== undefined ? toBool(paye) : etudiantExistant.paye;
+    const transportBool = transport !== undefined ? toBool(transport) : etudiantExistant.transport;
+
+    console.log('✅ PUT - Données reçues et converties:', {
+      cin: { original: cin, converti: cin ? cin.trim().toUpperCase() : etudiantExistant.cin },
+      transport: { original: transport, converti: transportBool },
+      actif: { original: actif, converti: actifBool },
+      paye: { original: paye, converti: payeBool }
+    });
+
+    // Image (garder l'ancienne si pas de nouvelle)
+    let imagePath = etudiantExistant.image;
+    if (req.file) {
+      imagePath = `/uploads/${req.file.filename}`;
+    }
+
+    // Hash MDP seulement si un nouveau mot de passe est fourni
+    let hashedPassword = etudiantExistant.motDePasse;
+    if (motDePasse && motDePasse.trim() !== '') {
+      hashedPassword = await bcrypt.hash(motDePasse.trim(), 12);
+    }
+
+    // ===== MISE À JOUR DE L'ÉTUDIANT =====
+    const etudiantData = {
+      // Identité (seulement les champs fournis)
+      nomComplet: nomComplet.trim(),
+      ...(genre && { genre }),
+      ...(dateNaissanceFormatted && { dateNaissance: dateNaissanceFormatted }),
+      ...(lieuNaissance && { lieuNaissance: lieuNaissance.trim() }),
+      ...(nationalite && { nationalite: nationalite.trim() }),
+      ...(cin && cin.trim() !== '' && { cin: cin.trim().toUpperCase() }),
+
+      // Parents (seulement les champs fournis)
+      ...(nomCompletPere && { nomCompletPere: nomCompletPere.trim() }),
+      ...(nomCompletMere && { nomCompletMere: nomCompletMere.trim() }),
+      ...(travailPere !== undefined && { travailPere: (travailPere || '').trim() }),
+      ...(travailMere !== undefined && { travailMere: (travailMere || '').trim() }),
+
+      // Contact (seulement les champs fournis)
+      ...(telephoneEtudiant && { telephoneEtudiant: telephoneEtudiant.trim() }),
+      ...(telephonePere !== undefined && { telephonePere: (telephonePere || '').trim() }),
+      ...(telephoneMere !== undefined && { telephoneMere: (telephoneMere || '').trim() }),
+
+      // Scolarité (seulement les champs fournis)
+      ...(codeMassar && { codeMassar: codeMassar.trim() }),
+      ...(adresse !== undefined && { adresse: (adresse || '').trim() }),
+      ...(email && { email: email.toLowerCase().trim() }),
+      motDePasse: hashedPassword,
+      ...(niveau && { niveau: niveau.trim() }),
+      transport: transportBool,
+
+      // Divers
+      cours: coursArray,
+      image: imagePath,
+      actif: actifBool,
+
+      // Paiement (seulement les champs fournis)
+      ...(prixTotal !== undefined && { prixTotal: prixTotalNum }),
+      paye: payeBool,
+      ...(pourcentageBourse !== undefined && { pourcentageBourse: pourcentageBourseNum }),
+      typePaiement: typePaySelected,
+      ...(anneeScolaire && { anneeScolaire: anneeScolaire.trim() })
+    };
+
+    console.log('✅ Données finales avant modification:', {
+      cin: etudiantData.cin,
+      transport: etudiantData.transport,
+      actif: etudiantData.actif,
+      paye: etudiantData.paye
+    });
+
+    const etudiantModifie = await Etudiant.findByIdAndUpdate(
+      req.params.id,
+      etudiantData,
+      { new: true, runValidators: true }
+    );
+
+    // Réponse (sans mot de passe)
+    const etudiantResponse = etudiantModifie.toObject();
+    delete etudiantResponse.motDePasse;
+
+    const montantBourse = (etudiantModifie.prixTotal * etudiantModifie.pourcentageBourse) / 100;
+    const montantAPayer = etudiantModifie.prixTotal - montantBourse;
+
+    res.json({
+      message: 'Étudiant modifié avec succès',
+      etudiant: etudiantResponse,
+      infosPaiement: {
+        montantTotal: etudiantModifie.prixTotal,
+        montantBourse: montantBourse,
+        montantAPayer: montantAPayer,
+        pourcentageBourse: etudiantModifie.pourcentageBourse,
+        typePaiement: etudiantModifie.typePaiement,
+        statutPaiement: etudiantModifie.paye ? 'Payé' : (etudiantModifie.prixTotal === 0 ? 'Gratuit' : 'En attente')
+      },
+      metadata: {
+        anneeScolaire: etudiantModifie.anneeScolaire,
+        niveau: etudiantModifie.niveau,
+        transport: etudiantModifie.transport,
+        nombreCours: etudiantModifie.cours.length,
+        dateModification: new Date()
+      }
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur modification étudiant:', err);
+
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ message: 'Erreur de validation', errors });
+    }
+
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      const fieldNames = { 
+        email: 'Email', 
+        codeMassar: 'Code Massar',
+        cin: 'CIN'
+      };
+      return res.status(400).json({
+        message: `${fieldNames[field] || field} déjà utilisé par un autre étudiant`
+      });
+    }
+
+    if (err.name === 'CastError') {
       return res.status(400).json({ message: `Format invalide pour le champ ${err.path}` });
     }
 
@@ -7335,7 +7571,107 @@ app.get('/api/presences/student/:studentId', authAdminOrInscripteurOrPaiementMan
     res.status(500).json({ error: err.message });
   }
 });
+// Route pour obtenir tous les professeurs (pour la sélection)
+app.get('/api/professeurs/tous', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const professeurs = await Professeur.find({ actif: true })
+      .select('nom matiere cours email')
+      .sort({ nom: 1 });
+    res.json(professeurs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// Route pour obtenir les étudiants d'un cours spécifique
+app.get('/api/etudiants/par-cours/:coursNom', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const coursNom = req.params.coursNom;
+    const etudiants = await Etudiant.find({ 
+      cours: coursNom,
+      actif: true 
+    }).select('nomComplet email cours');
+    
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour créer présence en tant qu'admin/inscripteur
+app.post('/api/presences/manuel', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { 
+      professeurId,
+      etudiant, 
+      cours, 
+      dateSession, 
+      present,
+      retardMinutes,
+      remarque, 
+      heure, 
+      periode 
+    } = req.body;
+
+    // Vérifier que le professeur existe et enseigne ce cours
+    const prof = await Professeur.findById(professeurId);
+    if (!prof) {
+      return res.status(404).json({ message: 'Professeur introuvable.' });
+    }
+    
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ message: 'Ce professeur n\'enseigne pas ce cours.' });
+    }
+
+    // Vérifier si déjà enregistré
+    const existingPresence = await Presence.findOne({
+      etudiant: etudiant,
+      cours: cours,
+      dateSession: new Date(dateSession),
+      heure: heure,
+      periode: periode
+    });
+
+    if (existingPresence) {
+      return res.status(409).json({ 
+        message: 'Cet étudiant est déjà enregistré pour cette séance.' 
+      });
+    }
+
+    // Logique retard
+    let finalPresent = present || false;
+    let finalRetardMinutes = 0;
+
+    if (retardMinutes && retardMinutes > 0) {
+      finalPresent = true;
+      finalRetardMinutes = Math.min(retardMinutes, 60);
+    } else if (present) {
+      finalRetardMinutes = 0;
+    }
+
+    // Créer présence avec creePar = admin/inscripteur actuel
+    const presence = new Presence({
+      etudiant,
+      cours,
+      dateSession: new Date(dateSession),
+      present: finalPresent,
+      retardMinutes: finalRetardMinutes,
+      remarque,
+      heure,
+      periode,
+      creePar: req.userId, // ID de l'admin/inscripteur
+      matiere: prof.matiere,
+      nomProfesseur: prof.nom   
+    });
+
+    await presence.save();
+    res.status(201).json(presence);
+
+  } catch (err) {
+    console.error('Erreur:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // Lister les cours
 // Récupérer un seul cours avec détails
 // 📌 Route: GET /api/cours/:id
@@ -8251,6 +8587,7 @@ app.get('/api/paiement-manager/stats', authAdminOrPaiementManager, async (req, r
     });
   }
 });
+
 // ✅ Lister les paiements
 app.get('/api/paiements', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {

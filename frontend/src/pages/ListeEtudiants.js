@@ -67,6 +67,7 @@ const [formAjout, setFormAjout] = useState({
   telephonePere: '',
   telephoneMere: '',
   codeMassar: '',
+  cin: '', // ← AJOUT: CIN
   adresse: '',
   email: '@kastler.com',
   motDePasse: '',
@@ -107,6 +108,7 @@ const [formAjout, setFormAjout] = useState({
   telephonePere: '',
   telephoneMere: '',
   codeMassar: '',
+  cin: '', // ← AJOUT: CIN
   adresse: '',
   email: '',
   motDePasse: '',
@@ -301,7 +303,8 @@ if (recherche) {
     (e.nomComplet && e.nomComplet.toLowerCase().includes(recherche.toLowerCase())) ||
     (e.telephoneEtudiant && e.telephoneEtudiant.includes(recherche)) ||
     (e.email && e.email.toLowerCase().includes(recherche.toLowerCase())) ||
-    (e.codeMassar && e.codeMassar.toLowerCase().includes(recherche.toLowerCase()))
+    (e.codeMassar && e.codeMassar.toLowerCase().includes(recherche.toLowerCase())) ||
+    (e.cin && e.cin.toLowerCase().includes(recherche.toLowerCase())) // ← AJOUT: recherche par CIN
   );
 }
 
@@ -354,6 +357,7 @@ if (recherche) {
     telephonePere: '',
     telephoneMere: '',
     codeMassar: '',
+    cin: '', // Réinitialiser CIN
     adresse: '',
     email: '',
     motDePasse: '',
@@ -451,6 +455,7 @@ const handleSubmitAjout = async (e) => {
       telephonePere: '',
       telephoneMere: '',
       codeMassar: '',
+      cin: '', // Réinitialiser CIN
       adresse: '',
       email: '',
       motDePasse: '',
@@ -498,6 +503,7 @@ const openEditModal = (etudiant) => {
     telephonePere: etudiant.telephonePere || '',
     telephoneMere: etudiant.telephoneMere || '',
     codeMassar: etudiant.codeMassar || '',
+    cin: etudiant.cin || '', // ← AJOUT : pré-remplir CIN
     adresse: etudiant.adresse || '',
     email: etudiant.email || '',
     motDePasse: '',
@@ -536,6 +542,7 @@ const closeEditModal = () => {
     telephonePere: '',
     telephoneMere: '',
     codeMassar: '',
+    cin: '', // Réinitialiser CIN
     adresse: '',
     email: '',
     motDePasse: '',
@@ -971,6 +978,7 @@ const closeEditModal = () => {
               <tr>
                 <th>Nom Complet</th>
                 <th>Genre</th>
+                <th>CIN</th> {/* ← AJOUT */}
                 <th>Niveau</th>
                 <th>Date de Naissance</th>
                 <th>Âge</th>
@@ -996,6 +1004,7 @@ const closeEditModal = () => {
                   <tr key={e._id}>
                     <td className="nom-colonne">{e.nomComplet}</td>
                     <td>{e.genre}</td>
+                    <td>{e.cin || '—'}</td> {/* ← AJOUT : affichage CIN */}
                     <td className="niveau-colonne">
                       <span className="niveau-badge">
                         <GraduationCap size={16} className="inline mr-1" />
@@ -1196,6 +1205,10 @@ const closeEditModal = () => {
               <div className="carte-detail">
                 <span className="carte-label">Code Massar:</span>
                 <span>{e.codeMassar}</span>
+              </div>
+              <div className="carte-detail">
+                <span className="carte-label">CIN:</span>
+                <span>{e.cin || '—'}</span>
               </div>
               <div className="carte-detail">
                 <span className="carte-label">Email:</span>
@@ -1468,6 +1481,16 @@ const closeEditModal = () => {
                     onChange={handleChangeAjout}
                   />
                 </div>
+               <div className="form-group">
+                 <label>CIN</label>
+                 <input
+                   type="text"
+                   name="cin"
+                   placeholder="CIN (ex: AB123456)"
+                   value={formAjout.cin}
+                   onChange={handleChangeAjout}
+                 />
+               </div>
               </div>
 
               <div className="form-row">
@@ -1773,6 +1796,16 @@ const closeEditModal = () => {
                     onChange={handleChangeModifier}
                   />
                 </div>
+               <div className="form-group">
+                 <label>CIN</label>
+                 <input
+                   type="text"
+                   name="cin"
+                   placeholder="CIN"
+                   value={formModifier.cin}
+                   onChange={handleChangeModifier}
+                 />
+               </div>
               </div>
 
               <div className="form-row">
@@ -2007,6 +2040,11 @@ const closeEditModal = () => {
           <div className="info-card">
             <div className="info-label">Code Massar</div>
             <div className="info-value">{etudiantSelectionne.codeMassar}</div>
+          </div>
+
+          <div className="info-card">
+            <div className="info-label">CIN</div>
+            <div className="info-value">{etudiantSelectionne.cin || 'Non spécifié'}</div>
           </div>
 
           <div className="info-card">

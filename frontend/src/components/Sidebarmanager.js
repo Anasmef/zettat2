@@ -81,7 +81,12 @@ const Sidebar = ({ onLogout }) => {
     },
 
 
-   
+    {
+      path: '/manager/presence-manuelle',
+      label: 'Présence Manuelle',
+      icon: BookOpen
+    },
+
       {
       path: '/manager/messages',
       label: 'messages',

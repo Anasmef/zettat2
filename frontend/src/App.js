@@ -64,6 +64,7 @@ import CrechePrescolairePage from './pages/CrechePrescolairePage';
 import CollegePage from './pages/CollegePage';
 import LyceePage from './pages/LyceePage';
 import AdminActualites from './pages/AdminActualites';
+import PresenceManuelleAdmin from './pages/PresenceManuelleAdmin';
 import PaiementManagerPage from './pages/PaiementManagerPage';
         import ParentEmploiDuTemps from './pages/ParentEmploiDuTemps';
 
@@ -381,6 +382,7 @@ function AppContent() {
         <Route path="/manager/messages" element={<AdminMessagesmanager />} />
         <Route path="/admin/gestion-parents" element={<GestionParents />} />
         <Route path="/manager/liste-presences" element={<ListePresencesmanager />} />
+        <Route path="/manager/presence-manuelle" element={<PresenceManuelleAdmin />} />
         <Route path="/etudiant/Bulletin" element={<EtudiantBulletins />} />
         <Route path="/professeur/AjouterBulletin" element={<ProfAjouterBulletin />} />
         <Route path="/manager/VieScolaire" element={<AdminVieScolairemanager />} />

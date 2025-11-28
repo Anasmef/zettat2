@@ -1,0 +1,116 @@
+/* PresenceManuelleAdmin.css */
+
+* { 
+  box-sizing: border-box !important; 
+}
+
+html, body { 
+  overflow-x: hidden !important; 
+  width: 100% !important; 
+}
+
+/* Affichage par défaut - Desktop */
+.desktop-view { 
+  display: block !important; 
+}
+
+.mobile-view { 
+  display: none !important; 
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.form-select:focus, 
+.form-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+  outline: none !important;
+}
+
+@media (max-width: 968px) {
+  .config-grid { 
+    grid-template-columns: 1fr !important; 
+    gap: 16px !important; 
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-view { 
+    display: none !important; 
+  }
+  .mobile-view { 
+    display: block !important; 
+  }
+  
+  .main-content { 
+    padding: 12px !important; 
+  }
+  .form-content { 
+    padding: 16px !important; 
+  }
+  .card-header { 
+    padding: 16px 20px !important; 
+  }
+  .card-title-text { 
+    font-size: 17px !important; 
+  }
+  .config-grid { 
+    gap: 12px !important; 
+  }
+  .left-column, 
+  .right-column { 
+    padding: 16px !important; 
+  }
+}
+
+@media (max-width: 480px) {
+  .desktop-view { 
+    display: none !important; 
+  }
+  .mobile-view { 
+    display: block !important; 
+  }
+  
+  .main-content { 
+    padding: 8px !important; 
+  }
+  .form-content { 
+    padding: 12px !important; 
+  }
+  .title { 
+    font-size: 20px !important; 
+  }
+  .submit-button { 
+    width: 100% !important; 
+    font-size: 15px !important; 
+  }
+}
+
+/* Spinner animation */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(59, 130, 246, 0.3);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Table hover effect */
+.table-row:hover {
+  background-color: #f9fafb;
+}
+
+/* Submit button hover */
+.submit-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}

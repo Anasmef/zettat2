@@ -12,7 +12,12 @@ const etudiantSchema = new mongoose.Schema(
     dateNaissance: { type: Date },
     lieuNaissance: { type: String, trim: true },
     nationalite: { type: String, trim: true },
-
+  cin: { 
+      type: String, 
+      unique: true, 
+      sparse: true, // Important: permet d'avoir plusieurs documents avec cin=null
+      trim: true 
+    },
     // Scolarité (libre pour pouvoir ajouter des valeurs côté frontend)
     niveau: { type: String, trim: true },
 
