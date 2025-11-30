@@ -37,7 +37,7 @@ const DocumentsEtudiant = () => {
   }, [navigate]);
  const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
   // Chargement des documents
   useEffect(() => {

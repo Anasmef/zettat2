@@ -1,4 +1,4 @@
-/* StudentBadgeModern.css - Design Moderne avec fond blanc marbré */
+/* StudentBadgeModern.css - Design Moderne avec fond blanc marbré - Version Rouge */
 
 .card-wrapper-pvc {
   display: flex;
@@ -6,6 +6,7 @@
   align-items: center;
   margin: 10px;
   page-break-inside: avoid;
+  padding: 0;
 }
 
 .card-container-pvc {
@@ -17,10 +18,12 @@
   position: relative;
   border: 1px solid #e5e7eb;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin: 0;
+  padding: 0;
 }
 
 .header-pvc {
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  background: #dc2626;
   padding: 10px 15px;
   display: flex;
   align-items: center;
@@ -28,7 +31,7 @@
   position: relative;
   overflow: hidden;
   height: 50px;
-  border-radius: 0 0 20px 0;
+  border-radius: 0;
 }
 
 .header-accent-pvc {
@@ -37,7 +40,7 @@
   top: 0;
   bottom: 0;
   width: 120px;
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.3) 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(220, 38, 38, 0.3) 100%);
 }
 
 .logo-section-pvc {
@@ -45,28 +48,33 @@
   align-items: center;
   gap: 8px;
   z-index: 1;
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .logo-pvc {
-  width: 50px;
+  width: 65px;
   height: 50px;
   background: white;
-  border-radius: 8px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  color: #ec4899;
+  color: #dc2626;
   font-weight: bold;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
+  padding: 2px;
+  border: none;
 }
 
 .logo-img-pvc {
-  width: 46px;
-  height: 46px;
-  object-fit: cover;
-  border-radius: 6px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0;
+  border: none;
 }
 
 .company-name-pvc {
@@ -96,6 +104,36 @@
   height: calc(100% - 50px - 6px);
 }
 
+.logo-bottom-right-pvc {
+  position: absolute;
+  bottom: 15px;
+  right: 15px;
+  z-index: 10;
+}
+
+.logo-bottom-right-pvc .logo-pvc {
+  width: 50px;
+  height: 50px;
+  background: white;
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #dc2626;
+  font-weight: bold;
+  box-shadow: none;
+  border: none;
+}
+
+.logo-bottom-right-pvc .logo-img-pvc {
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 0;
+  border: none;
+}
+
 .decorative-circles-pvc {
   position: absolute;
   right: 15px;
@@ -108,7 +146,7 @@
 .circle-pvc {
   width: 8px;
   height: 8px;
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+  background: #dc2626;
   border-radius: 50%;
 }
 
@@ -128,9 +166,9 @@
   height: 115px;
   border-radius: 12px;
   border: 3px solid white;
-  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.2);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.2);
   overflow: hidden;
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  background: #dc2626;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -152,11 +190,18 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+}
+
+/* Titre compact pour les cartes avec CIN + Autorisation */
+.card-title-pvc.compact {
+  margin: 0 0 4px -12px;
+  padding: 5px 12px;
 }
 
 .card-title-pvc {
   color: white;
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+  background: #dc2626;
   font-size: 12px;
   font-weight: 800;
   margin: 0 0 8px -12px;
@@ -166,7 +211,7 @@
   text-transform: uppercase;
   display: inline-block;
   align-self: flex-start;
-  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
 }
 
 .info-row-pvc {
@@ -174,21 +219,33 @@
   margin-bottom: 3px;
   font-size: 9px;
   align-items: baseline;
+  min-width: 0;
+}
+
+/* Info row compact pour les cartes avec CIN + Autorisation */
+.info-left-pvc.compact .info-row-pvc {
+  margin-bottom: 1px;
 }
 
 .info-label-pvc {
   font-weight: 700;
-  color: #a855f7;
+  color: #dc2626;
   min-width: 65px;
   font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
 }
 
 .info-value-pvc {
   color: #1f2937;
   font-weight: 600;
   font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 /* QR Code à côté des infos */
@@ -197,6 +254,7 @@
   gap: 8px;
   align-items: flex-start;
   margin-top: 2px;
+  min-width: 0;
 }
 
 .info-left-pvc {
@@ -204,6 +262,13 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Gap compact pour les cartes avec CIN + Autorisation */
+.info-left-pvc.compact {
+  gap: 1px;
 }
 
 .qr-side-pvc {
@@ -238,19 +303,29 @@
   border-radius: 6px;
 }
 
-/* Style pour "Autorisé de sortir" */
+/* Style pour "Autorisation de sortie" */
 .autorisation-text-pvc {
   margin: 4px 0 0 0;
-  font-size: 7px;
+  font-size: 5.5px;
   color: #059669;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   background: #d1fae5;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
   border: 1px solid #6ee7b7;
   display: inline-block;
+  line-height: 1.2;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Autorisation compact pour les cartes avec CIN + Autorisation */
+.info-left-pvc.compact .autorisation-text-pvc {
+  margin: 2px 0 0 0;
 }
 
 /* Ancien style (conservé pour compatibilité) */
@@ -270,7 +345,7 @@
 
 .footer-accent-pvc {
   height: 6px;
-  background: linear-gradient(90deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  background: #dc2626;
   position: relative;
 }
 
@@ -312,45 +387,45 @@
   }
 
   .header-pvc {
-    background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%) !important;
+    background: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .header-accent-pvc {
-    background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.3) 100%) !important;
+    background: linear-gradient(90deg, transparent 0%, rgba(220, 38, 38, 0.3) 100%) !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .logo-pvc {
     background: white !important;
-    color: #ec4899 !important;
+    color: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .student-photo-pvc {
-    background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%) !important;
+    background: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .footer-accent-pvc {
-    background: linear-gradient(90deg, #ec4899 0%, #a855f7 50%, #6366f1 100%) !important;
+    background: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .card-title-pvc {
     color: white !important;
-    background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%) !important;
+    background: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
   .info-label-pvc {
-    color: #a855f7 !important;
+    color: #dc2626 !important;
     -webkit-print-color-adjust: exact !important;
   }
 

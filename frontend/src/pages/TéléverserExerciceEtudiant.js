@@ -4,7 +4,7 @@ import { Upload, BookOpen, FileText, GraduationCap, Hash, Send, CheckCircle, XCi
 import Sidebaretudiant from '../components/sidebaretudiant.js';
  const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 const TeleverserExerciceEtudiant = () => {
   const [titre, setTitre] = useState('');

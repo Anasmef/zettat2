@@ -4,7 +4,7 @@ import './message.css';
 import Sidebar from '../components/SidebarProf'; // Composant sidebar pour professeu
 const handleLogout = () => {
   localStorage.removeItem('token');
-  window.location.href = '/';
+  window.location.href = '/login';
 };
 
 const MicIcon = Mic;

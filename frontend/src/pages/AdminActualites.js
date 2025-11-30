@@ -40,7 +40,7 @@ if (typeof document !== 'undefined') {
 
 const handleLogout = () => {
   localStorage.removeItem('token');
-  window.location.href = '/';
+  window.location.href = '/login';
 };
 const AdminActualites = () => {
   const navigate = useNavigate();

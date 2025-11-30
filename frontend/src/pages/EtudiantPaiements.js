@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'; // déjà probablement importé
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 const EtudiantPaiements = () => {
   const [paiements, setPaiements] = useState([]);

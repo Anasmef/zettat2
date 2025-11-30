@@ -194,7 +194,7 @@ const PaiementsExp = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   // Fonction pour voir les détails

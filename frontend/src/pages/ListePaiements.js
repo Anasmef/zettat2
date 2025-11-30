@@ -112,7 +112,7 @@ const [filters, setFilters] = useState({
 }, [searchTerm, paiements, filters]);
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   const fetchPaiements = async () => {

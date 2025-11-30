@@ -198,7 +198,7 @@ if (dateTo) {
   const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR');
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 // Fonctions pour gérer l'édition et suppression
 const handleDeletePresence = async (presenceId, sessionIndex, presenceIndex) => {

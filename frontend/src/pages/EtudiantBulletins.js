@@ -28,7 +28,7 @@ import {
 import Sidebar from '../components/sidebaretudiant'; // ✅ ا
  const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 const EtudiantBulletins = () => {
   const [bulletins, setBulletins] = useState([]);

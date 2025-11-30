@@ -19,7 +19,7 @@ import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 
 const handleLogout = () => {
   localStorage.removeItem('token');
-  window.location.href = '/';
+  window.location.href = '/login';
 };
 
 const AdminMessages = () => {

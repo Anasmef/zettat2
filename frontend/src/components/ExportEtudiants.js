@@ -19,6 +19,7 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
     niveau: true,
     telephoneEtudiant: true,
     codeMassar: true,
+    cin: true,
     email: true,
     cours: true,
     lieuNaissance: false,
@@ -124,6 +125,7 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
       if (champsSelectionnes.niveau) ligne['Niveau'] = etudiant.niveau || '';
       if (champsSelectionnes.telephoneEtudiant) ligne['Téléphone Étudiant'] = etudiant.telephoneEtudiant || '';
       if (champsSelectionnes.codeMassar) ligne['Code Massar'] = etudiant.codeMassar || '';
+      if (champsSelectionnes.cin) ligne['CIN'] = etudiant.cin || '';
       if (champsSelectionnes.email) ligne['Email'] = etudiant.email || '';
       if (champsSelectionnes.cours) ligne['Classes'] = (Array.isArray(etudiant.cours) ? etudiant.cours.join(', ') : '');
       if (champsSelectionnes.nomCompletPere) ligne['Nom du Père'] = etudiant.nomCompletPere || '';
@@ -333,6 +335,14 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
                   onChange={() => handleToggleChamp('codeMassar')}
                 />
                 <span>Code Massar</span>
+              </label>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={champsSelectionnes.cin}
+                  onChange={() => handleToggleChamp('cin')}
+                />
+                <span>CIN</span>
               </label>
               <label className="checkbox-label">
                 <input

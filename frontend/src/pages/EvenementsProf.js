@@ -22,7 +22,7 @@ const EvenementsProf = () => {
   const navigate = useNavigate();
    const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
   useEffect(() => {
     const role = localStorage.getItem('role');

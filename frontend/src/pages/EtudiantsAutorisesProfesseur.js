@@ -4,7 +4,7 @@ import SidebarProf from '../components/SidebarProf';
 
    const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 const EtudiantsAutorisesProfesseur = () => {
   const [etudiants, setEtudiants] = useState([]);

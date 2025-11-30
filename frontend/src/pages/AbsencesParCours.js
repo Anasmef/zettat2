@@ -119,7 +119,7 @@ const AbsencesParCours = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   const getStatutColor = (totalAbsences) => {

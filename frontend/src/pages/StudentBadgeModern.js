@@ -76,7 +76,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
             </div>
 
             <div className="info-section-pvc">
-              <h2 className="card-title-pvc">CARTE D'ÉTUDIANT</h2>
+              <h2 className={`card-title-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>CARTE D'ÉTUDIANT</h2>
               
               <div className="info-row-pvc">
                 <span className="info-label-pvc">Nom</span>
@@ -85,12 +85,22 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
               
               {/* Section avec QR Code à côté */}
               <div className="info-with-qr-pvc">
-                <div className="info-left-pvc">
+                <div className={`info-left-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>
+                  {/* Afficher CIN si disponible */}
+                  {etudiant.cin && (
+                    <div className="info-row-pvc">
+                      <span className="info-label-pvc">CIN</span>
+                      <span className="info-value-pvc">: {etudiant.cin}</span>
+                    </div>
+                  )}
+                  
+                  {/* Toujours afficher ID Étudiant */}
                   <div className="info-row-pvc">
                     <span className="info-label-pvc">ID Étudiant</span>
                     <span className="info-value-pvc">: {etudiant.codeMassar || 'N/A'}</span>
                   </div>
                   
+                  {/* Toujours afficher Niveau */}
                   <div className="info-row-pvc">
                     <span className="info-label-pvc">Niveau</span>
                     <span className="info-value-pvc">: {etudiant.niveau || 'N/A'}</span>
@@ -98,7 +108,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
                   
                   {showAutorisation && (
                     <div className="info-row-pvc">
-                      <p className="autorisation-text-pvc">✓ Autorisé de sortir</p>
+                      <p className="autorisation-text-pvc">Autorisation de sortie (PAUSE DEJ)</p>
                     </div>
                   )}
                 </div>

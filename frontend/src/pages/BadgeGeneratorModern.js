@@ -4,7 +4,6 @@ import Sidebar from '../components/Sidebar';
 import StudentBadge from './StudentBadgeModern';
 import './BadgeGeneratorModern.css';
 import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 
 const BadgeGeneratorModern = () => {
   const [etudiants, setEtudiants] = useState([]);
@@ -16,6 +15,11 @@ const BadgeGeneratorModern = () => {
   const [recherche, setRecherche] = useState('');
   const [filtreNiveau, setFiltreNiveau] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
+  
+  // 🆕 Format d'export (PNG ou JPEG)
+  const [exportFormat, setExportFormat] = useState(() => {
+    return localStorage.getItem('exportFormat') || 'png';
+  });
   
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return sessionStorage.getItem('badgeAccess') === 'true';
@@ -32,9 +36,6 @@ const BadgeGeneratorModern = () => {
   });
   
   const [showConfig, setShowConfig] = useState(false);
-  
-  // Ref pour le rendu invisible
-  const hiddenCardRef = useRef(null);
 
   const handlePasswordSubmit = () => {
     const correctPassword = 'abdoraki2002';
@@ -118,16 +119,16 @@ const BadgeGeneratorModern = () => {
   const niveauxUniques = [...new Set(etudiants.map(e => e.niveau).filter(Boolean))].sort();
 
   // ========================================
-  // 🎯 Télécharger UNE carte en PDF (format PVC exact)
+  // 🎯 Télécharger UNE carte en PNG/JPEG
   // ========================================
-  const handleDownloadPDF = async (etudiant) => {
+  const handleDownloadImage = async (etudiant) => {
     try {
       setDownloadingId(etudiant._id);
 
-      // Attendre un peu que les images se chargent
+      // Attendre que les images se chargent
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Trouver le conteneur de la carte dans le DOM
+      // Trouver le conteneur de la carte
       const cardElement = document.querySelector(`[data-student-id="${etudiant._id}"] .card-container-pvc`);
       
       if (!cardElement) {
@@ -135,43 +136,38 @@ const BadgeGeneratorModern = () => {
         return;
       }
 
-      // Capturer UNIQUEMENT la carte (sans margin/padding)
+      // Capturer la carte en haute qualité
       const canvas = await html2canvas(cardElement, {
-        scale: 3, // Haute qualité
-        backgroundColor: '#ffffff',
+        scale: 3, // Haute résolution (972x612 px pour une carte PVC)
+        backgroundColor: exportFormat === 'png' ? null : '#ffffff',
         logging: false,
         useCORS: true,
         allowTaint: true,
         removeContainer: false,
         imageTimeout: 0,
-        width: 324, // Taille exacte de la carte
+        width: 324,
         height: 204
       });
 
-      // Dimensions carte PVC standard en mm
-      const pvcWidth = 85.6;  // mm
-      const pvcHeight = 54;   // mm
+      // Convertir en image (PNG ou JPEG)
+      const mimeType = exportFormat === 'png' ? 'image/png' : 'image/jpeg';
+      const quality = exportFormat === 'jpeg' ? 0.95 : 1.0;
+      const imgData = canvas.toDataURL(mimeType, quality);
 
-      // Créer PDF avec dimensions exactes
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [pvcWidth, pvcHeight]
-      });
-
-      // Convertir canvas en image
-      const imgData = canvas.toDataURL('image/png', 1.0);
-
-      // Ajouter l'image au PDF (remplir toute la page)
-      pdf.addImage(imgData, 'PNG', 0, 0, pvcWidth, pvcHeight, '', 'FAST');
-
-      // Télécharger
-      const nomFichier = `Carte_${etudiant.nomComplet?.replace(/\s+/g, '_') || etudiant._id}.pdf`;
-      pdf.save(nomFichier);
+      // Créer un lien de téléchargement
+      const link = document.createElement('a');
+      const extension = exportFormat === 'png' ? 'png' : 'jpg';
+      const nomFichier = `Carte_${etudiant.nomComplet?.replace(/\s+/g, '_') || etudiant._id}.${extension}`;
+      
+      link.href = imgData;
+      link.download = nomFichier;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
     } catch (err) {
-      console.error('Erreur PDF:', err);
-      alert('❌ Erreur lors de la génération du PDF');
+      console.error('Erreur export:', err);
+      alert('❌ Erreur lors de la génération de l\'image');
     } finally {
       setDownloadingId(null);
     }
@@ -189,13 +185,14 @@ const BadgeGeneratorModern = () => {
     for (const id of selectedIds) {
       const etudiant = etudiants.find(e => e._id === id);
       if (etudiant) {
-        await handleDownloadPDF(etudiant);
+        await handleDownloadImage(etudiant);
         // Pause entre chaque téléchargement
         await new Promise(resolve => setTimeout(resolve, 800));
       }
     }
 
-    alert(`✅ ${selectedIds.length} carte(s) téléchargée(s)`);
+    const format = exportFormat.toUpperCase();
+    alert(`✅ ${selectedIds.length} carte(s) téléchargée(s) en ${format}`);
   };
 
   const handleSelectAll = () => {
@@ -216,7 +213,7 @@ const BadgeGeneratorModern = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = '/';
+    window.location.href = '/login';
   };
 
   const countAutorisations = etudiants.filter(e => e.autorise).length;
@@ -339,6 +336,21 @@ const BadgeGeneratorModern = () => {
                   ))}
                 </select>
               </div>
+
+              {/* 🆕 Sélecteur de format */}
+              <div className="filtre-groupe">
+                <select
+                  value={exportFormat}
+                  onChange={(e) => {
+                    setExportFormat(e.target.value);
+                    localStorage.setItem('exportFormat', e.target.value);
+                  }}
+                  className="select-filtre"
+                >
+                  <option value="png">PNG (transparence)</option>
+                  <option value="jpeg">JPEG (plus léger)</option>
+                </select>
+              </div>
             </div>
 
             <div className="actions">
@@ -374,7 +386,7 @@ const BadgeGeneratorModern = () => {
                     disabled={downloadingId !== null}
                   >
                     <Download size={18} />
-                    {downloadingId ? 'Téléchargement...' : `Télécharger PDF (${selectedIds.length})`}
+                    {downloadingId ? 'Téléchargement...' : `Télécharger ${exportFormat.toUpperCase()} (${selectedIds.length})`}
                   </button>
                 </>
               )}
@@ -392,10 +404,10 @@ const BadgeGeneratorModern = () => {
                     className="btn-download-single"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDownloadPDF(etudiant);
+                      handleDownloadImage(etudiant);
                     }}
                     disabled={downloadingId === etudiant._id}
-                    title="Télécharger cette carte en PDF"
+                    title={`Télécharger cette carte en ${exportFormat.toUpperCase()}`}
                   >
                     {downloadingId === etudiant._id ? (
                       <div className="mini-spinner"></div>
