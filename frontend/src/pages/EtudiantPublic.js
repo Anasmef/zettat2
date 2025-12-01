@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   User, Phone, Mail, MapPin, Calendar, CreditCard, 
-  Book, Users, CheckCircle, XCircle, Truck, School, 
-  Award, Home, Briefcase, Loader
+  Book, CheckCircle, XCircle, Truck, School, 
+  Award, Home, Loader, AlertCircle, Globe
 } from 'lucide-react';
 
 const EtudiantPublic = () => {
@@ -21,7 +21,6 @@ const EtudiantPublic = () => {
       setLoading(true);
       setError('');
 
-      // ⚠️ ROUTE PUBLIQUE - Sans authentification
       const response = await fetch(`/api/etudiants/public/${id}`);
 
       if (!response.ok) {
@@ -74,7 +73,7 @@ const EtudiantPublic = () => {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.loadingCard}>
-          <Loader size={48} color="#6366f1" style={{ animation: 'spin 1s linear infinite' }} />
+          <Loader size={48} color="#dc2626" style={{ animation: 'spin 1s linear infinite' }} />
           <h2 style={styles.loadingTitle}>Chargement...</h2>
           <p style={styles.loadingText}>Récupération des informations de l'étudiant</p>
         </div>
@@ -118,8 +117,8 @@ const EtudiantPublic = () => {
         <div style={styles.headerContent}>
           <div style={styles.schoolLogo}>
             <img 
-              src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Alfred_Kastler.jpg/220px-Alfred_Kastler.jpg" 
-              alt="Alfred Kastler" 
+              src="/images/alfredkastler-removebg-preview.png" 
+              alt="Alfred Kastler Logo" 
               style={styles.logoImage}
               onError={(e) => {
                 e.target.style.display = 'none';
@@ -127,12 +126,12 @@ const EtudiantPublic = () => {
               }}
             />
             <div style={styles.logoFallback}>
-              <School size={32} color="white" />
+              <School size={32} color="#dc2626" />
             </div>
           </div>
           <div style={styles.headerText}>
-            <h1 style={styles.headerTitle}>École Alfred Kastler</h1>
-            <p style={styles.headerSubtitle}>Fiche Étudiant</p>
+            <h1 style={styles.headerTitle}>ALFRED KASTLER</h1>
+            <p style={styles.headerSubtitle}>Carte d'Étudiant Numérique</p>
           </div>
         </div>
       </div>
@@ -154,8 +153,8 @@ const EtudiantPublic = () => {
                 {etudiant.niveau && (
                   <span style={styles.levelBadge}>{etudiant.niveau}</span>
                 )}
-                {etudiant.codeMassar && (
-                  <span style={styles.massarBadge}>{etudiant.codeMassar}</span>
+                {etudiant.anneeScolaire && (
+                  <span style={styles.yearBadge}>{etudiant.anneeScolaire}</span>
                 )}
               </div>
             </div>
@@ -163,7 +162,7 @@ const EtudiantPublic = () => {
 
           {/* Statuts */}
           <div style={styles.statusSection}>
-            <StatusBadge active={etudiant.autorise} label="Autorisé" />
+            <StatusBadge active={etudiant.autorise} label="Autorisé de sortir" />
             <StatusBadge active={etudiant.actif} label="Actif" />
             {etudiant.transport && (
               <div style={styles.transportBadge}>
@@ -179,6 +178,10 @@ const EtudiantPublic = () => {
               <User size={20} /> Identité
             </h3>
             <div style={styles.infoGrid}>
+              <InfoItem icon={User} label="Nom Complet" value={etudiant.nomComplet} highlight />
+              {etudiant.cin && (
+                <InfoItem icon={CreditCard} label="CIN" value={etudiant.cin} highlight />
+              )}
               <InfoItem icon={User} label="Genre" value={etudiant.genre} />
               <InfoItem icon={Calendar} label="Date de naissance" value={formatDate(etudiant.dateNaissance)} />
               <InfoItem icon={MapPin} label="Lieu de naissance" value={etudiant.lieuNaissance} />
@@ -220,42 +223,63 @@ const EtudiantPublic = () => {
             </div>
           </div>
 
-          {/* Contact Père */}
-          {(etudiant.nomCompletPere || etudiant.telephonePere) && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>
-                👨 Contact du Père
-              </h3>
-              <div style={styles.parentCard}>
-                <div style={styles.infoGrid}>
-                  <InfoItem icon={User} label="Nom complet" value={etudiant.nomCompletPere} />
-                  <InfoItem icon={Phone} label="Téléphone" value={etudiant.telephonePere} />
-                  <InfoItem icon={Briefcase} label="Profession" value={etudiant.travailPere} />
-                </div>
+          {/* Informations de l'école */}
+          <div style={styles.schoolInfoSection}>
+            <div style={styles.infoBox}>
+              <School size={24} color="#dc2626" />
+              <div>
+                <h4 style={styles.infoBoxTitle}>Informations de Contact</h4>
+                <p style={styles.infoBoxText}>Pour toute question ou assistance</p>
               </div>
             </div>
-          )}
 
-          {/* Contact Mère */}
-          {(etudiant.nomCompletMere || etudiant.telephoneMere) && (
-            <div style={styles.section}>
-              <h3 style={styles.sectionTitle}>
-                👩 Contact de la Mère
-              </h3>
-              <div style={styles.parentCard}>
-                <div style={styles.infoGrid}>
-                  <InfoItem icon={User} label="Nom complet" value={etudiant.nomCompletMere} />
-                  <InfoItem icon={Phone} label="Téléphone" value={etudiant.telephoneMere} />
-                  <InfoItem icon={Briefcase} label="Profession" value={etudiant.travailMere} />
+            <div style={styles.schoolContactGrid}>
+              <div style={styles.schoolContactItem}>
+                <School size={18} color="#dc2626" />
+                <div>
+                  <div style={styles.schoolContactLabel}>École</div>
+                  <div style={styles.schoolContactValue}>ALFRED KASTLER</div>
+                </div>
+              </div>
+
+              <div style={styles.schoolContactItem}>
+                <Phone size={18} color="#dc2626" />
+                <div>
+                  <div style={styles.schoolContactLabel}>Téléphone</div>
+                  <div style={styles.schoolContactValue}>+212 5 22 600 700</div>
+                </div>
+              </div>
+
+              <div style={styles.schoolContactItem}>
+                <Mail size={18} color="#dc2626" />
+                <div>
+                  <div style={styles.schoolContactLabel}>Email</div>
+                  <div style={styles.schoolContactValue}>contact@kastler.ma</div>
+                </div>
+              </div>
+
+              <div style={styles.schoolContactItem}>
+                <Globe size={18} color="#dc2626" />
+                <div>
+                  <div style={styles.schoolContactLabel}>Site Web</div>
+                  <div style={styles.schoolContactValue}>www.kastler.ma</div>
+                </div>
+              </div>
+
+              <div style={styles.schoolContactItem}>
+                <MapPin size={18} color="#dc2626" />
+                <div>
+                  <div style={styles.schoolContactLabel}>Adresse</div>
+                  <div style={styles.schoolContactValue}>130, Bd Ali Yaàta, Hay Al Mohammadi, Casablanca</div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Footer */}
           <div style={styles.footer}>
             <School size={14} />
-            <span>École Alfred Kastler - Informations à jour le {formatDate(new Date())}</span>
+            <span>École Alfred Kastler - Carte valide pour l'année {etudiant.anneeScolaire || '2025/2026'}</span>
           </div>
         </div>
       </div>
@@ -271,9 +295,9 @@ const styles = {
   },
 
   header: {
-    background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)',
+    background: '#dc2626',
     padding: '24px 20px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
   },
 
   headerContent: {
@@ -287,18 +311,22 @@ const styles = {
   schoolLogo: {
     width: '60px',
     height: '60px',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    border: '3px solid rgba(255, 255, 255, 0.4)',
-    overflow: 'hidden',
+    borderRadius: '12px', // ← arrondi ajouté
+    backgroundColor: 'white',
+    border: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
     position: 'relative',
   },
 
   logoImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
+    objectFit: 'contain',
+    borderRadius: '12px' // ← assurer que l'image suit l'arrondi
   },
 
   logoFallback: {
@@ -310,6 +338,7 @@ const styles = {
     position: 'absolute',
     top: 0,
     left: 0,
+    backgroundColor: 'white',
   },
 
   headerText: {
@@ -318,16 +347,19 @@ const styles = {
 
   headerTitle: {
     fontSize: '24px',
-    fontWeight: '700',
+    fontWeight: '900',
     color: '#ffffff',
     margin: '0 0 4px 0',
+    letterSpacing: '2px',
+    textTransform: 'uppercase',
   },
 
   headerSubtitle: {
     fontSize: '14px',
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(255, 255, 255, 0.95)',
     margin: 0,
+    letterSpacing: '1px',
   },
 
   content: {
@@ -341,10 +373,11 @@ const styles = {
     borderRadius: '16px',
     overflow: 'hidden',
     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #e5e7eb',
   },
 
   studentHeader: {
-    background: 'linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%)',
+    background: '#dc2626',
     padding: '24px',
     display: 'flex',
     alignItems: 'center',
@@ -352,16 +385,17 @@ const styles = {
   },
 
   studentAvatar: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
+    width: '90px',
+    height: '115px',
+    borderRadius: '12px',
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '3px solid rgba(255, 255, 255, 0.5)',
+    border: '3px solid white',
     flexShrink: 0,
     overflow: 'hidden',
+    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
   },
 
   avatarImage: {
@@ -391,23 +425,21 @@ const styles = {
 
   levelBadge: {
     padding: '6px 12px',
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#dc2626',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+  },
+
+  yearBadge: {
+    padding: '6px 12px',
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: '16px',
     fontSize: '12px',
     fontWeight: '600',
     color: 'white',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-  },
-
-  massarBadge: {
-    padding: '6px 12px',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: '16px',
-    fontSize: '12px',
-    fontWeight: '700',
-    color: 'white',
-    fontFamily: 'monospace',
-    letterSpacing: '1px',
     border: '2px solid rgba(255, 255, 255, 0.3)',
   },
 
@@ -453,7 +485,7 @@ const styles = {
     gap: '10px',
     fontSize: '16px',
     fontWeight: '700',
-    color: '#1e293b',
+    color: '#dc2626',
     margin: '0 0 16px 0',
   },
 
@@ -493,13 +525,7 @@ const styles = {
   infoValueHighlight: {
     fontSize: '14px',
     fontWeight: '700',
-    color: '#6366f1',
-  },
-
-  parentCard: {
-    backgroundColor: '#f8fafc',
-    padding: '16px',
-    borderRadius: '12px',
+    color: '#dc2626',
   },
 
   coursSection: {
@@ -523,11 +549,72 @@ const styles = {
 
   coursTag: {
     padding: '6px 12px',
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: '500',
+  },
+
+  schoolInfoSection: {
+    padding: '20px 24px',
+    backgroundColor: '#f9fafb',
+    borderTop: '3px solid #dc2626',
+  },
+
+  infoBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#e0f2fe',
+    border: '2px solid #7dd3fc',
+    borderRadius: '12px',
+    marginBottom: '20px',
+  },
+
+  infoBoxTitle: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#0c4a6e',
+    margin: '0 0 4px 0',
+  },
+
+  infoBoxText: {
+    fontSize: '12px',
+    color: '#075985',
+    margin: 0,
+  },
+
+  schoolContactGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+  },
+
+  schoolContactItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+    padding: '12px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+  },
+
+  schoolContactLabel: {
+    fontSize: '10px',
+    fontWeight: '600',
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    marginBottom: '2px',
+  },
+
+  schoolContactValue: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#1e293b',
+    wordBreak: 'break-word',
   },
 
   footer: {
@@ -535,9 +622,9 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     padding: '16px 24px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#dc2626',
     fontSize: '12px',
-    color: '#64748b',
+    color: 'white',
     fontStyle: 'italic',
   },
 
