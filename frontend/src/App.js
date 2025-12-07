@@ -81,6 +81,10 @@ import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
 import ReclamationsProfesseur
  from './pages/ReclamationsProfesseur';
 
+         
+import Rapportsmanager from './pages/Rapportmanager';
+
+
 import  GestionParents from './pages/GestionParents';
  import  BadgeGeneratorModern
  from './pages/BadgeGeneratorModern';
@@ -355,6 +359,10 @@ function AppContent() {
         <Route path="/professeur/mes-rapports" element={<MesRapports />} />
         <Route path="/professeur/rapports" element={<PageProfesseurRapports />} />
         {/* Routes Admin */}
+
+
+        <Route path="/manager/rapports" element={<Rapportsmanager />} />
+
 
 <Route path="/parent/bulletins" element={<ParentBulletins />} />
 <Route path="/parent/emploi-du-temps" element={<ParentEmploiDuTemps />} />

@@ -87,6 +87,12 @@ const Sidebar = ({ onLogout }) => {
       icon: BookOpen
     },
 
+    {
+      path: '/manager/rapports',
+      label: 'Rapports',
+      icon: ClipboardList
+    },
+    
       {
       path: '/manager/messages',
       label: 'messages',

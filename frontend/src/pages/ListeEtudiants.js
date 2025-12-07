@@ -7,6 +7,8 @@ import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 import ExportEtudiants from '../components/ExportEtudiants';
 import { Download } from 'lucide-react'; // Si pas déjà importé
 import RapportNotificationModal from '../components/RapportNotificationModal';
+import EtudiantsArchives from '../components/EtudiantsArchives';
+
 import { 
   User, 
   CheckCircle, 
@@ -46,6 +48,11 @@ const [showRapportModal, setShowRapportModal] = useState(false);
   const [showExportAuthModal, setShowExportAuthModal] = useState(false);
   const [exportPassword, setExportPassword] = useState('');
   const [exportAuthError, setExportAuthError] = useState('');
+
+  // Auth modal pour accéder aux archives
+  const [showArchivesAuthModal, setShowArchivesAuthModal] = useState(false);
+  const [archivesPassword, setArchivesPassword] = useState('');
+  const [archivesAuthError, setArchivesAuthError] = useState('');
 
   // Role-based permission state
   const [userRole, setUserRole] = useState('');
@@ -125,7 +132,8 @@ const [formAjout, setFormAjout] = useState({
   const [messageModifier, setMessageModifier] = useState('');
   const [loadingModifier, setLoadingModifier] = useState(false);
   const [etudiantAModifier, setEtudiantAModifier] = useState(null);
-  
+    const [showArchivesModal, setShowArchivesModal] = useState(false);
+
   // États pour le modal de suppression
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteCode, setDeleteCode] = useState('');
@@ -652,36 +660,40 @@ const closeEditModal = () => {
     }
   };
 
-  const handleDelete = (etudiant) => {
-    setEtudiantASupprimer(etudiant);
+const handleDelete = (etudiant) => {
+  setEtudiantASupprimer(etudiant);
+  setDeleteCode('');
+  setDeleteError('');
+  setShowDeleteModal(true);
+};
+
+const handleConfirmDelete = async (e) => {
+  e.preventDefault();
+  
+  if (deleteCode !== 'allahakbir') {
+    setDeleteError('❌ Code incorrect. Veuillez réessayer.');
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    await axios.delete(`/api/etudiants/${etudiantASupprimer._id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    
+    // ✅ Retirer l'étudiant de la liste (il est maintenant hidden)
+    setEtudiants(etudiants.filter(e => e._id !== etudiantASupprimer._id));
+    
+    setShowDeleteModal(false);
+    setEtudiantASupprimer(null);
     setDeleteCode('');
     setDeleteError('');
-    setShowDeleteModal(true);
-  };
-
-  const handleConfirmDelete = async (e) => {
-    e.preventDefault();
     
-    if (deleteCode !== 'allahakbir') {
-      setDeleteError('❌ Code incorrect. Veuillez réessayer.');
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`/api/etudiants/${etudiantASupprimer._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setEtudiants(etudiants.filter(e => e._id !== etudiantASupprimer._id));
-      setShowDeleteModal(false);
-      setEtudiantASupprimer(null);
-      setDeleteCode('');
-      setDeleteError('');
-    } catch (err) {
-      console.error('Erreur suppression:', err);
-      setDeleteError('❌ Erreur lors de la suppression');
-    }
-  };
+  } catch (err) {
+    console.error('Erreur archivage:', err);
+    setDeleteError('❌ Erreur lors de l\'archivage');
+  }
+};
 
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
@@ -820,6 +832,27 @@ const closeEditModal = () => {
     setShowExportAuthModal(true);
   };
 
+  // Handlers du modal d'authentification Archives
+  const handleSubmitArchivesAuth = (e) => {
+    e.preventDefault();
+    const correct = 'errakiabdelmajid';
+    if (archivesPassword === correct) {
+      setShowArchivesAuthModal(false);
+      setShowArchivesModal(true);
+      setArchivesPassword('');
+      setArchivesAuthError('');
+    } else {
+      setArchivesAuthError('Mot de passe incorrect');
+      setArchivesPassword('');
+    }
+  };
+  
+  const closeArchivesAuth = () => {
+    setShowArchivesAuthModal(false);
+    setArchivesPassword('');
+    setArchivesAuthError('');
+  };
+
   const handleSubmitExportAuth = (e) => {
     e.preventDefault();
     if (exportPassword === 'abdoraki2001') {
@@ -865,7 +898,28 @@ const closeEditModal = () => {
               Cartes
             </button>
           </div>
-          
+           <button 
+          onClick={() => {
+            // Ouvre d'abord le modal d'authentification
+            setArchivesPassword('');
+            setArchivesAuthError('');
+            setShowArchivesAuthModal(true);
+          }}
+          className="btn-archives"
+          style={{
+            background: '#8b5cf6',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+           Archives
+        </button>
           {/* ✅ NOUVEAU: Bouton d'export Excel (ouvre modal d'authentification) */}
           <button 
             onClick={openExportAuth} 
@@ -2201,6 +2255,35 @@ const closeEditModal = () => {
         </div>
       )}
 
+      {/* Modal d'authentification pour accéder aux Archives */}
+      {showArchivesAuthModal && (
+        <div className="modal-overlay" onClick={closeArchivesAuth}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Accès aux Archives</h3>
+              <button className="btn-fermer-modal" onClick={closeArchivesAuth}>×</button>
+            </div>
+            <form onSubmit={handleSubmitArchivesAuth} className="form-export-auth">
+              <div className="form-group">
+                <label>Mot de passe</label>
+                <input
+                  type="password"
+                  value={archivesPassword}
+                  onChange={(e) => setArchivesPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+              {archivesAuthError && <div className="message-ajout error" style={{marginTop: '8px'}}>{archivesAuthError}</div>}
+              <div className="modal-actions" style={{marginTop: '12px', display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                <button type="button" onClick={closeArchivesAuth} className="btn-annuler">Annuler</button>
+                <button type="submit" className="btn-enregistrer">Valider</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modal d'export Excel */}
       {showExportModal && (
         <ExportEtudiants 
@@ -2323,7 +2406,12 @@ const closeEditModal = () => {
             </form>
           </div>
         </div>
+        
       )}
+       <EtudiantsArchives 
+        show={showArchivesModal}
+        onClose={() => setShowArchivesModal(false)}
+      />
     </div>
   );
 };

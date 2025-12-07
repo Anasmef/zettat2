@@ -9,6 +9,7 @@ const Reclamation = require('./models/Reclamation'); // Ajuster le chemin selon 
 const QRCodeGen = require('qrcode');
 const Parent = require('./models/Parent'); // ← AJOUTER CETTE LIGNE
 const pdfMake = require('pdfmake');
+const ListeNoire = require('./models/ListeNoire');
 
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
@@ -1589,30 +1590,7 @@ app.patch('/api/etudiants/:id/finance', authAdminOrPaiementManager, async (req, 
 // 4. ROUTE SPÉCIALE POUR RÉCUPÉRER ÉTUDIANTS
 // ========================================
 
-// Route pour récupérer étudiants avec filtrage selon le rôle
-app.get('/api/etudiants/filtered', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
-  try {
-    const userRole = req.userRole || req.user?.role;
-    
-    // Sélectionner les champs selon le rôle
-    let selectFields = '-motDePasse';
-    
-    if (userRole === 'inscripteur') {
-      // Exclure les champs financiers pour les inscripteurs
-      selectFields = '-motDePasse -prixTotal -paye -pourcentageBourse -typePaiement -dateReglement';
-    }
-    
-    const etudiants = await Etudiant.find()
-      .select(selectFields)
-      .populate('creeParAdmin', 'nom email')
-      .populate('creeParInscripteur', 'nom email')
-      .sort({ createdAt: -1 });
-    
-    res.json(etudiants);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+
 
 // ✅ 1. GÉNÉRER UN SEUL QR CODE PAR MOIS (valable 30 JOURS, réutilisable chaque jour)
 app.post('/api/admin/generate-qr', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
@@ -3292,15 +3270,145 @@ app.get('/api/professeurs/:id/historique', authAdminOrInscripteurOrPaiementManag
     res.status(500).json({ message: 'Erreur lors de la récupération de l\'historique' });
   }
 });
+// ✅ NOUVELLE VERSION - Soft Delete
 app.delete('/api/etudiants/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
-    await Etudiant.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Étudiant supprimé' });
+    const etudiant = await Etudiant.findById(req.params.id);
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // ✅ Au lieu de supprimer, on met à jour :
+    etudiant.hidden = true;      // Marquer comme caché
+    etudiant.cours = [];          // Vider les cours
+    etudiant.actif = false;       // Désactiver aussi (optionnel)
+    
+    await etudiant.save();
+    
+    res.json({ 
+      message: 'Étudiant archivé avec succès',
+      etudiant: etudiant 
+    });
+    
   } catch (err) {
-    res.status(500).json({ message: 'Erreur lors de la suppression' });
+    console.error('Erreur soft delete:', err);
+    res.status(500).json({ message: 'Erreur lors de l\'archivage' });
+  }
+});// ✅ Exclure les étudiants hidden par défaut
+app.get('/api/etudiants/filtered', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const role = req.user.role;
+    let query = { hidden: { $ne: true } }; // ✅ Exclure les cachés
+    
+    if (role === 'inscripteur') {
+      query.creeParInscripteur = req.user.id;
+    }
+    
+    const etudiants = await Etudiant.find(query)
+      .populate('creeParAdmin', 'nom prenom')
+      .populate('creeParInscripteur', 'nom prenom');
+      
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});// ✅ Nouvelle route pour restaurer
+app.patch('/api/etudiants/:id/restore', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id);
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    etudiant.hidden = false;  // Rendre visible à nouveau
+    etudiant.actif = true;    // Réactiver
+    
+    await etudiant.save();
+    
+    res.json({ 
+      message: 'Étudiant restauré avec succès',
+      etudiant: etudiant 
+    });
+    
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur lors de la restauration' });
+  }
+});
+// ✅ Route pour obtenir les étudiants archivés
+app.get('/api/etudiants/archives', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const role = req.user.role;
+    let query = { hidden: true }; // Seulement les cachés
+    
+    if (role === 'inscripteur') {
+      query.creeParInscripteur = req.user.id;
+    }
+    
+    const etudiants = await Etudiant.find(query)
+      .populate('creeParAdmin', 'nom prenom')
+      .populate('creeParInscripteur', 'nom prenom')
+      .sort({ updatedAt: -1 }); // Les plus récents d'abord
+      
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur archives:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
+// ✅ Route pour restaurer un étudiant
+app.patch('/api/etudiants/:id/restore', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id);
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    etudiant.hidden = false;
+    etudiant.actif = true;
+    // NE PAS restaurer les cours automatiquement - ils sont vides
+    
+    await etudiant.save();
+    
+    res.json({ 
+      message: 'Étudiant restauré avec succès',
+      etudiant: etudiant 
+    });
+    
+  } catch (err) {
+    console.error('Erreur restore:', err);
+    res.status(500).json({ message: 'Erreur lors de la restauration' });
+  }
+});
+
+// ✅ Route pour suppression DÉFINITIVE
+app.delete('/api/etudiants/:id/permanent', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiant = await Etudiant.findById(req.params.id);
+    
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+
+    // Vérifier que l'étudiant est bien hidden
+    if (!etudiant.hidden) {
+      return res.status(400).json({ 
+        message: 'Seuls les étudiants archivés peuvent être supprimés définitivement' 
+      });
+    }
+
+    await Etudiant.findByIdAndDelete(req.params.id);
+    
+    res.json({ message: 'Étudiant supprimé définitivement' });
+    
+  } catch (err) {
+    console.error('Erreur suppression permanente:', err);
+    res.status(500).json({ message: 'Erreur lors de la suppression' });
+  }
+});
 // Créer une nouvelle réclamation
 app.post('/api/professeur/reclamations', authProfesseur, async (req, res) => {
   try {
@@ -6796,6 +6904,359 @@ app.get('/api/seances/etudiant', authEtudiant, async (req, res) => {
 });
 
 
+// 📋 1. RÉCUPÉRER TOUS LES CAS DE LISTE NOIRE
+app.get('/api/liste-noire', authAdmin, async (req, res) => {
+  try {
+    const { statut, gravite, niveau, cours, anneeScolaire } = req.query;
+    
+    let filter = {};
+    
+    if (statut) filter.statut = statut;
+    if (gravite) filter.gravite = gravite;
+    if (niveau) filter.niveau = niveau;
+    if (cours) filter.cours = cours;
+    if (anneeScolaire) filter.anneeScolaire = anneeScolaire;
+    
+    const cas = await ListeNoire.find(filter)
+      .populate('etudiant', 'nomComplet email telephoneEtudiant image niveau cours')
+      .populate('ajoutePar', 'nom prenom')
+      .populate('resoluPar', 'nom prenom')
+      .sort({ dateAjout: -1 });
+    
+    res.json(cas);
+  } catch (err) {
+    console.error('Erreur récupération liste noire:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// 📌 2. RÉCUPÉRER UN CAS SPÉCIFIQUE
+app.get('/api/liste-noire/:id', authAdmin, async (req, res) => {
+  try {
+    const cas = await ListeNoire.findById(req.params.id)
+      .populate('etudiant')
+      .populate('ajoutePar', 'nom prenom')
+      .populate('resoluPar', 'nom prenom')
+      .populate('observations.ajoutePar', 'nom prenom');
+    
+    if (!cas) {
+      return res.status(404).json({ message: 'Cas non trouvé' });
+    }
+    
+    res.json(cas);
+  } catch (err) {
+    console.error('Erreur récupération cas:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// ➕ 3. AJOUTER UN ÉTUDIANT À LA LISTE NOIRE
+app.post('/api/liste-noire', authAdmin, async (req, res) => {
+  try {
+    const {
+      etudiantId,
+      motif,
+      description,
+      gravite,
+      sanction,
+      nombreAbsences,
+      nombreRetards,
+      nombreRapports,
+      dateInfraction,
+      anneeScolaire
+    } = req.body;
+    
+    // Validation
+    if (!etudiantId || !motif || !description) {
+      return res.status(400).json({ 
+        message: 'Étudiant, motif et description sont obligatoires' 
+      });
+    }
+    
+    // Vérifier si l'étudiant existe
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ message: 'Étudiant non trouvé' });
+    }
+    
+    // Vérifier si déjà en liste noire active
+    const dejaDansListeNoire = await ListeNoire.findOne({
+      etudiant: etudiantId,
+      statut: { $in: ['actif', 'en_cours'] }
+    });
+    
+    if (dejaDansListeNoire) {
+      return res.status(400).json({ 
+        message: 'Cet étudiant est déjà dans la liste noire active' 
+      });
+    }
+    
+    // Créer le cas
+    const nouveauCas = new ListeNoire({
+      etudiant: etudiantId,
+      nomComplet: etudiant.nomComplet,
+      niveau: etudiant.niveau,
+      cours: etudiant.cours,
+      email: etudiant.email,
+      telephoneEtudiant: etudiant.telephoneEtudiant,
+      motif,
+      description,
+      gravite: gravite || 'moyen',
+      sanction: sanction || 'avertissement',
+      nombreAbsences: nombreAbsences || 0,
+      nombreRetards: nombreRetards || 0,
+      nombreRapports: nombreRapports || 0,
+      dateInfraction: dateInfraction || new Date(),
+      ajoutePar: req.adminId,
+      anneeScolaire: anneeScolaire || '2025/2026'
+    });
+    
+    await nouveauCas.save();
+    
+    // Peupler les références
+    await nouveauCas.populate('etudiant', 'nomComplet email telephoneEtudiant image');
+    await nouveauCas.populate('ajoutePar', 'nom prenom');
+    
+    res.status(201).json({
+      message: 'Étudiant ajouté à la liste noire avec succès',
+      cas: nouveauCas
+    });
+    
+  } catch (err) {
+    console.error('Erreur ajout liste noire:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// ✏️ 4. MODIFIER UN CAS
+app.put('/api/liste-noire/:id', authAdmin, async (req, res) => {
+  try {
+    const {
+      motif,
+      description,
+      gravite,
+      sanction,
+      nombreAbsences,
+      nombreRetards,
+      nombreRapports,
+      statut,
+      parentsInformes
+    } = req.body;
+    
+    const cas = await ListeNoire.findById(req.params.id);
+    
+    if (!cas) {
+      return res.status(404).json({ message: 'Cas non trouvé' });
+    }
+    
+    // Mise à jour des champs
+    if (motif) cas.motif = motif;
+    if (description) cas.description = description;
+    if (gravite) cas.gravite = gravite;
+    if (sanction) cas.sanction = sanction;
+    if (nombreAbsences !== undefined) cas.nombreAbsences = nombreAbsences;
+    if (nombreRetards !== undefined) cas.nombreRetards = nombreRetards;
+    if (nombreRapports !== undefined) cas.nombreRapports = nombreRapports;
+    if (statut) cas.statut = statut;
+    if (parentsInformes !== undefined) {
+      cas.parentsInformes = parentsInformes;
+      if (parentsInformes) cas.dateInformationParents = new Date();
+    }
+    
+    await cas.save();
+    
+    await cas.populate('etudiant', 'nomComplet email telephoneEtudiant image');
+    await cas.populate('ajoutePar', 'nom prenom');
+    
+    res.json({
+      message: 'Cas modifié avec succès',
+      cas
+    });
+    
+  } catch (err) {
+    console.error('Erreur modification cas:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// ✅ 5. RÉSOUDRE UN CAS
+app.patch('/api/liste-noire/:id/resoudre', authAdmin, async (req, res) => {
+  try {
+    const { noteResolution } = req.body;
+    
+    const cas = await ListeNoire.findById(req.params.id);
+    
+    if (!cas) {
+      return res.status(404).json({ message: 'Cas non trouvé' });
+    }
+    
+    await cas.resoudre(noteResolution, req.adminId);
+    
+    await cas.populate('etudiant', 'nomComplet email telephoneEtudiant image');
+    await cas.populate('resoluPar', 'nom prenom');
+    
+    res.json({
+      message: 'Cas résolu avec succès',
+      cas
+    });
+    
+  } catch (err) {
+    console.error('Erreur résolution cas:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// 📝 6. AJOUTER UNE OBSERVATION
+app.post('/api/liste-noire/:id/observation', authAdmin, async (req, res) => {
+  try {
+    const { texte } = req.body;
+    
+    if (!texte || texte.trim() === '') {
+      return res.status(400).json({ message: 'Le texte de l\'observation est obligatoire' });
+    }
+    
+    const cas = await ListeNoire.findById(req.params.id);
+    
+    if (!cas) {
+      return res.status(404).json({ message: 'Cas non trouvé' });
+    }
+    
+    await cas.ajouterObservation(texte, req.adminId);
+    
+    await cas.populate('observations.ajoutePar', 'nom prenom');
+    
+    res.json({
+      message: 'Observation ajoutée avec succès',
+      cas
+    });
+    
+  } catch (err) {
+    console.error('Erreur ajout observation:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// 🗑️ 7. SUPPRIMER UN CAS (ARCHIVER)
+app.delete('/api/liste-noire/:id', authAdmin, async (req, res) => {
+  try {
+    const cas = await ListeNoire.findById(req.params.id);
+    
+    if (!cas) {
+      return res.status(404).json({ message: 'Cas non trouvé' });
+    }
+    
+    // Au lieu de supprimer, on archive
+    cas.statut = 'archive';
+    await cas.save();
+    
+    res.json({
+      message: 'Cas archivé avec succès'
+    });
+    
+  } catch (err) {
+    console.error('Erreur suppression cas:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// 📊 8. STATISTIQUES LISTE NOIRE
+app.get('/api/liste-noire/stats/general', authAdmin, async (req, res) => {
+  try {
+    const { anneeScolaire } = req.query;
+    
+    let filter = {};
+    if (anneeScolaire) filter.anneeScolaire = anneeScolaire;
+    
+    const stats = await ListeNoire.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalCas: { $sum: 1 },
+          casActifs: { 
+            $sum: { $cond: [{ $eq: ['$statut', 'actif'] }, 1, 0] } 
+          },
+          casResolus: { 
+            $sum: { $cond: [{ $eq: ['$statut', 'resolu'] }, 1, 0] } 
+          },
+          casGraves: { 
+            $sum: { $cond: [{ $eq: ['$gravite', 'grave'] }, 1, 0] } 
+          },
+          casTresGraves: { 
+            $sum: { $cond: [{ $eq: ['$gravite', 'tres_grave'] }, 1, 0] } 
+          },
+          totalAbsences: { $sum: '$nombreAbsences' },
+          totalRetards: { $sum: '$nombreRetards' },
+          totalRapports: { $sum: '$nombreRapports' }
+        }
+      }
+    ]);
+    
+    // Stats par motif
+    const statsParMotif = await ListeNoire.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$motif',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Stats par niveau
+    const statsParNiveau = await ListeNoire.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$niveau',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    res.json({
+      general: stats[0] || {
+        totalCas: 0,
+        casActifs: 0,
+        casResolus: 0,
+        casGraves: 0,
+        casTresGraves: 0,
+        totalAbsences: 0,
+        totalRetards: 0,
+        totalRapports: 0
+      },
+      parMotif: statsParMotif,
+      parNiveau: statsParNiveau
+    });
+    
+  } catch (err) {
+    console.error('Erreur stats liste noire:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+// 🔍 9. VÉRIFIER SI UN ÉTUDIANT EST EN LISTE NOIRE
+app.get('/api/liste-noire/etudiant/:etudiantId/check', authAdmin, async (req, res) => {
+  try {
+    const cas = await ListeNoire.findOne({
+      etudiant: req.params.etudiantId,
+      statut: { $in: ['actif', 'en_cours'] }
+    }).populate('etudiant', 'nomComplet');
+    
+    res.json({
+      estListeNoire: !!cas,
+      cas: cas || null
+    });
+    
+  } catch (err) {
+    console.error('Erreur vérification liste noire:', err);
+    res.status(500).json({ message: 'Erreur serveur', error: err.message });
+  }
+});
+
+console.log('✅ Routes Liste Noire ajoutées');
 
 
 app.get('/api/seances/professeur', authProfesseur, async (req, res) => {
@@ -10416,7 +10877,222 @@ app.get('/api/etudiant/photo/info', authEtudiant, async (req, res) => {
     });
   }
 });
+// ============================================
+// ROUTES BACKEND POUR LE STAFF
+// À ajouter dans votre fichier de routes (server.js ou rapportsRoutes.js)
+// ============================================
 
+// GET - Récupérer tous les rapports (Pour Staff: Inscripteur et Paiement Manager)
+app.get('/api/rapports/staff/rapports', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { statut, cours, dateDebut, dateFin } = req.query;
+    
+    let query = {};
+    
+    if (statut) {
+      query.statut = statut;
+    }
+    
+    if (cours) {
+      query.cours = cours;
+    }
+    
+    if (dateDebut || dateFin) {
+      query.date = {};
+      if (dateDebut) query.date.$gte = new Date(dateDebut);
+      if (dateFin) query.date.$lte = new Date(dateFin);
+    }
+
+    const rapports = await Rapport.find(query)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire telephonePere telephoneMere')
+      .sort({ date: -1 });
+
+    res.json(rapports);
+  } catch (err) {
+    console.error('Erreur récupération rapports staff:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET - Récupérer un rapport spécifique (Pour Staff)
+app.get('/api/rapports/staff/rapports/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire telephonePere telephoneMere');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    res.json(rapport);
+  } catch (err) {
+    console.error('Erreur récupération rapport staff:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST - Générer PDF d'un rapport (Pour Staff)
+app.post('/api/rapports/staff/rapports/:id/generate-pdf', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const rapport = await Rapport.findById(req.params.id)
+      .populate('professeur', 'nom prenom email')
+      .populate('etudiant', 'nomComplet email niveau anneeScolaire image');
+
+    if (!rapport) {
+      return res.status(404).json({ message: 'Rapport non trouvé' });
+    }
+
+    let logoBase64 = null;
+    let photoBase64 = null;
+
+    const logoPath = path.join(__dirname, '..', 'frontend', 'public', 'images', 'logo-ecole.jpg');
+    if (fs.existsSync(logoPath)) {
+      logoBase64 = 'data:image/jpeg;base64,' + fs.readFileSync(logoPath).toString('base64');
+    }
+
+    if (rapport.etudiant && rapport.etudiant.image) {
+      const photoPath = path.join(__dirname, '..', 'frontend', 'public', rapport.etudiant.image);
+      if (fs.existsSync(photoPath)) {
+        const ext = path.extname(photoPath).toLowerCase();
+        const mime = ext === '.png' ? 'image/png' : 'image/jpeg';
+        photoBase64 = `data:${mime};base64,` + fs.readFileSync(photoPath).toString('base64');
+      }
+    }
+
+    const nomProf = rapport.professeur ? (rapport.professeur.prenom || '') + ' ' + (rapport.professeur.nom || '') : 'Non renseigné';
+
+    const natureProbleme = rapport.natureProbleme || [];
+    const mesurePrise = rapport.mesurePrise || [];
+
+    // Problèmes
+    const prob1 = natureProbleme.includes('Devoirs non faits') ? '[X]' : '[ ]';
+    const prob2 = natureProbleme.includes('Indiscipline en classe') ? '[X]' : '[ ]';
+    const prob3 = natureProbleme.includes('Bavardage excessif') ? '[X]' : '[ ]';
+    const prob4 = natureProbleme.includes("Refus d'obéir") || natureProbleme.includes("Refus d'obeir") ? '[X]' : '[ ]';
+    const prob5 = natureProbleme.includes('Violence verbale / physique') || natureProbleme.includes('Violence verbale/physique') ? '[X]' : '[ ]';
+    const prob6 = natureProbleme.includes('Retard ou absence répétée') || natureProbleme.includes('Retard ou absence repetee') ? '[X]' : '[ ]';
+    const prob7 = natureProbleme.includes('Autre') ? '[X]' : '[ ]';
+
+    // Mesures
+    const mes1 = mesurePrise.includes('Observation / remarque orale') || mesurePrise.includes('Observation/remarque orale') ? '[X]' : '[ ]';
+    const mes2 = mesurePrise.includes('Avertissement écrit') || mesurePrise.includes('Avertissement ecrit') ? '[X]' : '[ ]';
+    const mes3 = mesurePrise.includes('Élève exclu temporairement du cours') || mesurePrise.includes('Eleve exclu temporairement du cours') || mesurePrise.includes('Élève exclu temporairement') ? '[X]' : '[ ]';
+    const mes4 = mesurePrise.includes('Communication avec les parents') || mesurePrise.includes('Communication avec parents') ? '[X]' : '[ ]';
+    const mes5 = mesurePrise.includes('Autre') ? '[X]' : '[ ]';
+
+    const docDefinition = {
+      pageSize: 'A4',
+      pageMargins: [30, 25, 30, 25],
+      defaultStyle: { font: 'Amiri', fontSize: 10 },
+      content: [
+        // EN-TÊTE
+        {
+          columns: [
+            logoBase64 ? { image: logoBase64, width: 75, height: 75 } : { text: '', width: 75 },
+            {
+              stack: [
+                { text: 'Rapport d\'observation', fontSize: 16, bold: true, alignment: 'center', margin: [0, 12, 0, 3] },
+                { text: 'Comportement des élèves', fontSize: 11, alignment: 'center' }
+              ],
+              width: '*'
+            },
+            photoBase64 ? { image: photoBase64, width: 55, height: 70 } : { text: '', width: 55 }
+          ],
+          margin: [0, 0, 0, 15]
+        },
+
+        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 0.5, lineColor: '#666' }], margin: [0, 0, 0, 12] },
+
+        {
+          columns: [
+            { text: [{ text: 'Année scolaire : ', bold: true }, rapport.anneeScolaire || '2025/2026'], width: '50%' },
+            { text: [{ text: 'Niveau/Classe : ', bold: true }, rapport.niveau || '...........'], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        {
+          columns: [
+            { text: [{ text: 'Élève : ', bold: true }, rapport.etudiant?.nomComplet || ''], width: '50%' },
+            { text: [{ text: 'Date : ', bold: true }, new Date(rapport.date).toLocaleDateString('fr-FR')], width: '50%' }
+          ], margin: [0, 0, 0, 8]
+        },
+        { text: [{ text: 'Professeur : ', bold: true }, nomProf.trim()], margin: [0, 0, 0, 15] },
+
+        // NATURE PROBLÈME
+        { text: 'Nature du problème observé :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: prob1 + ' Devoirs non faits', margin: [8, 0, 0, 4] },
+              { text: prob2 + ' Indiscipline en classe', margin: [8, 0, 0, 4] },
+              { text: prob3 + ' Bavardage excessif', margin: [8, 0, 0, 4] },
+              { text: prob4 + ' Refus d\'obéir', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: prob5 + ' Violence verbale/physique', margin: [8, 0, 0, 4] },
+              { text: prob6 + ' Retard/absence répétée', margin: [8, 0, 0, 4] },
+              { text: prob7 + ' Autre' + (rapport.autreProbleme ? ': ' + rapport.autreProbleme : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // DESCRIPTION
+        { text: "Description de l'incident :", bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [55], body: [[{ text: rapport.descriptionIncident || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 12]
+        },
+
+        // MESURES
+        { text: 'Mesure prise par le professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 8] },
+        {
+          columns: [
+            { stack: [
+              { text: mes1 + ' Observation/remarque orale', margin: [8, 0, 0, 4] },
+              { text: mes2 + ' Avertissement écrit', margin: [8, 0, 0, 4] },
+              { text: mes3 + ' Élève exclu temporairement', margin: [8, 0, 0, 4] }
+            ], width: '50%' },
+            { stack: [
+              { text: mes4 + ' Communication avec parents', margin: [8, 0, 0, 4] },
+              { text: mes5 + ' Autre' + (rapport.autreMesure ? ': ' + rapport.autreMesure : ''), margin: [8, 0, 0, 4] }
+            ], width: '50%' }
+          ], margin: [0, 0, 0, 12]
+        },
+
+        // OBSERVATIONS
+        { text: 'Observation du professeur :', bold: true, fontSize: 11, margin: [0, 0, 0, 6] },
+        {
+          table: { widths: ['*'], heights: [45], body: [[{ text: rapport.observationProfesseur || '', fontSize: 9, margin: [5, 5, 5, 5] }]] },
+          layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => '#000', vLineColor: () => '#000' },
+          margin: [0, 0, 0, 20]
+        },
+
+        // SIGNATURES
+        {
+          columns: [
+            { stack: [{ text: 'Signature du professeur :', bold: true }, { text: '\n.....................................' }], width: '50%' },
+            { stack: [
+              { text: 'Visa de la direction :', bold: true, alignment: 'right' },
+              { text: rapport.visaDirection ? '\nApposé le ' + new Date(rapport.dateVisa).toLocaleDateString('fr-FR') : '\n.....................................', alignment: 'right' }
+            ], width: '50%' }
+          ]
+        }
+      ]
+    };
+
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=rapport_' + rapport._id + '.pdf');
+    pdfDoc.pipe(res);
+    pdfDoc.end();
+
+  } catch (err) {
+    console.error('Erreur PDF staff:', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
 // ====================================================================
 // 📍 ROUTE 2: POST - Upload photo (UNE SEULE FOIS)
 // ====================================================================
