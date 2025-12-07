@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 
 // Import des pages
-import PrintSingleBadge from './pages/PrintSingleBadge';
 
 import ParentBulletins from './pages/ParentBulletins';
 import Login from './pages/Login';
@@ -90,7 +89,6 @@ import  GestionParents from './pages/GestionParents';
  from './pages/BadgeGeneratorModern';
         import ParentDashboard from './pages/ParentDashboard';
 import ParentAbsences from './pages/ParentAbsences';
-import ReclamationsAdmin from './pages/ReclamationsAdmin';
 import AdminProfManagement from './pages/AdminProfManagement';
 import EtudiantPublic from './pages/EtudiantPublic';
 import PageProfesseurRapports from './pages/PageProfesseurRapports';
@@ -424,10 +422,8 @@ function AppContent() {
 
  <Route path="/parent/absences" element={< ParentAbsences />} />  
  <Route path="/parent/rapports" element={< ParentRapports />} />  
-      <Route path="/print-badge/:id" element={<PrintSingleBadge />} />
 
 <Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
-<Route path="/admin/reclamations" element={<ReclamationsAdmin />} />
 <Route path="/professeur/etudiants-autorises" element={<EtudiantsAutorisesProfesseur />} />
         {/* Routes Étudiant */}
         <Route path="/etudiant/messages" element={<MessageEtudiant />} />
