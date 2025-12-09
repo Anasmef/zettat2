@@ -121,11 +121,7 @@ const Sidebar = ({ onLogout }) => {
       label: 'Historique Étudiant',
       icon: BookOpen
     },
-    {
-      path: '/admin/reclamations',
-      label: 'Réclamations',
-      icon: MessageCircle
-    },
+ 
     {
       path: '/ajouter-paiement',
       label: 'Nouveau Paiement',

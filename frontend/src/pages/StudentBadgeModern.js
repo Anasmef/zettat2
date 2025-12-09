@@ -76,10 +76,10 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
             </div>
 
             <div className="info-section-pvc">
-              <h2 className={`card-title-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>CARTE D'ÉTUDIANT</h2>
+              <h2 className={`card-title-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>CARTE D'ÉLÈVE</h2>
               
               <div className="info-row-pvc">
-                <span className="info-label-pvc">Nom</span>
+                <span className="info-label-pvc">Nom Complet</span>
                 <span className="info-value-pvc">: {etudiant.nomComplet || 'N/A'}</span>
               </div>
               
@@ -94,9 +94,9 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
                     </div>
                   )}
                   
-                  {/* Toujours afficher ID Étudiant */}
+                  {/* Toujours afficher Code Massar */}
                   <div className="info-row-pvc">
-                    <span className="info-label-pvc">ID Étudiant</span>
+                    <span className="info-label-pvc">Code Massar</span>
                     <span className="info-value-pvc">: {etudiant.codeMassar || 'N/A'}</span>
                   </div>
                   
@@ -108,7 +108,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
                   
                   {showAutorisation && (
                     <div className="info-row-pvc">
-                      <p className="autorisation-text-pvc">Autorisation de sortie (PAUSE DEJ)</p>
+                      <p className="non-autorisation-text-pvc">NON AUTORISÉ DE SORTIE</p>
                     </div>
                   )}
                 </div>

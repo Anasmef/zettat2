@@ -193,7 +193,7 @@
   min-width: 0;
 }
 
-/* Titre compact pour les cartes avec CIN + Autorisation */
+/* Titre compact pour les cartes avec CIN + Non-Autorisation */
 .card-title-pvc.compact {
   margin: 0 0 4px -12px;
   padding: 5px 12px;
@@ -222,7 +222,7 @@
   min-width: 0;
 }
 
-/* Info row compact pour les cartes avec CIN + Autorisation */
+/* Info row compact pour les cartes avec CIN + Non-Autorisation */
 .info-left-pvc.compact .info-row-pvc {
   margin-bottom: 1px;
 }
@@ -266,7 +266,7 @@
   overflow: hidden;
 }
 
-/* Gap compact pour les cartes avec CIN + Autorisation */
+/* Gap compact pour les cartes avec CIN + Non-Autorisation */
 .info-left-pvc.compact {
   gap: 1px;
 }
@@ -303,18 +303,18 @@
   border-radius: 6px;
 }
 
-/* Style pour "Autorisation de sortie" */
-.autorisation-text-pvc {
+/* Style pour "NON AUTORISÉ DE SORTIE" */
+.non-autorisation-text-pvc {
   margin: 4px 0 0 0;
   font-size: 5.5px;
-  color: #059669;
+  color: #dc2626;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.2px;
-  background: #d1fae5;
+  background: #fee2e2;
   padding: 2px 4px;
   border-radius: 3px;
-  border: 1px solid #6ee7b7;
+  border: 1px solid #fca5a5;
   display: inline-block;
   line-height: 1.2;
   max-width: 100%;
@@ -323,8 +323,8 @@
   text-overflow: ellipsis;
 }
 
-/* Autorisation compact pour les cartes avec CIN + Autorisation */
-.info-left-pvc.compact .autorisation-text-pvc {
+/* Non-autorisation compact pour les cartes avec CIN */
+.info-left-pvc.compact .non-autorisation-text-pvc {
   margin: 2px 0 0 0;
 }
 
@@ -429,10 +429,10 @@
     -webkit-print-color-adjust: exact !important;
   }
 
-  .autorisation-text-pvc {
-    color: #059669 !important;
-    background: #d1fae5 !important;
-    border-color: #6ee7b7 !important;
+  .non-autorisation-text-pvc {
+    color: #dc2626 !important;
+    background: #fee2e2 !important;
+    border-color: #fca5a5 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }

@@ -216,7 +216,7 @@ const BadgeGeneratorModern = () => {
     window.location.href = '/login';
   };
 
-  const countAutorisations = etudiants.filter(e => e.autorise).length;
+  const countNonAutorisations = etudiants.filter(e => e.autorise === false).length;
 
   if (!isAuthenticated) {
     return (
@@ -306,7 +306,7 @@ const BadgeGeneratorModern = () => {
             <h1 className="badge-title">🎓 Cartes Étudiants PVC</h1>
             <p className="badge-subtitle">
               {selectedIds.length} carte(s) sélectionnée(s) sur {etudiantsFiltres.length}
-              {countAutorisations > 0 && ` • ${countAutorisations} avec autorisation de sortie`}
+              {countNonAutorisations > 0 && ` • ${countNonAutorisations} NON autorisé(s) de sortie`}
             </p>
           </div>
         </div>
@@ -437,7 +437,7 @@ const BadgeGeneratorModern = () => {
                   etudiant={etudiant} 
                   logoUrl={logoUrl} 
                   anneeScolaire={anneeScolaire}
-                  showAutorisation={etudiant.autorise}
+                  showAutorisation={etudiant.autorise === false}
                 />
               </div>
             ))}
