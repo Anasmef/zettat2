@@ -108,7 +108,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
                   
                   {showAutorisation && (
                     <div className="info-row-pvc">
-                      <p className="non-autorisation-text-pvc">NON AUTORISÉ DE SORTIE</p>
+                      <p className="non-autorisation-text-pvc">NON AUTORISÉ </p>
                     </div>
                   )}
                 </div>
