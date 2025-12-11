@@ -438,6 +438,7 @@ const BadgeGeneratorModern = () => {
                   logoUrl={logoUrl} 
                   anneeScolaire={anneeScolaire}
                   showAutorisation={etudiant.autorise === false}
+                  isAutorised={etudiant.autorise !== false}
                 />
               </div>
             ))}

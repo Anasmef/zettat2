@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import './StudentBadgeModern.css';
 
-const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAutorisation = false }) => {
+const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', isAutorised = true }) => {
   const qrRef = useRef(null);
   const [qrDataUrl, setQrDataUrl] = useState('');
 
@@ -58,7 +58,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
 
           <div className="content-wrapper-pvc">
             <div className="photo-section-pvc">
-              <div className="student-photo-pvc">
+              <div className={`student-photo-pvc ${isAutorised ? 'photo-rouge' : 'photo-blanc'}`}>
                 {etudiant.image ? (
                   <img 
                     src={etudiant.image.startsWith('http') ? etudiant.image : `${window.location.origin}${etudiant.image}`}
@@ -76,7 +76,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
             </div>
 
             <div className="info-section-pvc">
-              <h2 className={`card-title-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>CARTE D'ÉLÈVE</h2>
+              <h2 className="card-title-pvc">CARTE D'ÉLÈVE</h2>
               
               <div className="info-row-pvc">
                 <span className="info-label-pvc">Nom Complet</span>
@@ -85,7 +85,7 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
               
               {/* Section avec QR Code à côté */}
               <div className="info-with-qr-pvc">
-                <div className={`info-left-pvc ${etudiant.cin && showAutorisation ? 'compact' : ''}`}>
+                <div className="info-left-pvc">
                   {/* Afficher CIN si disponible */}
                   {etudiant.cin && (
                     <div className="info-row-pvc">
@@ -105,12 +105,6 @@ const StudentBadge = ({ etudiant, logoUrl, anneeScolaire = '2025/2026', showAuto
                     <span className="info-label-pvc">Niveau</span>
                     <span className="info-value-pvc">: {etudiant.niveau || 'N/A'}</span>
                   </div>
-                  
-                  {showAutorisation && (
-                    <div className="info-row-pvc">
-                      <p className="non-autorisation-text-pvc">NON AUTORISÉ </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* QR Code à droite */}
