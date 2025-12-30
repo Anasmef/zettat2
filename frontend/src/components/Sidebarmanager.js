@@ -92,7 +92,13 @@ const Sidebar = ({ onLogout }) => {
       label: 'Rapports',
       icon: ClipboardList
     },
-    
+
+    {
+      path: '/manager/etudiants',
+      label: 'Étudiants',
+      icon: Users
+    },
+
       {
       path: '/manager/messages',
       label: 'messages',

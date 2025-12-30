@@ -103,7 +103,9 @@ import DashboardPaiementManager from './pages/DashboardPaiementManager';
 import AdminQRGenerator
  from './pages/AdminQRGenerator';
  import PageAdminRapports from './pages/PageAdminRapports';
+ import ManagerEtudiants from './pages/ManagerEtudiants';
 
+ 
 
  import AdminPointagesView from './pages/AdminPointagesView';
 import ProfQRScanner from './pages/ProfQRScanner';
@@ -367,6 +369,8 @@ function AppContent() {
         <Route path="/admin/rapports" element={<PageAdminRapports />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />
+        <Route path="/manager/etudiants" element={<ManagerEtudiants />} />
+
         <Route path="/ajouter-paiement" element={<AjouterPaiement />} />
         <Route path="/liste-paiements" element={<ListePaiements />} />
         <Route path="/liste-classe" element={<ListeCours />} />
