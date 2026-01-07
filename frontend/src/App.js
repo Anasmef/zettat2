@@ -10,6 +10,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import ListeEtudiants from './pages/ListeEtudiants';
+
+import NotificationAbsences from './pages/NotificationAbsences';
 import ListeCours from './pages/ListeCours';
 import AjouterPaiement from './pages/AjouterPaiement';
 import ListePaiements from './pages/ListePaiements';
@@ -371,6 +373,9 @@ function AppContent() {
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />
         <Route path="/manager/etudiants" element={<ManagerEtudiants />} />
 
+
+
+        <Route path="/notification-absences" element={<NotificationAbsences />} />
         <Route path="/ajouter-paiement" element={<AjouterPaiement />} />
         <Route path="/liste-paiements" element={<ListePaiements />} />
         <Route path="/liste-classe" element={<ListeCours />} />

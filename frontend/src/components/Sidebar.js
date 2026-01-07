@@ -121,7 +121,12 @@ const Sidebar = ({ onLogout }) => {
       label: 'Historique Étudiant',
       icon: BookOpen
     },
- 
+
+    {
+      path: '/notification-absences',
+      label: 'Notification Absences',
+      icon: AlertTriangle
+    },
     {
       path: '/ajouter-paiement',
       label: 'Nouveau Paiement',
