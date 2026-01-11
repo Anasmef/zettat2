@@ -14,6 +14,7 @@ const ListeNoire = require('./models/ListeNoire');
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
 const Rapport = require('./models/Rapport'); // 👈 importe ton modèle
+const Payment = require('./models/Payment');
 
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
@@ -9736,6 +9737,625 @@ app.delete('/api/vie-scolaire/:id', authAdminOrPaiementManager, async (req, res)
       error: 'Erreur serveur lors de la suppression de l\'activité',
       success: false
     });
+  }
+});
+app.get('/api/payments/cheques/expiring', authInscripteur, async (req, res) => {
+  try {
+    const jours = parseInt(req.query.jours) || 7;
+    
+    const maintenant = new Date();
+    const limite = new Date();
+    limite.setDate(limite.getDate() + jours);
+    
+    const cheques = await Payment.find({
+      creeParInscripteur: req.inscripteurId,
+      typePaiement: 'Chèque',
+      statutCheque: 'En attente',
+      dateEcheance: {
+        $gte: maintenant,
+        $lte: limite
+      }
+    })
+    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau') // ← AJOUTEZ CETTE LIGNE
+    .sort({ dateEcheance: 1 })
+    .lean();
+    
+    console.log('✅ Chèques trouvés:', cheques.length); // Pour déboguer
+    
+    res.json(cheques);
+  } catch (err) {
+    console.error('Erreur chèques expirant:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/payments', authInscripteur, async (req, res) => {
+  try {
+    console.log('Données reçues:', req.body);
+    
+    const {
+      etudiant,  // Changez de etudiantId à etudiant
+      montantTotal,
+      montantPaye,
+      typePaiement,
+      numeroCheque,
+      banque,
+      dateEcheance,
+      moisDebut,
+      nombreMois,
+      cours,
+      note,
+      anneeScolaire
+    } = req.body;
+
+    // Validation des champs obligatoires
+    if (!etudiant || !montantTotal || !moisDebut || !nombreMois || !montantPaye || !typePaiement) {
+      return res.status(400).json({ 
+        message: 'Champs obligatoires manquants' 
+      });
+    }
+
+    // Préparation des données selon le modèle
+    const paymentData = {
+      etudiant,  // ObjectId de l'étudiant
+      montantTotal: parseFloat(montantTotal),
+      montantPaye: parseFloat(montantPaye),
+      montantRestant: parseFloat(montantTotal) - parseFloat(montantPaye),
+      typePaiement,
+      moisDebut: new Date(moisDebut),
+      nombreMois: parseInt(nombreMois) || 1,
+      cours: Array.isArray(cours) ? cours : (cours ? [cours] : []),
+      note: note || '',
+      anneeScolaire: anneeScolaire || '2025/2026',
+      creeParInscripteur: req.inscripteurId
+    };
+
+    // Ajouter infos spécifiques pour chèque
+    if (typePaiement === 'Chèque') {
+      paymentData.numeroCheque = numeroCheque;
+      paymentData.banque = banque || '';
+      paymentData.dateEcheance = new Date(dateEcheance);
+      paymentData.statutCheque = 'En attente';
+    }
+
+    // Création du paiement
+    const payment = await Payment.create(paymentData);
+    
+    console.log('Paiement créé avec succès:', payment._id);
+    
+    res.status(201).json({
+      message: 'Paiement créé avec succès',
+      payment
+    });
+
+  } catch (err) {
+    console.error('Erreur création paiement:', err);
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la création du paiement',
+      error: err.message 
+    });
+  }
+});
+// routes/etudiants.js
+app.put('/api/etudiants/:id/prix', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { prixTotal } = req.body;
+
+    console.log('Mise à jour prix - Étudiant ID:', id, 'Prix:', prixTotal);
+    console.log('Inscripteur ID:', req.inscripteurId);
+
+    // Validation
+    if (prixTotal === undefined || prixTotal === null) {
+      return res.status(400).json({ 
+        message: 'Le prix total est requis' 
+      });
+    }
+
+    const prixNum = parseFloat(prixTotal);
+    if (isNaN(prixNum) || prixNum < 0) {
+      return res.status(400).json({ 
+        message: 'Prix total invalide. Doit être un nombre positif.' 
+      });
+    }
+
+    // VERSION SIMPLIFIÉE - Permet à tout inscripteur authentifié de modifier
+    const etudiant = await Etudiant.findByIdAndUpdate(
+      id,
+      { 
+        prixTotal: prixNum,
+        // Toujours réinitialiser le statut paye quand on change le prix
+        paye: false,
+        dateReglement: null
+      },
+      { new: true, runValidators: true }
+    ).select('nomComplet prixTotal niveau cours telephoneEtudiant paye');
+
+    if (!etudiant) {
+      console.log('Étudiant non trouvé avec ID:', id);
+      return res.status(404).json({ 
+        message: 'Étudiant non trouvé' 
+      });
+    }
+
+    console.log('Prix mis à jour avec succès pour:', etudiant.nomComplet);
+
+    res.json({
+      message: 'Prix total mis à jour avec succès',
+      etudiant
+    });
+
+  } catch (err) {
+    console.error('Erreur mise à jour prix:', err);
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'ID étudiant invalide' });
+    }
+    
+    res.status(500).json({ 
+      message: 'Erreur serveur lors de la mise à jour',
+      error: err.message 
+    });
+  }
+});
+app.get('/api/payments', authInscripteur, async (req, res) => {
+  try {
+    const payments = await Payment.find({ 
+      creeParInscripteur: req.inscripteurId 
+    })
+    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau prixTotal') // Populate l'étudiant
+    .sort({ createdAt: -1 });
+    
+    res.json(payments);
+  } catch (err) {
+    console.error('Erreur récupération paiements:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+// 3. OBTENIR LES PAIEMENTS D'UN ÉTUDIANT (GET)
+app.get('/api/payments/etudiant/:etudiantId', authInscripteur, async (req, res) => {
+  try {
+    const { etudiantId } = req.params;
+    
+    // CORRECTION: Chercher par 'etudiant' au lieu de 'etudiantId'
+    const payments = await Payment.find({ 
+      etudiant: etudiantId,  // <-- Changé ici
+      creeParInscripteur: req.inscripteurId 
+    })
+    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau prixTotal')
+    .sort({ createdAt: -1 })  // <-- Changé de moisDebut à createdAt
+    .lean();
+    
+    // Calculer les statistiques
+    const stats = await Payment.aggregate([
+      { 
+        $match: { 
+          etudiant: new mongoose.Types.ObjectId(etudiantId),  // <-- Changé ici aussi
+          creeParInscripteur: new mongoose.Types.ObjectId(req.inscripteurId)
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalAPayer: { $sum: '$montantTotal' },
+          totalPaye: { $sum: '$montantPaye' },
+          totalRestant: { $sum: '$montantRestant' },
+          nombrePaiements: { $sum: 1 },
+          dernierPaiement: { $max: '$createdAt' }
+        }
+      }
+    ]);
+
+    res.json({
+      payments: payments,
+      stats: stats[0] || {
+        totalAPayer: 0,
+        totalPaye: 0,
+        totalRestant: 0,
+        nombrePaiements: 0,
+        dernierPaiement: null
+      }
+    });
+  } catch (err) {
+    console.error('Erreur historique paiements:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 4. OBTENIR LES STATISTIQUES PAR ÉTUDIANT (GET)
+app.get('/api/payments/stats/:etudiantId', authInscripteur, async (req, res) => {
+  try {
+    const { etudiantId } = req.params;
+    
+    const stats = await Payment.aggregate([
+      { 
+        $match: { 
+          etudiantId,
+          creeParInscripteur: req.inscripteurId 
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalAPayer: { $sum: '$montantTotal' },
+          totalPaye: { $sum: '$montantPaye' },
+          totalRestant: { $sum: '$montantRestant' },
+          nombrePaiements: { $sum: 1 },
+          moyennePaiement: { $avg: '$montantPaye' },
+          premierPaiement: { $min: '$createdAt' },
+          dernierPaiement: { $max: '$createdAt' }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalAPayer: 0,
+      totalPaye: 0,
+      totalRestant: 0,
+      nombrePaiements: 0,
+      moyennePaiement: 0,
+      premierPaiement: null,
+      dernierPaiement: null
+    };
+
+    // Calculer le pourcentage payé
+    result.pourcentagePaye = result.totalAPayer > 0 
+      ? Math.round((result.totalPaye / result.totalAPayer) * 100) 
+      : 0;
+
+    res.json(result);
+  } catch (err) {
+    console.error('Erreur statistiques étudiant:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 5. OBTENIR LES CHÈQUES QUI EXPIRENT (GET)
+app.get('/api/payments/cheques/expiring', authInscripteur, async (req, res) => {
+  try {
+    const jours = parseInt(req.query.jours) || 7;
+    
+    const maintenant = new Date();
+    const limite = new Date();
+    limite.setDate(limite.getDate() + jours);
+    
+    const cheques = await Payment.find({
+      creeParInscripteur: req.inscripteurId,
+      typePaiement: 'Chèque',
+      statutCheque: 'En attente',
+      dateEcheance: {
+        $gte: maintenant,
+        $lte: limite
+      }
+    })
+    .sort({ dateEcheance: 1 })
+    .lean();
+    
+    res.json(cheques);
+  } catch (err) {
+    console.error('Erreur chèques expirant:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 6. OBTENIR LES CHÈQUES EXPIRÉS (GET)
+app.get('/api/payments/cheques/expired', authInscripteur, async (req, res) => {
+  try {
+    const cheques = await Payment.find({
+      creeParInscripteur: req.inscripteurId,
+      typePaiement: 'Chèque',
+      statutCheque: 'En attente',
+      dateEcheance: { $lt: new Date() }
+    })
+    .sort({ dateEcheance: 1 })
+    .lean();
+    
+    res.json(cheques);
+  } catch (err) {
+    console.error('Erreur chèques expirés:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 7. METTRE À JOUR STATUT CHÈQUE (PATCH)
+app.patch('/api/payments/:id/cheque-status', authInscripteur, async (req, res) => {
+  try {
+    const { statutCheque } = req.body;
+    const { id } = req.params;
+
+    if (!['En attente', 'Encaissé', 'Rejeté', 'Expiré'].includes(statutCheque)) {
+      return res.status(400).json({ message: 'Statut invalide' });
+    }
+
+    const payment = await Payment.findOneAndUpdate(
+      { 
+        _id: id, 
+        creeParInscripteur: req.inscripteurId,
+        typePaiement: 'Chèque'
+      },
+      { statutCheque },
+      { new: true, runValidators: true }
+    );
+
+    if (!payment) {
+      return res.status(404).json({ 
+        message: 'Chèque non trouvé ou vous n\'avez pas la permission' 
+      });
+    }
+
+    res.json({
+      message: 'Statut mis à jour avec succès',
+      payment
+    });
+  } catch (err) {
+    console.error('Erreur mise à jour statut chèque:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 8. SUPPRIMER UN PAIEMENT (DELETE)
+app.delete('/api/payments/:id', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await Payment.findOneAndDelete({
+      _id: id,
+      creeParInscripteur: req.inscripteurId
+    });
+
+    if (!payment) {
+      return res.status(404).json({ 
+        message: 'Paiement non trouvé ou non autorisé' 
+      });
+    }
+
+    res.json({ 
+      message: 'Paiement supprimé avec succès',
+      paymentId: id
+    });
+  } catch (err) {
+    console.error('Erreur suppression paiement:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 9. OBTENIR LES STATISTIQUES GÉNÉRALES (GET)
+app.get('/api/payments/stats/general', authInscripteur, async (req, res) => {
+  try {
+    const stats = await Payment.aggregate([
+      { $match: { creeParInscripteur: req.inscripteurId } },
+      {
+        $group: {
+          _id: null,
+          totalPaiements: { $sum: 1 },
+          totalMontant: { $sum: '$montantTotal' },
+          totalPaye: { $sum: '$montantPaye' },
+          totalRestant: { $sum: '$montantRestant' },
+          nombreEtudiants: { $addToSet: '$etudiantId' },
+          nombreChequesEnAttente: {
+            $sum: {
+              $cond: [
+                { $and: [
+                  { $eq: ['$typePaiement', 'Chèque'] },
+                  { $eq: ['$statutCheque', 'En attente'] }
+                ]},
+                1,
+                0
+              ]
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalPaiements: 1,
+          totalMontant: 1,
+          totalPaye: 1,
+          totalRestant: 1,
+          nombreEtudiants: { $size: '$nombreEtudiants' },
+          nombreChequesEnAttente: 1,
+          pourcentagePaye: {
+            $cond: [
+              { $eq: ['$totalMontant', 0] },
+              0,
+              { $multiply: [{ $divide: ['$totalPaye', '$totalMontant'] }, 100] }
+            ]
+          }
+        }
+      }
+    ]);
+
+    const result = stats[0] || {
+      totalPaiements: 0,
+      totalMontant: 0,
+      totalPaye: 0,
+      totalRestant: 0,
+      nombreEtudiants: 0,
+      nombreChequesEnAttente: 0,
+      pourcentagePaye: 0
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error('Erreur statistiques générales:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 10. RECHERCHER DES PAIEMENTS (GET)
+app.get('/api/payments/search', authInscripteur, async (req, res) => {
+  try {
+    const { query, type, statut, dateDebut, dateFin } = req.query;
+    
+    const filter = { creeParInscripteur: req.inscripteurId };
+    
+    // Recherche par nom ou téléphone
+    if (query) {
+      filter.$or = [
+        { etudiantNom: { $regex: query, $options: 'i' } },
+        { etudiantTelephone: { $regex: query, $options: 'i' } },
+        { numeroCheque: { $regex: query, $options: 'i' } }
+      ];
+    }
+    
+    // Filtre par type de paiement
+    if (type && ['Cash', 'Chèque', 'Virement', 'En ligne'].includes(type)) {
+      filter.typePaiement = type;
+    }
+    
+    // Filtre par statut chèque
+    if (statut && ['En attente', 'Encaissé', 'Rejeté', 'Expiré'].includes(statut)) {
+      filter.statutCheque = statut;
+    }
+    
+    // Filtre par date
+    if (dateDebut || dateFin) {
+      filter.createdAt = {};
+      if (dateDebut) filter.createdAt.$gte = new Date(dateDebut);
+      if (dateFin) filter.createdAt.$lte = new Date(dateFin);
+    }
+    
+    const payments = await Payment.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    res.json(payments);
+  } catch (err) {
+    console.error('Erreur recherche paiements:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 11. OBTENIR LES PAIEMENTS PAR MOIS (STATISTIQUES MENSUELLES)
+app.get('/api/payments/stats/mensuel', authInscripteur, async (req, res) => {
+  try {
+    const { annee } = req.query;
+    const anneeFiltre = annee || '2025';
+    
+    const stats = await Payment.aggregate([
+      { 
+        $match: { 
+          creeParInscripteur: req.inscripteurId,
+          createdAt: {
+            $gte: new Date(`${anneeFiltre}-01-01`),
+            $lte: new Date(`${anneeFiltre}-12-31`)
+          }
+        } 
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m", date: "$createdAt" }
+          },
+          nombrePaiements: { $sum: 1 },
+          totalPaye: { $sum: '$montantPaye' },
+          moyennePaiement: { $avg: '$montantPaye' }
+        }
+      },
+      { $sort: { '_id': 1 } },
+      {
+        $project: {
+          mois: '$_id',
+          nombrePaiements: 1,
+          totalPaye: 1,
+          moyennePaiement: { $round: ['$moyennePaiement', 2] },
+          _id: 0
+        }
+      }
+    ]);
+    
+    res.json(stats);
+  } catch (err) {
+    console.error('Erreur statistiques mensuelles:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 12. METTRE À JOUR UN PAIEMENT (PUT)
+app.put('/api/payments/:id', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Supprimer les champs qui ne doivent pas être mis à jour
+    delete updateData._id;
+    delete updateData.createdAt;
+    delete updateData.creeParInscripteur;
+    
+    // Recalculer les montants si nécessaire
+    if (updateData.prixParMois || updateData.nombreMois) {
+      const existingPayment = await Payment.findById(id);
+      const prixParMois = updateData.prixParMois || existingPayment.prixParMois;
+      const nombreMois = updateData.nombreMois || existingPayment.nombreMois;
+      updateData.montantTotal = prixParMois * nombreMois;
+    }
+    
+    if (updateData.montantPaye) {
+      const montantTotal = updateData.montantTotal || (await Payment.findById(id)).montantTotal;
+      updateData.montantRestant = Math.max(0, montantTotal - updateData.montantPaye);
+    }
+    
+    const payment = await Payment.findOneAndUpdate(
+      { 
+        _id: id, 
+        creeParInscripteur: req.inscripteurId 
+      },
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    if (!payment) {
+      return res.status(404).json({ 
+        message: 'Paiement non trouvé ou non autorisé' 
+      });
+    }
+    
+    res.json({
+      message: 'Paiement mis à jour avec succès',
+      payment
+    });
+  } catch (err) {
+    console.error('Erreur mise à jour paiement:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// 13. OBTENIR LES ÉTUDIANTS UNIQUES (pour le dropdown)
+app.get('/api/payments/etudiants-uniques', authInscripteur, async (req, res) => {
+  try {
+    const etudiants = await Payment.aggregate([
+      { $match: { creeParInscripteur: req.inscripteurId } },
+      {
+        $group: {
+          _id: {
+            id: '$etudiantId',
+            nom: '$etudiantNom'
+          },
+          derniereClasse: { $last: '$etudiantCours' },
+          dernierTelephone: { $last: '$etudiantTelephone' },
+          totalPaye: { $sum: '$montantPaye' },
+          dernierPaiement: { $max: '$createdAt' }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          etudiantId: '$_id.id',
+          etudiantNom: '$_id.nom',
+          etudiantCours: { $arrayElemAt: ['$derniereClasse', 0] },
+          etudiantTelephone: '$dernierTelephone',
+          totalPaye: 1,
+          dernierPaiement: 1
+        }
+      },
+      { $sort: { etudiantNom: 1 } }
+    ]);
+    
+    res.json(etudiants);
+  } catch (err) {
+    console.error('Erreur étudiants uniques:', err);
+    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 

@@ -1,21 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
-
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import './ListeEtudiants.css';
-import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
+import Sidebar from '../components/Sidebar';
 import ExportEtudiants from '../components/ExportEtudiants';
-import { Download } from 'lucide-react'; // Si pas déjà importé
+import { Download } from 'lucide-react';
 import RapportNotificationModal from '../components/RapportNotificationModal';
 import EtudiantsArchives from '../components/EtudiantsArchives';
-
 import { 
   User, 
   CheckCircle, 
   XCircle, 
   Phone, 
   Eye, 
-  Edit,   BookOpen, 
+  Edit, 
+  BookOpen, 
   Calendar, 
   Cake, 
   MapPin,
@@ -42,7 +41,7 @@ const ListeEtudiants = () => {
   const [etudiantsParPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
-const [showRapportModal, setShowRapportModal] = useState(false);
+  const [showRapportModal, setShowRapportModal] = useState(false);
 
   // Nouveaux états pour l'authentification avant export
   const [showExportAuthModal, setShowExportAuthModal] = useState(false);
@@ -59,36 +58,35 @@ const [showRapportModal, setShowRapportModal] = useState(false);
   
   // États pour le modal d'ajout
   const [showModal, setShowModal] = useState(false);
-const [formAjout, setFormAjout] = useState({
-  nomComplet: '',
-  genre: 'Homme',
-  dateNaissance: '',
-  lieuNaissance: '',
-  nationalite: '',
-  nomCompletPere: '',
-  nomCompletMere: '',
-  travailPere: '',
-  travailMere: '',
-  niveau: '1AC', // valeur par défaut modifiée
-  telephoneEtudiant: '',
-  telephonePere: '',
-  telephoneMere: '',
-  codeMassar: '',
-  cin: '', // ← AJOUT: CIN
-  adresse: '',
-  email: '@kastler.com',
-  motDePasse: '',
-  transport: false,
-  cours: [],
-  actif: true,
-  prixTotal: 0,
-  paye: false,
-  pourcentageBourse: 0,
-  typePaiement: 'Cash',
-  anneeScolaire: '2025/2026'
-});
-  const [vueMode, setVueMode] = useState('tableau'); // 'tableau' ou 'carte'
-
+  const [formAjout, setFormAjout] = useState({
+    nomComplet: '',
+    genre: 'Homme',
+    dateNaissance: '',
+    lieuNaissance: '',
+    nationalite: '',
+    nomCompletPere: '',
+    nomCompletMere: '',
+    travailPere: '',
+    travailMere: '',
+    niveau: '1AC',
+    telephoneEtudiant: '',
+    telephonePere: '',
+    telephoneMere: '',
+    codeMassar: '',
+    cin: '',
+    adresse: '',
+    email: '@kastler.com',
+    motDePasse: '',
+    transport: false,
+    cours: [],
+    actif: true,
+    prixTotal: 0,
+    paye: false,
+    pourcentageBourse: 0,
+    typePaiement: 'Cash',
+    anneeScolaire: '2025/2026'
+  });
+  const [vueMode, setVueMode] = useState('tableau');
   const [imageFile, setImageFile] = useState(null);
   const [listeCours, setListeCours] = useState([]);
   const [messageAjout, setMessageAjout] = useState('');
@@ -100,39 +98,39 @@ const [formAjout, setFormAjout] = useState({
   
   // États pour le modal de modification
   const [showEditModal, setShowEditModal] = useState(false);
- const [formModifier, setFormModifier] = useState({
-  nomComplet: '',
-  genre: 'Homme',
-  dateNaissance: '',
-  lieuNaissance: '',
-  nationalite: '',
-  nomCompletPere: '',
-  nomCompletMere: '',
-  travailPere: '',
-  travailMere: '',
-  niveau: '1AC', // valeur par défaut modifiée
-  telephoneEtudiant: '',
-  telephonePere: '',
-  telephoneMere: '',
-  codeMassar: '',
-  cin: '', // ← AJOUT: CIN
-  adresse: '',
-  email: '',
-  motDePasse: '',
-  transport: false,
-  cours: [],
-  actif: true,
-  prixTotal: 0,
-  paye: false,
-  pourcentageBourse: 0,
-  typePaiement: 'Cash',
-  anneeScolaire: '2025/2026'
-});
+  const [formModifier, setFormModifier] = useState({
+    nomComplet: '',
+    genre: 'Homme',
+    dateNaissance: '',
+    lieuNaissance: '',
+    nationalite: '',
+    nomCompletPere: '',
+    nomCompletMere: '',
+    travailPere: '',
+    travailMere: '',
+    niveau: '1AC',
+    telephoneEtudiant: '',
+    telephonePere: '',
+    telephoneMere: '',
+    codeMassar: '',
+    cin: '',
+    adresse: '',
+    email: '',
+    motDePasse: '',
+    transport: false,
+    cours: [],
+    actif: true,
+    prixTotal: 0,
+    paye: false,
+    pourcentageBourse: 0,
+    typePaiement: 'Cash',
+    anneeScolaire: '2025/2026'
+  });
   const [imageFileModifier, setImageFileModifier] = useState(null);
   const [messageModifier, setMessageModifier] = useState('');
   const [loadingModifier, setLoadingModifier] = useState(false);
   const [etudiantAModifier, setEtudiantAModifier] = useState(null);
-    const [showArchivesModal, setShowArchivesModal] = useState(false);
+  const [showArchivesModal, setShowArchivesModal] = useState(false);
 
   // États pour le modal de suppression
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -144,73 +142,42 @@ const [formAjout, setFormAjout] = useState({
 
   // Niveaux disponibles mis à jour selon vos spécifications
   const niveauxDisponibles = [
-  // Collège
-  "1AC",
-  "2AC", 
-  "3AC",
-  
-  
-  // Tronc Commun
-  "Tronc Commun",
- 
-  
-  // 1ère Bac
-  "1BAC SC",
-  "1BAC Économie",
- 
-  
-  // 2ème Bac
-  "2BAC PC",
- 
-  "2BAC Économie",
- 
-];
+    "1AC", "2AC", "3AC", "Tronc Commun", "1BAC SC", "1BAC Économie", "2BAC PC", "2BAC Économie"
+  ];
 
-// Helper للحصول على الكورسات حسب المستوى - VERSION CORRIGÉE
-const coursPourNiveau = (liste, niveau) => {
-  if (!niveau) return liste;
-  
-  console.log('🔍 Recherche cours pour niveau:', niveau);
-  console.log('📚 Liste complète des cours:', liste.map(c => ({ nom: c.nom, niveau: c.niveau || 'NON DÉFINI' })));
-  
-  const coursCorrespondants = liste.filter(c => {
-    const niveauCours = c.niveau || c.nom || '';
+  // Helper pour obtenir les cours selon le niveau
+  const coursPourNiveau = (liste, niveau) => {
+    if (!niveau) return liste;
     
-    // Correspondance exacte
-    if (niveauCours.toLowerCase() === niveau.toLowerCase()) {
-      return true;
-    }
-    
-    // Correspondance avec variations
-    if (niveauCours.toLowerCase().startsWith(niveau.toLowerCase())) {
-      const suffixe = niveauCours.substring(niveau.length).trim();
+    const coursCorrespondants = liste.filter(c => {
+      const niveauCours = c.niveau || c.nom || '';
       
-      // Si pas de suffixe, c'est valide
-      if (suffixe === '') {
+      if (niveauCours.toLowerCase() === niveau.toLowerCase()) {
         return true;
       }
       
-      // Si le suffixe commence par un espace, on vérifie ce qui suit
-      if (suffixe.startsWith(' ')) {
-        const suffixeNettoye = suffixe.substring(1); // Enlever l'espace
+      if (niveauCours.toLowerCase().startsWith(niveau.toLowerCase())) {
+        const suffixe = niveauCours.substring(niveau.length).trim();
         
-        // Permettre n'importe quelle lettre ou combinaison de lettres/chiffres après un espace
-        // Exemples: "2BAC PC A", "2BAC PC D", "1AC B", etc.
-        return /^[A-Z0-9\s]*$/i.test(suffixeNettoye);
+        if (suffixe === '') {
+          return true;
+        }
+        
+        if (suffixe.startsWith(' ')) {
+          const suffixeNettoye = suffixe.substring(1);
+          return /^[A-Z0-9\s]*$/i.test(suffixeNettoye);
+        }
+        
+        return /^[A-Z]$/i.test(suffixe);
       }
       
-      // Si pas d'espace, permettre seulement des lettres simples (A, B, C, etc.)
-      return /^[A-Z]$/i.test(suffixe);
-    }
+      return false;
+    });
     
-    return false;
-  });
-  
-  console.log('✅ Cours trouvés pour', niveau, ':', coursCorrespondants.map(c => ({ nom: c.nom, niveau: c.niveau })));
-  return coursCorrespondants;
-};
+    return coursCorrespondants;
+  };
 
-  // حساب الكورسات المتاحة حسب المستوى الحالي
+  // Calculer les cours disponibles selon le niveau
   const coursDisponiblesAjout = useMemo(
     () => coursPourNiveau(listeCours, formAjout.niveau),
     [listeCours, formAjout.niveau]
@@ -227,43 +194,44 @@ const coursPourNiveau = (liste, niveau) => {
     fetchEtudiants();
     fetchCours();
   }, []);
-useEffect(() => {
-  const checkRapportsAujourdhui = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const role = localStorage.getItem('role');
-      
-      if (!token || role !== 'admin') return;
 
-      const headers = { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
-      
-      const res = await fetch('/api/rapports/admin/rapports', { headers });
-      if (!res.ok) return;
-      
-      const data = await res.json();
-      
-      const aujourdhui = new Date();
-      aujourdhui.setHours(0, 0, 0, 0);
-      
-      const rapportsDuJour = data.filter(r => {
-        const dateRapport = new Date(r.date);
-        dateRapport.setHours(0, 0, 0, 0);
-        return dateRapport.getTime() === aujourdhui.getTime();
-      });
+  useEffect(() => {
+    const checkRapportsAujourdhui = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const role = localStorage.getItem('role');
+        
+        if (!token || role !== 'admin') return;
 
-      if (rapportsDuJour.length > 0) {
-        setShowRapportModal(true);
+        const headers = { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+        
+        const res = await fetch('/api/rapports/admin/rapports', { headers });
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        
+        const aujourdhui = new Date();
+        aujourdhui.setHours(0, 0, 0, 0);
+        
+        const rapportsDuJour = data.filter(r => {
+          const dateRapport = new Date(r.date);
+          dateRapport.setHours(0, 0, 0, 0);
+          return dateRapport.getTime() === aujourdhui.getTime();
+        });
+
+        if (rapportsDuJour.length > 0) {
+          setShowRapportModal(true);
+        }
+      } catch (error) {
+        console.error('Erreur vérification rapports:', error);
       }
-    } catch (error) {
-      console.error('Erreur vérification rapports:', error);
-    }
-  };
+    };
 
-  checkRapportsAujourdhui();
-}, []);
+    checkRapportsAujourdhui();
+  }, []);
 
   useEffect(() => {
     filtrerEtudiants();
@@ -279,7 +247,6 @@ useEffect(() => {
         const res = await axios.get('/api/etudiants/filtered', { headers });
         setEtudiants(res.data);
       } catch (err) {
-        // fallback to original route
         const res = await axios.get('/api/etudiants', { headers });
         setEtudiants(res.data);
       }
@@ -302,44 +269,39 @@ useEffect(() => {
     }
   };
 
-const filtrerEtudiants = () => {
-  let resultats = etudiants;
+  const filtrerEtudiants = () => {
+    let resultats = etudiants;
 
-  // Filtre par recherche (nom, téléphone, email, code massar)
-if (recherche) {
-  resultats = resultats.filter(e =>
-    (e.nomComplet && e.nomComplet.toLowerCase().includes(recherche.toLowerCase())) ||
-    (e.telephoneEtudiant && e.telephoneEtudiant.includes(recherche)) ||
-    (e.email && e.email.toLowerCase().includes(recherche.toLowerCase())) ||
-    (e.codeMassar && e.codeMassar.toLowerCase().includes(recherche.toLowerCase())) ||
-    (e.cin && e.cin.toLowerCase().includes(recherche.toLowerCase())) // ← AJOUT: recherche par CIN
-  );
-}
+    if (recherche) {
+      resultats = resultats.filter(e =>
+        (e.nomComplet && e.nomComplet.toLowerCase().includes(recherche.toLowerCase())) ||
+        (e.telephoneEtudiant && e.telephoneEtudiant.includes(recherche)) ||
+        (e.email && e.email.toLowerCase().includes(recherche.toLowerCase())) ||
+        (e.codeMassar && e.codeMassar.toLowerCase().includes(recherche.toLowerCase())) ||
+        (e.cin && e.cin.toLowerCase().includes(recherche.toLowerCase()))
+      );
+    }
 
-    // Filtre par genre
     if (filtreGenre) {
       resultats = resultats.filter(e => e.genre === filtreGenre);
     }
 
-    // Filtre par cours
     if (filtreCours) {
       resultats = resultats.filter(e => 
         e.cours.some(cours => cours.toLowerCase().includes(filtreCours.toLowerCase()))
       );
     }
 
-    // Filtre par niveau
     if (filtreNiveau) {
       resultats = resultats.filter(e => e.niveau === filtreNiveau);
     }
 
-    // Filtre par statut actif
     if (filtreActif !== '') {
       resultats = resultats.filter(e => e.actif === (filtreActif === 'true'));
     }
 
     setEtudiantsFiltres(resultats);
-    setPageActuelle(1); // Reset à la première page après filtrage
+    setPageActuelle(1);
   };
 
   // Fonctions pour le modal d'ajout
@@ -348,39 +310,39 @@ if (recherche) {
     setMessageAjout('');
   };
 
- const closeModal = () => {
-  setShowModal(false);
-  setFormAjout({
-    nomComplet: '',
-    genre: 'Homme',
-    dateNaissance: '',
-    lieuNaissance: '',
-    nationalite: '',
-    nomCompletPere: '',
-    nomCompletMere: '',
-    travailPere: '',
-    travailMere: '',
-    niveau: '1AC', // valeur par défaut modifiée
-    telephoneEtudiant: '',
-    telephonePere: '',
-    telephoneMere: '',
-    codeMassar: '',
-    cin: '', // Réinitialiser CIN
-    adresse: '',
-    email: '',
-    motDePasse: '',
-    transport: false,
-    cours: [],
-    actif: true,
-    prixTotal: 0,
-    paye: false,
-    pourcentageBourse: 0,
-    typePaiement: 'Cash',
-    anneeScolaire: '2025/2026'
-  });
-  setImageFile(null);
-  setMessageAjout('');
-};
+  const closeModal = () => {
+    setShowModal(false);
+    setFormAjout({
+      nomComplet: '',
+      genre: 'Homme',
+      dateNaissance: '',
+      lieuNaissance: '',
+      nationalite: '',
+      nomCompletPere: '',
+      nomCompletMere: '',
+      travailPere: '',
+      travailMere: '',
+      niveau: '1AC',
+      telephoneEtudiant: '',
+      telephonePere: '',
+      telephoneMere: '',
+      codeMassar: '',
+      cin: '',
+      adresse: '',
+      email: '',
+      motDePasse: '',
+      transport: false,
+      cours: [],
+      actif: true,
+      prixTotal: 0,
+      paye: false,
+      pourcentageBourse: 0,
+      typePaiement: 'Cash',
+      anneeScolaire: '2025/2026'
+    });
+    setImageFile(null);
+    setMessageAjout('');
+  };
 
   const handleChangeAjout = (e) => {
     const { name, value, type, checked } = e.target;
@@ -406,49 +368,119 @@ if (recherche) {
     setImageFile(e.target.files[0]);
   };
 
-const handleSubmitAjout = async (e) => {
-  e.preventDefault();
-  setLoadingAjout(true);
+  const handleSubmitAjout = async (e) => {
+    e.preventDefault();
+    setLoadingAjout(true);
 
-  console.log('✅ Données avant envoi:', {
-    transport: formAjout.transport,
-    actif: formAjout.actif,
-    paye: formAjout.paye
-  });
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
 
-  try {
-    const token = localStorage.getItem('token');
-    const formData = new FormData();
+      Object.keys(formAjout).forEach(key => {
+        if (key === 'cours') {
+          formAjout.cours.forEach(c => formData.append('cours', c));
+        } else if (typeof formAjout[key] === 'boolean') {
+          formData.append(key, formAjout[key].toString());
+        } else {
+          formData.append(key, formAjout[key]);
+        }
+      });
 
-    Object.keys(formAjout).forEach(key => {
-      if (key === 'cours') {
-        formAjout.cours.forEach(c => formData.append('cours', c));
-      } else if (typeof formAjout[key] === 'boolean') {
-        formData.append(key, formAjout[key].toString());
-        console.log(`✅ ${key}:`, formAjout[key], '-> string:', formAjout[key].toString());
-      } else {
-        formData.append(key, formAjout[key]);
-      }
-    });
+      if (imageFile) formData.append('image', imageFile);
 
-    if (imageFile) formData.append('image', imageFile);
+      const response = await axios.post('/api/etudiants', formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
-    console.log('✅ FormData envoyé:');
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`);
+      setMessageAjout('✅ Étudiant ajouté avec succès');
+      await fetchEtudiants();
+
+      setFormAjout({
+        nomComplet: '',
+        genre: 'Homme',
+        dateNaissance: '',
+        lieuNaissance: '',
+        nationalite: '',
+        nomCompletPere: '',
+        nomCompletMere: '',
+        travailPere: '',
+        travailMere: '',
+        niveau: '1AC',
+        telephoneEtudiant: '',
+        telephonePere: '',
+        telephoneMere: '',
+        codeMassar: '',
+        cin: '',
+        adresse: '',
+        email: '',
+        motDePasse: '',
+        transport: false,
+        cours: [],
+        actif: true,
+        prixTotal: 0,
+        paye: false,
+        pourcentageBourse: 0,
+        typePaiement: 'Cash',
+        anneeScolaire: '2025/2026'
+      });
+      setImageFile(null);
+
+      setTimeout(() => {
+        closeModal();
+      }, 2000);
+
+    } catch (err) {
+      console.error('❌ Erreur:', err.response?.data);
+      setMessageAjout('❌ Erreur: ' + (err.response?.data?.message || 'Erreur inconnue'));
+    } finally {
+      setLoadingAjout(false);
     }
+  };
 
-    const response = await axios.post('/api/etudiants', formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
+  // Fonctions pour le modal de modification
+  const openEditModal = (etudiant) => {
+    console.log('✅ Données étudiant reçues:', etudiant);
+    setEtudiantAModifier(etudiant);
+    setFormModifier({
+      nomComplet: etudiant.nomComplet || '',
+      genre: etudiant.genre || 'Homme',
+      dateNaissance: etudiant.dateNaissance ? etudiant.dateNaissance.slice(0, 10) : '',
+      lieuNaissance: etudiant.lieuNaissance || '',
+      nationalite: etudiant.nationalite || '',
+      nomCompletPere: etudiant.nomCompletPere || '',
+      nomCompletMere: etudiant.nomCompletMere || '',
+      travailPere: etudiant.travailPere || '',
+      travailMere: etudiant.travailMere || '',
+      niveau: etudiant.niveau || '1AC',
+      telephoneEtudiant: etudiant.telephoneEtudiant || '',
+      telephonePere: etudiant.telephonePere || '',
+      telephoneMere: etudiant.telephoneMere || '',
+      codeMassar: etudiant.codeMassar || '',
+      cin: etudiant.cin || '',
+      adresse: etudiant.adresse || '',
+      email: etudiant.email || '',
+      motDePasse: '',
+      transport: etudiant.transport === true,
+      cours: Array.isArray(etudiant.cours) ? etudiant.cours : [],
+      actif: etudiant.actif === true,
+      prixTotal: etudiant.prixTotal || 0,
+      paye: etudiant.paye === true,
+      pourcentageBourse: etudiant.pourcentageBourse || 0,
+      typePaiement: etudiant.typePaiement || 'Cash',
+      anneeScolaire: etudiant.anneeScolaire || '2025/2026'
     });
+    setImageFileModifier(null);
+    setMessageModifier('');
+    setShowEditModal(true);
+  };
 
-    setMessageAjout('✅ Étudiant ajouté avec succès');
-    await fetchEtudiants();
-
-    setFormAjout({
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEtudiantAModifier(null);
+    setFormModifier({
       nomComplet: '',
       genre: 'Homme',
       dateNaissance: '',
@@ -458,12 +490,12 @@ const handleSubmitAjout = async (e) => {
       nomCompletMere: '',
       travailPere: '',
       travailMere: '',
-      niveau: '1AC', // valeur par défaut modifiée
+      niveau: '1AC',
       telephoneEtudiant: '',
       telephonePere: '',
       telephoneMere: '',
       codeMassar: '',
-      cin: '', // Réinitialiser CIN
+      cin: '',
       adresse: '',
       email: '',
       motDePasse: '',
@@ -476,96 +508,9 @@ const handleSubmitAjout = async (e) => {
       typePaiement: 'Cash',
       anneeScolaire: '2025/2026'
     });
-    setImageFile(null);
-
-    setTimeout(() => {
-      closeModal();
-    }, 2000);
-
-  } catch (err) {
-    console.error('❌ Erreur:', err.response?.data);
-    setMessageAjout('❌ Erreur: ' + (err.response?.data?.message || 'Erreur inconnue'));
-  } finally {
-    setLoadingAjout(false);
-  }
-};
-
-
-  // Fonctions pour le modal de modification
- // Correction de openEditModal avec conversion stricte et debug
-const openEditModal = (etudiant) => {
-  console.log('✅ Données étudiant reçues:', etudiant); // Debug
-  setEtudiantAModifier(etudiant);
-  setFormModifier({
-    nomComplet: etudiant.nomComplet || '',
-    genre: etudiant.genre || 'Homme',
-    dateNaissance: etudiant.dateNaissance ? etudiant.dateNaissance.slice(0, 10) : '',
-    lieuNaissance: etudiant.lieuNaissance || '',
-    nationalite: etudiant.nationalite || '',
-    nomCompletPere: etudiant.nomCompletPere || '',
-    nomCompletMere: etudiant.nomCompletMere || '',
-    travailPere: etudiant.travailPere || '',
-    travailMere: etudiant.travailMere || '',
-    niveau: etudiant.niveau || '1AC',
-    telephoneEtudiant: etudiant.telephoneEtudiant || '',
-    telephonePere: etudiant.telephonePere || '',
-    telephoneMere: etudiant.telephoneMere || '',
-    codeMassar: etudiant.codeMassar || '',
-    cin: etudiant.cin || '', // ← AJOUT : pré-remplir CIN
-    adresse: etudiant.adresse || '',
-    email: etudiant.email || '',
-    motDePasse: '',
-    transport: etudiant.transport === true,
-    cours: Array.isArray(etudiant.cours) ? etudiant.cours : [],
-    actif: etudiant.actif === true,
-    prixTotal: etudiant.prixTotal || 0,
-    paye: etudiant.paye === true,
-    pourcentageBourse: etudiant.pourcentageBourse || 0,
-    typePaiement: etudiant.typePaiement || 'Cash',
-    anneeScolaire: etudiant.anneeScolaire || '2025/2026'
-  });
-  console.log('✅ Transport original:', etudiant.transport, 'Converti:', etudiant.transport === true);
-  console.log('✅ Actif original:', etudiant.actif, 'Converti:', etudiant.actif === true);
-  console.log('✅ Payé original:', etudiant.paye, 'Converti:', etudiant.paye === true);
-  setImageFileModifier(null);
-  setMessageModifier('');
-  setShowEditModal(true);
-};
-
-const closeEditModal = () => {
-  setShowEditModal(false);
-  setEtudiantAModifier(null);
-  setFormModifier({
-    nomComplet: '',
-    genre: 'Homme',
-    dateNaissance: '',
-    lieuNaissance: '',
-    nationalite: '',
-    nomCompletPere: '',
-    nomCompletMere: '',
-    travailPere: '',
-    travailMere: '',
-    niveau: '1AC', // valeur par défaut modifiée
-    telephoneEtudiant: '',
-    telephonePere: '',
-    telephoneMere: '',
-    codeMassar: '',
-    cin: '', // Réinitialiser CIN
-    adresse: '',
-    email: '',
-    motDePasse: '',
-    transport: false,
-    cours: [],
-    actif: true,
-    prixTotal: 0,
-    paye: false,
-    pourcentageBourse: 0,
-    typePaiement: 'Cash',
-    anneeScolaire: '2025/2026'
-  });
-  setImageFileModifier(null);
-  setMessageModifier('');
-};
+    setImageFileModifier(null);
+    setMessageModifier('');
+  };
 
   const handleChangeModifier = (e) => {
     const { name, value, type, checked } = e.target;
@@ -591,62 +536,49 @@ const closeEditModal = () => {
     setImageFileModifier(e.target.files[0]);
   };
 
- const handleSubmitModifier = async (e) => {
-  e.preventDefault();
-  setLoadingModifier(true);
+  const handleSubmitModifier = async (e) => {
+    e.preventDefault();
+    setLoadingModifier(true);
 
-  console.log('✅ Données modification avant envoi:', {
-    transport: formModifier.transport,
-    actif: formModifier.actif,
-    paye: formModifier.paye
-  });
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
 
-  try {
-    const token = localStorage.getItem('token');
-    const formData = new FormData();
+      Object.keys(formModifier).forEach(key => {
+        if (key === 'cours') {
+          formModifier.cours.forEach(c => formData.append('cours', c));
+        } else if (key === 'motDePasse' && formModifier.motDePasse.trim() === '') {
+          return;
+        } else if (typeof formModifier[key] === 'boolean') {
+          formData.append(key, formModifier[key].toString());
+        } else {
+          formData.append(key, formModifier[key]);
+        }
+      });
 
-    Object.keys(formModifier).forEach(key => {
-      if (key === 'cours') {
-        formModifier.cours.forEach(c => formData.append('cours', c));
-      } else if (key === 'motDePasse' && formModifier.motDePasse.trim() === '') {
-        return;
-      } else if (typeof formModifier[key] === 'boolean') {
-        formData.append(key, formModifier[key].toString());
-        console.log(`✅ ${key}:`, formModifier[key], '-> string:', formModifier[key].toString());
-      } else {
-        formData.append(key, formModifier[key]);
-      }
-    });
+      if (imageFileModifier) formData.append('image', imageFileModifier);
 
-    if (imageFileModifier) formData.append('image', imageFileModifier);
+      const response = await axios.put(`/api/etudiants/${etudiantAModifier._id}`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
-    console.log('✅ FormData modification envoyé:');
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`);
+      setMessageModifier('✅ Étudiant modifié avec succès');
+      await fetchEtudiants();
+
+      setTimeout(() => {
+        closeEditModal();
+      }, 2000);
+
+    } catch (err) {
+      console.error('❌ Erreur modification:', err.response?.data);
+      setMessageModifier('❌ Erreur: ' + (err.response?.data?.message || 'Erreur inconnue'));
+    } finally {
+      setLoadingModifier(false);
     }
-
-    const response = await axios.put(`/api/etudiants/${etudiantAModifier._id}`, formData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-
-    setMessageModifier('✅ Étudiant modifié avec succès');
-    await fetchEtudiants();
-
-    setTimeout(() => {
-      closeEditModal();
-    }, 2000);
-
-  } catch (err) {
-    console.error('❌ Erreur modification:', err.response?.data);
-    setMessageModifier('❌ Erreur: ' + (err.response?.data?.message || 'Erreur inconnue'));
-  } finally {
-    setLoadingModifier(false);
-  }
-};
-
+  };
 
   const handleToggleActif = async (id) => {
     try {
@@ -660,40 +592,39 @@ const closeEditModal = () => {
     }
   };
 
-const handleDelete = (etudiant) => {
-  setEtudiantASupprimer(etudiant);
-  setDeleteCode('');
-  setDeleteError('');
-  setShowDeleteModal(true);
-};
-
-const handleConfirmDelete = async (e) => {
-  e.preventDefault();
-  
-  if (deleteCode !== 'allahakbir') {
-    setDeleteError('❌ Code incorrect. Veuillez réessayer.');
-    return;
-  }
-
-  try {
-    const token = localStorage.getItem('token');
-    await axios.delete(`/api/etudiants/${etudiantASupprimer._id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    // ✅ Retirer l'étudiant de la liste (il est maintenant hidden)
-    setEtudiants(etudiants.filter(e => e._id !== etudiantASupprimer._id));
-    
-    setShowDeleteModal(false);
-    setEtudiantASupprimer(null);
+  const handleDelete = (etudiant) => {
+    setEtudiantASupprimer(etudiant);
     setDeleteCode('');
     setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async (e) => {
+    e.preventDefault();
     
-  } catch (err) {
-    console.error('Erreur archivage:', err);
-    setDeleteError('❌ Erreur lors de l\'archivage');
-  }
-};
+    if (deleteCode !== 'allahakbir') {
+      setDeleteError('❌ Code incorrect. Veuillez réessayer.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/etudiants/${etudiantASupprimer._id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setEtudiants(etudiants.filter(e => e._id !== etudiantASupprimer._id));
+      
+      setShowDeleteModal(false);
+      setEtudiantASupprimer(null);
+      setDeleteCode('');
+      setDeleteError('');
+      
+    } catch (err) {
+      console.error('Erreur archivage:', err);
+      setDeleteError('❌ Erreur lors de l\'archivage');
+    }
+  };
 
   const closeDeleteModal = () => {
     setShowDeleteModal(false);
@@ -743,6 +674,7 @@ const handleConfirmDelete = async (e) => {
     }
     return age;
   };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
@@ -765,71 +697,9 @@ const handleConfirmDelete = async (e) => {
     return <div className="loading">Chargement des étudiants...</div>;
   }
 
-  // Permission helper
+  // Permission helper - MODIFIÉ POUR CACHER LES CHAMPS FINANCIERS
   const canViewFinance = () => {
-    return userRole === 'admin' || userRole === 'paiement_manager';
-  };
-
-  // Finance fields component for forms
-  const renderFinanceFields = (form, onChange) => {
-    if (!canViewFinance()) return null;
-    
-    return (
-      <>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Prix Total</label>
-            <input
-              type="number"
-              name="prixTotal"
-              placeholder="Prix total"
-              value={form.prixTotal}
-              onChange={onChange}
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div className="form-group">
-            <label>Payé</label>
-            <select name="paye" value={String(form.paye)} onChange={onChange}>
-              <option value="true">Oui</option>
-              <option value="false">Non</option>
-            </select>
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Pourcentage Bourse (%)</label>
-            <input
-              type="number"
-              name="pourcentageBourse"
-              placeholder="Pourcentage bourse"
-              value={form.pourcentageBourse}
-              onChange={onChange}
-              min="0"
-              max="100"
-              step="1"
-            />
-          </div>
-          <div className="form-group">
-            <label>Type Paiement</label>
-            <select name="typePaiement" value={form.typePaiement} onChange={onChange}>
-              <option value="Cash">Cash</option>
-              <option value="Virement">Virement</option>
-              <option value="Chèque">Chèque</option>
-              <option value="En ligne">En ligne</option>
-            </select>
-          </div>
-        </div>
-      </>
-    );
-  };
-
-  // --- Ajout : handlers pour l'authentification avant export ---
-  const openExportAuth = () => {
-    setExportPassword('');
-    setExportAuthError('');
-    setShowExportAuthModal(true);
+    return false; // ← TOUJOURS false pour cacher les champs
   };
 
   // Handlers du modal d'authentification Archives
@@ -853,6 +723,13 @@ const handleConfirmDelete = async (e) => {
     setArchivesAuthError('');
   };
 
+  // --- Ajout : handlers pour l'authentification avant export ---
+  const openExportAuth = () => {
+    setExportPassword('');
+    setExportAuthError('');
+    setShowExportAuthModal(true);
+  };
+
   const handleSubmitExportAuth = (e) => {
     e.preventDefault();
     if (exportPassword === 'abdoraki2001') {
@@ -864,11 +741,11 @@ const handleConfirmDelete = async (e) => {
       setExportAuthError('Mot de passe incorrect. Veuillez réessayer.');
     }
   };
- 
+
   return (
     <div className="liste-etudiants-container" style={{
-          background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
-        }}>
+      background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)'
+    }}>
       <Sidebar onLogout={handleLogout} />
 
       <div className="header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -898,29 +775,28 @@ const handleConfirmDelete = async (e) => {
               Cartes
             </button>
           </div>
-           <button 
-          onClick={() => {
-            // Ouvre d'abord le modal d'authentification
-            setArchivesPassword('');
-            setArchivesAuthError('');
-            setShowArchivesAuthModal(true);
-          }}
-          className="btn-archives"
-          style={{
-            background: '#8b5cf6',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-           Archives
-        </button>
-          {/* ✅ NOUVEAU: Bouton d'export Excel (ouvre modal d'authentification) */}
+          <button 
+            onClick={() => {
+              setArchivesPassword('');
+              setArchivesAuthError('');
+              setShowArchivesAuthModal(true);
+            }}
+            className="btn-archives"
+            style={{
+              background: '#8b5cf6',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Archives
+          </button>
+          
           <button 
             onClick={openExportAuth} 
             className="btn-export-excel"
@@ -943,7 +819,7 @@ const handleConfirmDelete = async (e) => {
           </button>
           
           <button onClick={openModal} className="btn-ajouter-etudiant">
-             Ajouter un étudiant
+            Ajouter un étudiant
           </button>
           
         </div>
@@ -1032,7 +908,7 @@ const handleConfirmDelete = async (e) => {
               <tr>
                 <th>Nom Complet</th>
                 <th>Genre</th>
-                <th>CIN</th> {/* ← AJOUT */}
+                <th>CIN</th>
                 <th>Niveau</th>
                 <th>Date de Naissance</th>
                 <th>Âge</th>
@@ -1041,15 +917,13 @@ const handleConfirmDelete = async (e) => {
                 <th>Classe</th>
                 <th>Statut</th>
                 <th>Image</th>
-                {canViewFinance() && <th>Prix Total</th>}
-                {canViewFinance() && <th>Statut Paiement</th>}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {etudiantsActuels.length === 0 ? (
                 <tr>
-                  <td colSpan={canViewFinance() ? "13" : "11"} className="aucun-resultat">
+                  <td colSpan="12" className="aucun-resultat">
                     Aucun étudiant trouvé
                   </td>
                 </tr>
@@ -1058,7 +932,7 @@ const handleConfirmDelete = async (e) => {
                   <tr key={e._id}>
                     <td className="nom-colonne">{e.nomComplet}</td>
                     <td>{e.genre}</td>
-                    <td>{e.cin || '—'}</td> {/* ← AJOUT : affichage CIN */}
+                    <td>{e.cin || '—'}</td>
                     <td className="niveau-colonne">
                       <span className="niveau-badge">
                         <GraduationCap size={16} className="inline mr-1" />
@@ -1098,16 +972,6 @@ const handleConfirmDelete = async (e) => {
                         <div className="pas-image">N/A</div>
                       )}
                     </td>
-                    {canViewFinance() && (
-                      <td>{e.prixTotal || 0} DH</td>
-                    )}
-                    {canViewFinance() && (
-                      <td>
-                        <span className={`paiement-badge ${e.paye ? 'paye' : 'non-paye'}`}>
-                          {e.paye ? '✅ Payé' : '❌ Non payé'}
-                        </span>
-                      </td>
-                    )}
                     <td className="actions-colonne" style={{ 
                       minWidth: '300px', 
                       width: '300px', 
@@ -1200,128 +1064,126 @@ const handleConfirmDelete = async (e) => {
         </div>
       ) : (
         // VUE CARTES
-
-<div className="cartes-container">
-  {etudiantsActuels.length === 0 ? (
-    <div className="aucun-resultat-cartes">
-      Aucun étudiant trouvé
-    </div>
-  ) : (
-    <div className="cartes-grid">
-      {etudiantsActuels.map((e) => (
-        <div key={e._id} className="carte-etudiant">
-          <div className="carte-header">
-            <div className="carte-image">
-              {e.image ? (
-                <img 
-                  src={`${e.image}`} 
-                  alt="etudiant" 
-                  className="carte-photo"
-                />
-              ) : (
-                <div className="carte-placeholder">
-                  <User size={24} />
+        <div className="cartes-container">
+          {etudiantsActuels.length === 0 ? (
+            <div className="aucun-resultat-cartes">
+              Aucun étudiant trouvé
+            </div>
+          ) : (
+            <div className="cartes-grid">
+              {etudiantsActuels.map((e) => (
+                <div key={e._id} className="carte-etudiant">
+                  <div className="carte-header">
+                    <div className="carte-image">
+                      {e.image ? (
+                        <img 
+                          src={`${e.image}`} 
+                          alt="etudiant" 
+                          className="carte-photo"
+                        />
+                      ) : (
+                        <div className="carte-placeholder">
+                          <User size={24} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="carte-statut">
+                      <span className={`statut-badge ${e.actif ? 'actif' : 'inactif'}`}>
+                        {e.actif ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="carte-content">
+                    <h3 className="carte-nom">{e.nomComplet}</h3>
+                    <div className="carte-info">
+                      <div className="carte-detail">
+                        <span className="carte-label">Genre:</span>
+                        <span>
+                          <User size={16} className="inline mr-1" /> {e.genre}
+                        </span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">Niveau:</span>
+                        <span>
+                          <GraduationCap size={16} className="inline mr-1" /> {e.niveau || 'Non défini'}
+                        </span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">Âge:</span>
+                        <span>{calculerAge(e.dateNaissance)} ans</span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">Tél. Étudiant:</span>
+                        <span>
+                          <Phone size={16} className="inline mr-1" /> {e.telephoneEtudiant}
+                        </span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">Code Massar:</span>
+                        <span>{e.codeMassar}</span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">CIN:</span>
+                        <span>{e.cin || '—'}</span>
+                      </div>
+                      <div className="carte-detail">
+                        <span className="carte-label">Email:</span>
+                        <span>
+                          <Mail size={16} className="inline mr-1" /> {e.email}
+                        </span>
+                      </div>
+                      <div className="carte-detail cours-detail">
+                        <span className="carte-label">Classe:</span>
+                        <div className="carte-cours">
+                          {(Array.isArray(e.cours) && e.cours.length > 0) ? (
+                            e.cours.map((cours, index) => (
+                              <span key={index} className="cours-tag">{cours}</span>
+                            ))
+                          ) : (
+                            <span className="no-cours">Aucun classe</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="carte-actions">
+                    <button 
+                      onClick={() => handleView(e)}
+                      className="btn-carte btn-voir"
+                      title="Voir détails"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleEdit(e)}
+                      className="btn-carte btn-modifier"
+                      title="Modifier"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleToggleActif(e._id)}
+                      className="btn-carte btn-toggle"
+                      title={e.actif ? 'Désactiver' : 'Activer'}
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(e)}
+                      className="btn-carte btn-supprimer"
+                      title="Supprimer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-            <div className="carte-statut">
-              <span className={`statut-badge ${e.actif ? 'actif' : 'inactif'}`}>
-                {e.actif ? <CheckCircle size={16} /> : <XCircle size={16} />}
-              </span>
-            </div>
-          </div>
-          
-          <div className="carte-content">
-            <h3 className="carte-nom">{e.nomComplet}</h3>
-            <div className="carte-info">
-              <div className="carte-detail">
-                <span className="carte-label">Genre:</span>
-                <span>
-                  <User size={16} className="inline mr-1" /> {e.genre}
-                </span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">Niveau:</span>
-                <span>
-                  <GraduationCap size={16} className="inline mr-1" /> {e.niveau || 'Non défini'}
-                </span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">Âge:</span>
-                <span>{calculerAge(e.dateNaissance)} ans</span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">Tél. Étudiant:</span>
-                <span>
-                  <Phone size={16} className="inline mr-1" /> {e.telephoneEtudiant}
-                </span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">Code Massar:</span>
-                <span>{e.codeMassar}</span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">CIN:</span>
-                <span>{e.cin || '—'}</span>
-              </div>
-              <div className="carte-detail">
-                <span className="carte-label">Email:</span>
-                <span>
-                  <Mail size={16} className="inline mr-1" /> {e.email}
-                </span>
-              </div>
-              <div className="carte-detail cours-detail">
-                <span className="carte-label">Classe:</span>
-                <div className="carte-cours">
-                  {(Array.isArray(e.cours) && e.cours.length > 0) ? (
-                    e.cours.map((cours, index) => (
-                      <span key={index} className="cours-tag">{cours}</span>
-                    ))
-                  ) : (
-                    <span className="no-cours">Aucun classe</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="carte-actions">
-            <button 
-              onClick={() => handleView(e)}
-              className="btn-carte btn-voir"
-              title="Voir détails"
-            >
-              <Eye size={16} />
-            </button>
-            <button 
-              onClick={() => handleEdit(e)}
-              className="btn-carte btn-modifier"
-              title="Modifier"
-            >
-              <Edit size={16} />
-            </button>
-            <button 
-              onClick={() => handleToggleActif(e._id)}
-              className="btn-carte btn-toggle"
-              title={e.actif ? 'Désactiver' : 'Activer'}
-            >
-              <RotateCcw size={16} />
-            </button>
-            <button 
-              onClick={() => handleDelete(e)}
-              className="btn-carte btn-supprimer"
-              title="Supprimer"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
+          )}
         </div>
-      ))}
-
-    </div>
-  )}
-</div>
-)}
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -1361,7 +1223,7 @@ const handleConfirmDelete = async (e) => {
         </div>
       )}
 
-      {/* Modal d'ajout d'étudiant with conditional finance fields */}
+      {/* Modal d'ajout d'étudiant - CHAMPS FINANCIERS CACHÉS */}
       {showModal && (
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1489,7 +1351,6 @@ const handleConfirmDelete = async (e) => {
               </div>
 
               <div className="form-row">
-                {/* Dans le modal d'ajout - remplacer la section téléphones */}
                 <div className="form-group">
                   <label>Téléphone Père</label>
                   <input
@@ -1535,16 +1396,16 @@ const handleConfirmDelete = async (e) => {
                     onChange={handleChangeAjout}
                   />
                 </div>
-               <div className="form-group">
-                 <label>CIN</label>
-                 <input
-                   type="text"
-                   name="cin"
-                   placeholder="CIN (ex: AB123456)"
-                   value={formAjout.cin}
-                   onChange={handleChangeAjout}
-                 />
-               </div>
+                <div className="form-group">
+                  <label>CIN</label>
+                  <input
+                    type="text"
+                    name="cin"
+                    placeholder="CIN (ex: AB123456)"
+                    value={formAjout.cin}
+                    onChange={handleChangeAjout}
+                  />
+                </div>
               </div>
 
               <div className="form-row">
@@ -1637,8 +1498,7 @@ const handleConfirmDelete = async (e) => {
                 </div>
               </div>
 
-              {/* Conditional finance fields */}
-              {renderFinanceFields(formAjout, handleChangeAjout)}
+              {/* LES CHAMPS FINANCIERS SONT CACHÉS ICI */}
 
               <div className="form-row">
                 <div className="form-group">
@@ -1675,7 +1535,7 @@ const handleConfirmDelete = async (e) => {
         </div>
       )}
 
-      {/* Modal de modification d'étudiant with conditional finance fields */}
+      {/* Modal de modification d'étudiant - CHAMPS FINANCIERS CACHÉS */}
       {showEditModal && etudiantAModifier && (
         <div className="modal-overlay" onClick={closeEditModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1804,7 +1664,6 @@ const handleConfirmDelete = async (e) => {
               </div>
 
               <div className="form-row">
-                {/* Dans le modal de modification - remplacer la section téléphones */}
                 <div className="form-group">
                   <label>Téléphone Père</label>
                   <input
@@ -1850,16 +1709,16 @@ const handleConfirmDelete = async (e) => {
                     onChange={handleChangeModifier}
                   />
                 </div>
-               <div className="form-group">
-                 <label>CIN</label>
-                 <input
-                   type="text"
-                   name="cin"
-                   placeholder="CIN"
-                   value={formModifier.cin}
-                   onChange={handleChangeModifier}
-                 />
-               </div>
+                <div className="form-group">
+                  <label>CIN</label>
+                  <input
+                    type="text"
+                    name="cin"
+                    placeholder="CIN"
+                    value={formModifier.cin}
+                    onChange={handleChangeModifier}
+                  />
+                </div>
               </div>
 
               <div className="form-row">
@@ -1966,8 +1825,7 @@ const handleConfirmDelete = async (e) => {
                 </div>
               </div>
 
-              {/* Conditional finance fields */}
-              {renderFinanceFields(formModifier, handleChangeModifier)}
+              {/* LES CHAMPS FINANCIERS SONT CACHÉS ICI AUSSI */}
 
               <div className="form-group">
                 <label>Année Scolaire *</label>
@@ -2002,229 +1860,230 @@ const handleConfirmDelete = async (e) => {
         </div>
       )}
 
-    {/* Modal de visualisation d'étudiant - VERSION CORRIGÉE */}
-{showViewModal && etudiantSelectionne && (
-  <div className="modal-overlay" onClick={closeViewModal}>
-    <div className="modal-content modal-view" onClick={(e) => e.stopPropagation()}>
-      <div className="modal-header">
-        <h3>Informations de l'étudiant</h3>
-        <button className="btn-fermer-modal" onClick={closeViewModal}>
-          <X size={20} />
-        </button>
-      </div>
-      
-      <div className="etudiant-details">
-        <div className="etudiant-header">
-          <div className="etudiant-image-section">
-            {etudiantSelectionne.image ? (
-              <img 
-                src={`${etudiantSelectionne.image}`} 
-                alt="Photo de l'étudiant" 
-                className="etudiant-image-large"
-              />
-            ) : (
-              <div className="etudiant-image-placeholder">
-                <User size={48} />
+      {/* Modal de visualisation d'étudiant - VERSION CORRIGÉE */}
+      {showViewModal && etudiantSelectionne && (
+        <div className="modal-overlay" onClick={closeViewModal}>
+          <div className="modal-content modal-view" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Informations de l'étudiant</h3>
+              <button className="btn-fermer-modal" onClick={closeViewModal}>
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="etudiant-details">
+              <div className="etudiant-header">
+                <div className="etudiant-image-section">
+                  {etudiantSelectionne.image ? (
+                    <img 
+                      src={`${etudiantSelectionne.image}`} 
+                      alt="Photo de l'étudiant" 
+                      className="etudiant-image-large"
+                    />
+                  ) : (
+                    <div className="etudiant-image-placeholder">
+                      <User size={48} />
+                    </div>
+                  )}
+                </div>
+                <div className="etudiant-info-principal">
+                  <h2>{etudiantSelectionne.nomComplet}</h2>
+                  <div className="statut-badge">
+                    <span className={`badge ${etudiantSelectionne.actif ? 'actif' : 'inactif'}`}>
+                      {etudiantSelectionne.actif ? (
+                        <><CheckCircle size={16} className="inline mr-1" /> Actif</>
+                      ) : (
+                        <><XCircle size={16} className="inline mr-1" /> Inactif</>
+                      )}
+                    </span>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="etudiant-info-principal">
-            <h2>{etudiantSelectionne.nomComplet}</h2>
-            <div className="statut-badge">
-              <span className={`badge ${etudiantSelectionne.actif ? 'actif' : 'inactif'}`}>
-                {etudiantSelectionne.actif ? (
-                  <><CheckCircle size={16} className="inline mr-1" /> Actif</>
-                ) : (
-                  <><XCircle size={16} className="inline mr-1" /> Inactif</>
-                )}
-              </span>
+
+              <div className="etudiant-info-grid">
+                {/* ✅ INFORMATIONS DE BASE */}
+                <div className="info-card">
+                  <div className="info-label">Genre</div>
+                  <div className="info-value">
+                    <User size={16} className="inline mr-1" /> {etudiantSelectionne.genre}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Niveau</div>
+                  <div className="info-value">
+                    <GraduationCap size={16} className="inline mr-1" /> {etudiantSelectionne.niveau || 'Non défini'}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Date de Naissance</div>
+                  <div className="info-value">
+                    <Calendar size={16} className="inline mr-1" /> {formatDate(etudiantSelectionne.dateNaissance)}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Âge</div>
+                  <div className="info-value">
+                    <Cake size={16} className="inline mr-1" /> {calculerAge(etudiantSelectionne.dateNaissance)} ans
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Lieu de Naissance</div>
+                  <div className="info-value">
+                    <MapPin size={16} className="inline mr-1" /> {etudiantSelectionne.lieuNaissance || 'Non spécifié'}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Nationalité</div>
+                  <div className="info-value">{etudiantSelectionne.nationalite || 'Non spécifiée'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Téléphone Étudiant</div>
+                  <div className="info-value">
+                    <Phone size={16} className="inline mr-1" /> {etudiantSelectionne.telephoneEtudiant}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Code Massar</div>
+                  <div className="info-value">{etudiantSelectionne.codeMassar}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">CIN</div>
+                  <div className="info-value">{etudiantSelectionne.cin || 'Non spécifié'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Email</div>
+                  <div className="info-value">
+                    <Mail size={16} className="inline mr-1" /> {etudiantSelectionne.email}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Année Scolaire</div>
+                  <div className="info-value">{etudiantSelectionne.anneeScolaire || 'Non définie'}</div>
+                </div>
+
+                {/* ✅ INFORMATIONS PARENTS */}
+                <div className="info-card">
+                  <div className="info-label">Nom du Père</div>
+                  <div className="info-value">{etudiantSelectionne.nomCompletPere || 'Non spécifié'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Nom de la Mère</div>
+                  <div className="info-value">{etudiantSelectionne.nomCompletMere || 'Non spécifié'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Travail du Père</div>
+                  <div className="info-value">{etudiantSelectionne.travailPere || 'Non spécifié'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Travail de la Mère</div>
+                  <div className="info-value">{etudiantSelectionne.travailMere || 'Non spécifié'}</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Téléphone Père</div>
+                  <div className="info-value">
+                    <Phone size={16} className="inline mr-1" /> 
+                    {etudiantSelectionne.telephonePere || 'Non spécifié'}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Téléphone Mère</div>
+                  <div className="info-value">
+                    <Phone size={16} className="inline mr-1" /> 
+                    {etudiantSelectionne.telephoneMere || 'Non spécifié'}
+                  </div>
+                </div>
+
+                {/* ✅ INFORMATIONS SUPPLÉMENTAIRES */}
+                <div className="info-card">
+                  <div className="info-label">Transport Scolaire</div>
+                  <div className="info-value">
+                    {etudiantSelectionne.transport ? '✅ Oui' : '❌ Non'}
+                  </div>
+                </div>
+
+                {/* LES CHAMPS FINANCIERS SONT CACHÉS ICI AUSSI DANS LA VUE */}
+                {/* 
+                <div className="info-card">
+                  <div className="info-label">Prix Total</div>
+                  <div className="info-value">{etudiantSelectionne.prixTotal || 0} DH</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Statut Paiement</div>
+                  <div className="info-value">
+                    {etudiantSelectionne.paye ? '✅ Payé' : '❌ Non payé'}
+                  </div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Pourcentage Bourse</div>
+                  <div className="info-value">{etudiantSelectionne.pourcentageBourse || 0}%</div>
+                </div>
+
+                <div className="info-card">
+                  <div className="info-label">Type Paiement</div>
+                  <div className="info-value">{etudiantSelectionne.typePaiement || 'Cash'}</div>
+                </div>
+                */}
+
+                {/* ✅ ADRESSE */}
+                <div className="info-card full-width">
+                  <div className="info-label">Adresse</div>
+                  <div className="info-value">
+                    <MapPin size={16} className="inline mr-1" /> 
+                    {etudiantSelectionne.adresse || 'Non spécifiée'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="cours-section">
+                <h4>
+                  <BookOpen size={20} className="inline mr-2" /> Classes Inscrites
+                </h4>
+                <div className="cours-badges">
+                  {(Array.isArray(etudiantSelectionne.cours) && etudiantSelectionne.cours.length > 0) ? (
+                    etudiantSelectionne.cours.map((cours, index) => (
+                      <span key={index} className="cours-badge">{cours}</span>
+                    ))
+                  ) : (
+                    <span className="no-cours">Aucune classe inscrite</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button 
+                  onClick={() => {
+                    closeViewModal();
+                    openEditModal(etudiantSelectionne);
+                  }}
+                  className="btn-modifier-depuis-view"
+                >
+                  <Edit size={16} className="inline mr-1" /> Modifier
+                </button>
+                <button onClick={closeViewModal} className="btn-fermer">
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        <div className="etudiant-info-grid">
-          {/* ✅ INFORMATIONS DE BASE */}
-          <div className="info-card">
-            <div className="info-label">Genre</div>
-            <div className="info-value">
-              <User size={16} className="inline mr-1" /> {etudiantSelectionne.genre}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Niveau</div>
-            <div className="info-value">
-              <GraduationCap size={16} className="inline mr-1" /> {etudiantSelectionne.niveau || 'Non défini'}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Date de Naissance</div>
-            <div className="info-value">
-              <Calendar size={16} className="inline mr-1" /> {formatDate(etudiantSelectionne.dateNaissance)}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Âge</div>
-            <div className="info-value">
-              <Cake size={16} className="inline mr-1" /> {calculerAge(etudiantSelectionne.dateNaissance)} ans
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Lieu de Naissance</div>
-            <div className="info-value">
-              <MapPin size={16} className="inline mr-1" /> {etudiantSelectionne.lieuNaissance || 'Non spécifié'}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Nationalité</div>
-            <div className="info-value">{etudiantSelectionne.nationalite || 'Non spécifiée'}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Téléphone Étudiant</div>
-            <div className="info-value">
-              <Phone size={16} className="inline mr-1" /> {etudiantSelectionne.telephoneEtudiant}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Code Massar</div>
-            <div className="info-value">{etudiantSelectionne.codeMassar}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">CIN</div>
-            <div className="info-value">{etudiantSelectionne.cin || 'Non spécifié'}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Email</div>
-            <div className="info-value">
-              <Mail size={16} className="inline mr-1" /> {etudiantSelectionne.email}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Année Scolaire</div>
-            <div className="info-value">{etudiantSelectionne.anneeScolaire || 'Non définie'}</div>
-          </div>
-
-          {/* ✅ INFORMATIONS PARENTS - TOUJOURS AFFICHÉES */}
-          <div className="info-card">
-            <div className="info-label">Nom du Père</div>
-            <div className="info-value">{etudiantSelectionne.nomCompletPere || 'Non spécifié'}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Nom de la Mère</div>
-            <div className="info-value">{etudiantSelectionne.nomCompletMere || 'Non spécifié'}</div>
-          </div>
-
-          {/* ✅ CORRECTION MAJEURE: SUPPRIMER LES CONDITIONS && */}
-          <div className="info-card">
-            <div className="info-label">Travail du Père</div>
-            <div className="info-value">{etudiantSelectionne.travailPere || 'Non spécifié'}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Travail de la Mère</div>
-            <div className="info-value">{etudiantSelectionne.travailMere || 'Non spécifié'}</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Téléphone Père</div>
-            <div className="info-value">
-              <Phone size={16} className="inline mr-1" /> 
-              
-              {etudiantSelectionne.telephonePere || 'Non spécifié'}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Téléphone Mère</div>
-            <div className="info-value">
-              <Phone size={16} className="inline mr-1" /> 
-              {etudiantSelectionne.telephoneMere || 'Non spécifié'}
-            </div>
-          </div>
-
-          {/* ✅ INFORMATIONS SUPPLÉMENTAIRES */}
-          <div className="info-card">
-            <div className="info-label">Transport Scolaire</div>
-            <div className="info-value">
-              {etudiantSelectionne.transport ? '✅ Oui' : '❌ Non'}
-            </div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Prix Total</div>
-            <div className="info-value">{etudiantSelectionne.prixTotal || 0} DH</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Statut Paiement</div>
-            <div className="info-value">
-              {etudiantSelectionne.paye ? '✅ Payé' : '❌ Non payé'}
-            </div>
-          </div>
-
-          <div className="info-card">
-                       <div className="info-label">Pourcentage Bourse</div>
-            <div className="info-value">{etudiantSelectionne.pourcentageBourse || 0}%</div>
-          </div>
-
-          <div className="info-card">
-            <div className="info-label">Type Paiement</div>
-            <div className="info-value">{etudiantSelectionne.typePaiement || 'Cash'}</div>
-          </div>
-
-          {/* ✅ ADRESSE - TOUJOURS AFFICHÉE */}
-          <div className="info-card full-width">
-            <div className="info-label">Adresse</div>
-            <div className="info-value">
-              <MapPin size={16} className="inline mr-1" /> 
-              {etudiantSelectionne.adresse || 'Non spécifiée'}
-            </div>
-          </div>
-        </div>
-
-        <div className="cours-section">
-          <h4>
-            <BookOpen size={20} className="inline mr-2" /> Classes Inscrites
-          </h4>
-          <div className="cours-badges">
-            {(Array.isArray(etudiantSelectionne.cours) && etudiantSelectionne.cours.length > 0) ? (
-              etudiantSelectionne.cours.map((cours, index) => (
-                <span key={index} className="cours-badge">{cours}</span>
-              ))
-            ) : (
-              <span className="no-cours">Aucune classe inscrite</span>
-            )}
-          </div>
-        </div>
-
-        <div className="modal-actions">
-          <button 
-            onClick={() => {
-              closeViewModal();
-              openEditModal(etudiantSelectionne);
-            }}
-            className="btn-modifier-depuis-view"
-          >
-            <Edit size={16} className="inline mr-1" /> Modifier
-          </button>
-          <button onClick={closeViewModal} className="btn-fermer">
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       {/* Modal d'authentification avant export */}
       {showExportAuthModal && (
@@ -2295,15 +2154,16 @@ const handleConfirmDelete = async (e) => {
           }}
         />
       )}
- {showRapportModal && (
-   <RapportNotificationModal 
-     show={showRapportModal}
-     onClose={() => {
-       console.log('🔴 Fermeture du modal');
-       setShowRapportModal(false);
-     }} 
-   />
- )}
+      
+      {showRapportModal && (
+        <RapportNotificationModal 
+          show={showRapportModal}
+          onClose={() => {
+            console.log('🔴 Fermeture du modal');
+            setShowRapportModal(false);
+          }} 
+        />
+      )}
 
       {/* Modal de suppression d'étudiant */}
       {showDeleteModal && etudiantASupprimer && (
@@ -2406,14 +2266,14 @@ const handleConfirmDelete = async (e) => {
             </form>
           </div>
         </div>
-        
       )}
-       <EtudiantsArchives 
+      
+      <EtudiantsArchives 
         show={showArchivesModal}
         onClose={() => setShowArchivesModal(false)}
       />
     </div>
   );
 };
- 
- export default ListeEtudiants;
+
+export default ListeEtudiants;
