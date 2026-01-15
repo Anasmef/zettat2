@@ -75,7 +75,7 @@ import AdminActualitesmanager from './pages/AdminActualitesmanager';
 import EtudiantProfil from './pages/EtudiantProfil';
 import ProfesseurProfil from './pages/ProfesseurProfil';
 import InscripteurPage from './pages/InscripteurPage';
-import InscripteurDashboard from './pages/InscripteurDashboard';
+import InscripteurDashboard from './pages/PaymentManagementSystem';
 import AbsencesParCours from './pages/AbsencesParCours';
 import AutorisationEtudiants from './pages/AutorisationEtudiants';
 import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';

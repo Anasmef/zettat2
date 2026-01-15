@@ -9739,623 +9739,825 @@ app.delete('/api/vie-scolaire/:id', authAdminOrPaiementManager, async (req, res)
     });
   }
 });
-app.get('/api/payments/cheques/expiring', authInscripteur, async (req, res) => {
+// ============================================
+// 1. OBTENIR TOUS LES ÉTUDIANTS AVEC PAIEMENTS MENSUELS
+// ============================================
+app.get('/api/paiements-mensuels/etudiants', authInscripteur, async (req, res) => {
   try {
-    const jours = parseInt(req.query.jours) || 7;
-    
-    const maintenant = new Date();
-    const limite = new Date();
-    limite.setDate(limite.getDate() + jours);
-    
-    const cheques = await Payment.find({
-      creeParInscripteur: req.inscripteurId,
-      typePaiement: 'Chèque',
-      statutCheque: 'En attente',
-      dateEcheance: {
-        $gte: maintenant,
-        $lte: limite
-      }
-    })
-    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau') // ← AJOUTEZ CETTE LIGNE
-    .sort({ dateEcheance: 1 })
-    .lean();
-    
-    console.log('✅ Chèques trouvés:', cheques.length); // Pour déboguer
-    
-    res.json(cheques);
-  } catch (err) {
-    console.error('Erreur chèques expirant:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+    const { anneeScolaire } = req.query;
+    const annee = anneeScolaire || '2025/2026';
 
-app.post('/api/payments', authInscripteur, async (req, res) => {
-  try {
-    console.log('Données reçues:', req.body);
-    
-    const {
-      etudiant,  // Changez de etudiantId à etudiant
-      montantTotal,
-      montantPaye,
-      typePaiement,
-      numeroCheque,
-      banque,
-      dateEcheance,
-      moisDebut,
-      nombreMois,
-      cours,
-      note,
-      anneeScolaire
-    } = req.body;
+    // Récupérer tous les étudiants visibles avec leurs paiements
+    const etudiants = await Etudiant.aggregate([
+      { $match: { 
+        hidden: { $ne: true },
+        actif: true,
+        anneeScolaire: annee 
+      }},
+      { $lookup: {
+        from: 'payments',
+        let: { etudiantId: '$_id' },
+        pipeline: [
+          { $match: { 
+            $expr: { $eq: ['$etudiant', '$$etudiantId'] },
+            anneeScolaire: annee,
+            type: 'mensuel'
+          }},
+          { $unwind: '$moisConcernes' },
+          { $group: {
+            _id: '$moisConcernes.mois',
+            nomMois: { $first: '$moisConcernes.nomMois' },
+            montantDu: { $first: '$moisConcernes.montantDu' },
+            montantPaye: { $sum: '$moisConcernes.montantPaye' },
+            montantRestant: { $sum: '$moisConcernes.montantRestant' },
+            payeComplet: { 
+              $max: { 
+                $cond: [{ $eq: ['$moisConcernes.montantRestant', 0] }, true, false] 
+              } 
+            }
+          }},
+          { $sort: { '_id': 1 } }
+        ],
+        as: 'paiementsMensuels'
+      }},
+      { $project: {
+        nomComplet: 1,
+        cours: 1,
+        mensualite: 1,
+        fraisInscription: 1,
+        fraisInscriptionMontantPaye: 1,
+        fraisInscriptionPaye: 1,
+        fraisInscriptionTypePaiement: 1,
+        paiementsMensuels: 1,
+        telephoneEtudiant: 1,
+        email: 1
+      }}
+    ]);
 
-    // Validation des champs obligatoires
-    if (!etudiant || !montantTotal || !moisDebut || !nombreMois || !montantPaye || !typePaiement) {
-      return res.status(400).json({ 
-        message: 'Champs obligatoires manquants' 
+    // Organiser les données par mois (10 mois scolaires)
+    const moisScolaires = [
+      { mois: '2025-09', nom: 'Septembre', index: 0 },
+      { mois: '2025-10', nom: 'Octobre', index: 1 },
+      { mois: '2025-11', nom: 'Novembre', index: 2 },
+      { mois: '2025-12', nom: 'Décembre', index: 3 },
+      { mois: '2026-01', nom: 'Janvier', index: 4 },
+      { mois: '2026-02', nom: 'Février', index: 5 },
+      { mois: '2026-03', nom: 'Mars', index: 6 },
+      { mois: '2026-04', nom: 'Avril', index: 7 },
+      { mois: '2026-05', nom: 'Mai', index: 8 },
+      { mois: '2026-06', nom: 'Juin', index: 9 }
+    ];
+
+    const etudiantsAvecPaiements = etudiants.map(etudiant => {
+      // Créer un tableau de 10 mois avec les données
+      const mois = moisScolaires.map(ms => {
+        // Trouver le paiement pour ce mois
+        const paiementMois = etudiant.paiementsMensuels?.find(p => p._id === ms.mois);
+        
+        const montantDu = etudiant.mensualite || 0;
+        const montantPaye = paiementMois?.montantPaye || 0;
+        const montantRestant = paiementMois?.montantRestant || montantDu;
+        
+        return {
+          ...ms,
+          montantDu,
+          montantPaye,
+          montantRestant,
+          payeComplet: paiementMois?.payeComplet || false,
+          statut: montantPaye >= montantDu ? 'Payé' : montantPaye > 0 ? 'Partiel' : 'Non payé'
+        };
       });
-    }
 
-    // Préparation des données selon le modèle
-    const paymentData = {
-      etudiant,  // ObjectId de l'étudiant
-      montantTotal: parseFloat(montantTotal),
-      montantPaye: parseFloat(montantPaye),
-      montantRestant: parseFloat(montantTotal) - parseFloat(montantPaye),
-      typePaiement,
-      moisDebut: new Date(moisDebut),
-      nombreMois: parseInt(nombreMois) || 1,
-      cours: Array.isArray(cours) ? cours : (cours ? [cours] : []),
-      note: note || '',
-      anneeScolaire: anneeScolaire || '2025/2026',
-      creeParInscripteur: req.inscripteurId
-    };
+      // Calculer les totaux
+      const totalDu = mois.reduce((sum, m) => sum + m.montantDu, 0);
+      const totalPaye = mois.reduce((sum, m) => sum + m.montantPaye, 0);
+      const totalRestant = totalDu - totalPaye;
 
-    // Ajouter infos spécifiques pour chèque
-    if (typePaiement === 'Chèque') {
-      paymentData.numeroCheque = numeroCheque;
-      paymentData.banque = banque || '';
-      paymentData.dateEcheance = new Date(dateEcheance);
-      paymentData.statutCheque = 'En attente';
-    }
+      // Calculer les frais d'inscription
+      const fraisInscriptionRestant = Math.max(
+        0, 
+        (etudiant.fraisInscription || 0) - (etudiant.fraisInscriptionMontantPaye || 0)
+      );
 
-    // Création du paiement
-    const payment = await Payment.create(paymentData);
-    
-    console.log('Paiement créé avec succès:', payment._id);
-    
-    res.status(201).json({
-      message: 'Paiement créé avec succès',
-      payment
+      return {
+        ...etudiant,
+        mois,
+        totalDu,
+        totalPaye,
+        totalRestant,
+        fraisInscription: etudiant.fraisInscription || 0,
+        fraisInscriptionMontantPaye: etudiant.fraisInscriptionMontantPaye || 0,
+        fraisInscriptionRestant,
+        fraisInscriptionPaye: etudiant.fraisInscriptionPaye || false,
+        fraisInscriptionTypePaiement: etudiant.fraisInscriptionTypePaiement || 'Cash'
+      };
+    });
+
+    res.json({
+      success: true,
+      etudiants: etudiantsAvecPaiements,
+      anneeScolaire: annee,
+      moisScolaires: moisScolaires.map(ms => ms.nom)
     });
 
   } catch (err) {
-    console.error('Erreur création paiement:', err);
+    console.error('Erreur récupération étudiants mensuels:', err);
     res.status(500).json({ 
-      message: 'Erreur serveur lors de la création du paiement',
+      success: false,
+      message: 'Erreur serveur',
       error: err.message 
     });
   }
 });
-// routes/etudiants.js
-app.put('/api/etudiants/:id/prix', authInscripteur, async (req, res) => {
+
+// ============================================
+// 2. OBTENIR DÉTAILS COMPLETS D'UN ÉTUDIANT
+// ============================================
+app.get('/api/paiements-mensuels/etudiant/:id', authInscripteur, async (req, res) => {
   try {
     const { id } = req.params;
-    const { prixTotal } = req.body;
+    const { anneeScolaire } = req.query;
+    const annee = anneeScolaire || '2025/2026';
 
-    console.log('Mise à jour prix - Étudiant ID:', id, 'Prix:', prixTotal);
-    console.log('Inscripteur ID:', req.inscripteurId);
-
-    // Validation
-    if (prixTotal === undefined || prixTotal === null) {
-      return res.status(400).json({ 
-        message: 'Le prix total est requis' 
-      });
-    }
-
-    const prixNum = parseFloat(prixTotal);
-    if (isNaN(prixNum) || prixNum < 0) {
-      return res.status(400).json({ 
-        message: 'Prix total invalide. Doit être un nombre positif.' 
-      });
-    }
-
-    // VERSION SIMPLIFIÉE - Permet à tout inscripteur authentifié de modifier
-    const etudiant = await Etudiant.findByIdAndUpdate(
-      id,
-      { 
-        prixTotal: prixNum,
-        // Toujours réinitialiser le statut paye quand on change le prix
-        paye: false,
-        dateReglement: null
-      },
-      { new: true, runValidators: true }
-    ).select('nomComplet prixTotal niveau cours telephoneEtudiant paye');
-
+    // Récupérer l'étudiant avec tous les détails
+    const etudiant = await Etudiant.findById(id).lean();
     if (!etudiant) {
-      console.log('Étudiant non trouvé avec ID:', id);
       return res.status(404).json({ 
+        success: false,
         message: 'Étudiant non trouvé' 
       });
     }
 
-    console.log('Prix mis à jour avec succès pour:', etudiant.nomComplet);
+    // Récupérer tous les paiements de cet étudiant
+    const paiementsMensuels = await Payment.getPaiementsParMois(id, annee);
+    const paiementsFraisInscription = await Payment.getFraisInscription(id, annee);
+    
+    // Récupérer l'historique complet des paiements
+    const historiqueComplet = await Payment.find({
+      etudiant: id,
+      anneeScolaire: annee
+    })
+    .sort({ createdAt: -1 })
+    .populate('creeParInscripteur', 'nom prenom')
+    .populate('creeParAdmin', 'nom prenom')
+    .lean();
+
+    // Organiser les mois scolaires
+    const moisScolaires = [
+      { mois: '2025-09', nom: 'Septembre', index: 0 },
+      { mois: '2025-10', nom: 'Octobre', index: 1 },
+      { mois: '2025-11', nom: 'Novembre', index: 2 },
+      { mois: '2025-12', nom: 'Décembre', index: 3 },
+      { mois: '2026-01', nom: 'Janvier', index: 4 },
+      { mois: '2026-02', nom: 'Février', index: 5 },
+      { mois: '2026-03', nom: 'Mars', index: 6 },
+      { mois: '2026-04', nom: 'Avril', index: 7 },
+      { mois: '2026-05', nom: 'Mai', index: 8 },
+      { mois: '2026-06', nom: 'Juin', index: 9 }
+    ];
+
+    const mois = moisScolaires.map(ms => {
+      const paiementMois = paiementsMensuels.find(p => p._id === ms.mois);
+      
+      const montantDu = etudiant.mensualite || 0;
+      const montantPaye = paiementMois?.montantPaye || 0;
+      const montantRestant = paiementMois?.montantRestant || montantDu;
+      
+      return {
+        ...ms,
+        montantDu,
+        montantPaye,
+        montantRestant,
+        payeComplet: paiementMois?.payeComplet || false,
+        statut: montantPaye >= montantDu ? 'Payé' : montantPaye > 0 ? 'Partiel' : 'Non payé',
+        paiements: historiqueComplet.filter(p => 
+          p.moisConcernes?.some(mc => mc.mois === ms.mois)
+        ).map(p => ({
+          _id: p._id,
+          montant: p.moisConcernes.find(mc => mc.mois === ms.mois)?.montantPaye || 0,
+          date: p.createdAt,
+          typePaiement: p.typePaiement,
+          numeroCheque: p.numeroCheque,
+          statutCheque: p.statutCheque,
+          note: p.note
+        }))
+      };
+    });
+
+    // Calculer les totaux
+    const totalDu = mois.reduce((sum, m) => sum + m.montantDu, 0);
+    const totalPaye = mois.reduce((sum, m) => sum + m.montantPaye, 0);
+    const totalRestant = totalDu - totalPaye;
+
+    // Statistiques des frais d'inscription
+    const fraisInscriptionRestant = Math.max(
+      0, 
+      (etudiant.fraisInscription || 0) - (etudiant.fraisInscriptionMontantPaye || 0)
+    );
 
     res.json({
-      message: 'Prix total mis à jour avec succès',
-      etudiant
+      success: true,
+      etudiant: {
+        ...etudiant,
+        mois,
+        totalDu,
+        totalPaye,
+        totalRestant,
+        fraisInscription: etudiant.fraisInscription || 0,
+        fraisInscriptionMontantPaye: etudiant.fraisInscriptionMontantPaye || 0,
+        fraisInscriptionRestant,
+        fraisInscriptionPaye: etudiant.fraisInscriptionPaye || false,
+        fraisInscriptionTypePaiement: etudiant.fraisInscriptionTypePaiement || 'Cash'
+      },
+      historiqueComplet,
+      paiementsFraisInscription,
+      statistiques: await Payment.getStatistiquesEtudiant(id, annee)
     });
 
   } catch (err) {
-    console.error('Erreur mise à jour prix:', err);
-    
-    if (err.name === 'CastError') {
-      return res.status(400).json({ message: 'ID étudiant invalide' });
-    }
-    
+    console.error('Erreur détails étudiant:', err);
     res.status(500).json({ 
-      message: 'Erreur serveur lors de la mise à jour',
+      success: false,
+      message: 'Erreur serveur',
       error: err.message 
     });
   }
 });
-app.get('/api/payments', authInscripteur, async (req, res) => {
+
+// ============================================
+// 3. AJOUTER UN PAIEMENT MENSUEL
+// ============================================
+app.post('/api/paiements-mensuels/ajouter', authInscripteur, async (req, res) => {
   try {
-    const payments = await Payment.find({ 
-      creeParInscripteur: req.inscripteurId 
-    })
-    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau prixTotal') // Populate l'étudiant
-    .sort({ createdAt: -1 });
-    
-    res.json(payments);
-  } catch (err) {
-    console.error('Erreur récupération paiements:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-// 3. OBTENIR LES PAIEMENTS D'UN ÉTUDIANT (GET)
-app.get('/api/payments/etudiant/:etudiantId', authInscripteur, async (req, res) => {
-  try {
-    const { etudiantId } = req.params;
-    
-    // CORRECTION: Chercher par 'etudiant' au lieu de 'etudiantId'
-    const payments = await Payment.find({ 
-      etudiant: etudiantId,  // <-- Changé ici
-      creeParInscripteur: req.inscripteurId 
-    })
-    .populate('etudiant', 'nomComplet telephoneEtudiant cours niveau prixTotal')
-    .sort({ createdAt: -1 })  // <-- Changé de moisDebut à createdAt
-    .lean();
-    
-    // Calculer les statistiques
-    const stats = await Payment.aggregate([
-      { 
-        $match: { 
-          etudiant: new mongoose.Types.ObjectId(etudiantId),  // <-- Changé ici aussi
-          creeParInscripteur: new mongoose.Types.ObjectId(req.inscripteurId)
-        } 
-      },
-      {
-        $group: {
-          _id: null,
-          totalAPayer: { $sum: '$montantTotal' },
-          totalPaye: { $sum: '$montantPaye' },
-          totalRestant: { $sum: '$montantRestant' },
-          nombrePaiements: { $sum: 1 },
-          dernierPaiement: { $max: '$createdAt' }
-        }
-      }
-    ]);
+    const {
+      etudiantId,
+      montantPaye,
+      typePaiement,
+      moisIndex,
+      note,
+      anneeScolaire,
+      numeroCheque,
+      banque,
+      dateEcheance
+    } = req.body;
 
-    res.json({
-      payments: payments,
-      stats: stats[0] || {
-        totalAPayer: 0,
-        totalPaye: 0,
-        totalRestant: 0,
-        nombrePaiements: 0,
-        dernierPaiement: null
-      }
-    });
-  } catch (err) {
-    console.error('Erreur historique paiements:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// 4. OBTENIR LES STATISTIQUES PAR ÉTUDIANT (GET)
-app.get('/api/payments/stats/:etudiantId', authInscripteur, async (req, res) => {
-  try {
-    const { etudiantId } = req.params;
-    
-    const stats = await Payment.aggregate([
-      { 
-        $match: { 
-          etudiantId,
-          creeParInscripteur: req.inscripteurId 
-        } 
-      },
-      {
-        $group: {
-          _id: null,
-          totalAPayer: { $sum: '$montantTotal' },
-          totalPaye: { $sum: '$montantPaye' },
-          totalRestant: { $sum: '$montantRestant' },
-          nombrePaiements: { $sum: 1 },
-          moyennePaiement: { $avg: '$montantPaye' },
-          premierPaiement: { $min: '$createdAt' },
-          dernierPaiement: { $max: '$createdAt' }
-        }
-      }
-    ]);
-
-    const result = stats[0] || {
-      totalAPayer: 0,
-      totalPaye: 0,
-      totalRestant: 0,
-      nombrePaiements: 0,
-      moyennePaiement: 0,
-      premierPaiement: null,
-      dernierPaiement: null
-    };
-
-    // Calculer le pourcentage payé
-    result.pourcentagePaye = result.totalAPayer > 0 
-      ? Math.round((result.totalPaye / result.totalAPayer) * 100) 
-      : 0;
-
-    res.json(result);
-  } catch (err) {
-    console.error('Erreur statistiques étudiant:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// 5. OBTENIR LES CHÈQUES QUI EXPIRENT (GET)
-app.get('/api/payments/cheques/expiring', authInscripteur, async (req, res) => {
-  try {
-    const jours = parseInt(req.query.jours) || 7;
-    
-    const maintenant = new Date();
-    const limite = new Date();
-    limite.setDate(limite.getDate() + jours);
-    
-    const cheques = await Payment.find({
-      creeParInscripteur: req.inscripteurId,
-      typePaiement: 'Chèque',
-      statutCheque: 'En attente',
-      dateEcheance: {
-        $gte: maintenant,
-        $lte: limite
-      }
-    })
-    .sort({ dateEcheance: 1 })
-    .lean();
-    
-    res.json(cheques);
-  } catch (err) {
-    console.error('Erreur chèques expirant:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// 6. OBTENIR LES CHÈQUES EXPIRÉS (GET)
-app.get('/api/payments/cheques/expired', authInscripteur, async (req, res) => {
-  try {
-    const cheques = await Payment.find({
-      creeParInscripteur: req.inscripteurId,
-      typePaiement: 'Chèque',
-      statutCheque: 'En attente',
-      dateEcheance: { $lt: new Date() }
-    })
-    .sort({ dateEcheance: 1 })
-    .lean();
-    
-    res.json(cheques);
-  } catch (err) {
-    console.error('Erreur chèques expirés:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// 7. METTRE À JOUR STATUT CHÈQUE (PATCH)
-app.patch('/api/payments/:id/cheque-status', authInscripteur, async (req, res) => {
-  try {
-    const { statutCheque } = req.body;
-    const { id } = req.params;
-
-    if (!['En attente', 'Encaissé', 'Rejeté', 'Expiré'].includes(statutCheque)) {
-      return res.status(400).json({ message: 'Statut invalide' });
-    }
-
-    const payment = await Payment.findOneAndUpdate(
-      { 
-        _id: id, 
-        creeParInscripteur: req.inscripteurId,
-        typePaiement: 'Chèque'
-      },
-      { statutCheque },
-      { new: true, runValidators: true }
-    );
-
-    if (!payment) {
-      return res.status(404).json({ 
-        message: 'Chèque non trouvé ou vous n\'avez pas la permission' 
+    // Validation
+    if (!etudiantId || !montantPaye || !typePaiement || moisIndex === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Champs obligatoires manquants'
       });
     }
 
-    res.json({
-      message: 'Statut mis à jour avec succès',
+    // Vérifier que l'étudiant existe
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Étudiant non trouvé'
+      });
+    }
+
+    // Mapper l'index du mois au format YYYY-MM
+    const moisMap = {
+      0: '2025-09', 1: '2025-10', 2: '2025-11', 3: '2025-12',
+      4: '2026-01', 5: '2026-02', 6: '2026-03', 7: '2026-04',
+      8: '2026-05', 9: '2026-06'
+    };
+
+    const nomMoisMap = {
+      0: 'Septembre 2025', 1: 'Octobre 2025', 2: 'Novembre 2025', 3: 'Décembre 2025',
+      4: 'Janvier 2026', 5: 'Février 2026', 6: 'Mars 2026', 7: 'Avril 2026',
+      8: 'Mai 2026', 9: 'Juin 2026'
+    };
+
+    const moisCode = moisMap[moisIndex];
+    const nomMois = nomMoisMap[moisIndex];
+    
+    if (!moisCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mois invalide'
+      });
+    }
+
+    const montantDu = etudiant.mensualite || 0;
+    const montantPayeNum = parseFloat(montantPaye);
+    
+    if (montantPayeNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le montant payé doit être supérieur à 0'
+      });
+    }
+
+    // Vérifier si un paiement existe déjà pour ce mois
+    const paiementExistant = await Payment.findOne({
+      etudiant: etudiantId,
+      anneeScolaire: anneeScolaire || '2025/2026',
+      type: 'mensuel',
+      'moisConcernes.mois': moisCode
+    });
+
+    let payment;
+
+    if (paiementExistant) {
+      // Mettre à jour le paiement existant
+      await paiementExistant.ajouterPaiementMois(
+        paiementExistant.moisConcernes.findIndex(mc => mc.mois === moisCode),
+        montantPayeNum
+      );
+      payment = paiementExistant;
+    } else {
+      // Créer un nouveau paiement
+      const moisDebut = new Date(moisCode + '-01');
+      const montantRestant = Math.max(0, montantDu - montantPayeNum);
+
+      const paymentData = {
+        etudiant: etudiantId,
+        montantTotal: montantDu,
+        montantPaye: montantPayeNum,
+        montantRestant: montantRestant,
+        typePaiement,
+        type: 'mensuel',
+        moisConcernes: [{
+          mois: moisCode,
+          nomMois: nomMois,
+          montantDu: montantDu,
+          montantPaye: montantPayeNum,
+          montantRestant: montantRestant,
+          payeComplet: montantRestant === 0
+        }],
+        moisDebut: moisDebut,
+        nombreMois: 1,
+        cours: etudiant.cours,
+        note: note || `Paiement mensuel pour ${nomMois}`,
+        anneeScolaire: anneeScolaire || '2025/2026',
+        creeParInscripteur: req.inscripteurId
+      };
+
+      // Ajouter infos chèque si nécessaire
+      if (typePaiement === 'Chèque') {
+        paymentData.numeroCheque = numeroCheque;
+        paymentData.banque = banque || '';
+        paymentData.dateEcheance = dateEcheance ? new Date(dateEcheance) : null;
+        paymentData.statutCheque = 'En attente';
+      }
+
+      payment = await Payment.create(paymentData);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Paiement ajouté avec succès',
       payment
     });
+
+  } catch (err) {
+    console.error('Erreur ajout paiement:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+
+// ============================================
+// 4. METTRE À JOUR LA MENSUALITÉ D'UN ÉTUDIANT
+// ============================================
+app.put('/api/paiements-mensuels/etudiant/:id/mensualite', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mensualite } = req.body;
+
+    if (mensualite === undefined || mensualite < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mensualité invalide'
+      });
+    }
+
+    const etudiant = await Etudiant.findById(id);
+    if (!etudiant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Étudiant non trouvé'
+      });
+    }
+
+    // Mettre à jour la mensualité
+    etudiant.mensualite = parseFloat(mensualite);
+    await etudiant.save();
+
+    // Mettre à jour les paiements existants pour les mois non payés
+    const paiements = await Payment.find({
+      etudiant: id,
+      type: 'mensuel',
+      anneeScolaire: etudiant.anneeScolaire
+    });
+
+    for (const paiement of paiements) {
+      for (const mois of paiement.moisConcernes) {
+        if (mois.montantRestant > 0) {
+          mois.montantDu = parseFloat(mensualite);
+          mois.montantRestant = Math.max(0, mois.montantDu - mois.montantPaye);
+          mois.payeComplet = mois.montantRestant === 0;
+        }
+      }
+      
+      // Recalculer les totaux
+      paiement.montantTotal = paiement.moisConcernes.reduce((sum, m) => sum + m.montantDu, 0);
+      paiement.montantPaye = paiement.moisConcernes.reduce((sum, m) => sum + m.montantPaye, 0);
+      paiement.montantRestant = paiement.moisConcernes.reduce((sum, m) => sum + m.montantRestant, 0);
+      
+      await paiement.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Mensualité mise à jour',
+      etudiant,
+      paiementsMisesAJour: paiements.length
+    });
+
+  } catch (err) {
+    console.error('Erreur mise à jour mensualité:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+
+// Dans app.js - MODIFIER CETTE ROUTE
+// ============================================
+// 5. GÉRER LES FRAIS D'INSCRIPTION
+// ============================================
+app.put('/api/etudiants/:id/frais-inscription', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      montantTotal,
+      montantPaye,
+      paye,
+      typePaiement
+    } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID étudiant requis'
+      });
+    }
+
+    const etudiant = await Etudiant.findById(id);
+    if (!etudiant) {
+      return res.status(404).json({
+        success: false,
+        message: 'Étudiant non trouvé'
+      });
+    }
+
+    // Mettre à jour les frais d'inscription
+    await etudiant.updateFraisInscription({
+      montantTotal: parseFloat(montantTotal || etudiant.fraisInscription),
+      montantPaye: parseFloat(montantPaye || etudiant.fraisInscriptionMontantPaye),
+      paye: paye || etudiant.fraisInscriptionPaye,
+      typePaiement: typePaiement || etudiant.fraisInscriptionTypePaiement
+    });
+
+    // Si un paiement a été fait, créer un enregistrement
+    const montantPayeNum = parseFloat(montantPaye || 0);
+    if (montantPayeNum > 0) {
+      // Créer une date de début pour aujourd'hui
+      const moisDebut = new Date();
+      
+      const paymentData = {
+        etudiant: id,
+        montantTotal: etudiant.fraisInscription,
+        montantPaye: montantPayeNum,
+        montantRestant: Math.max(0, etudiant.fraisInscription - montantPayeNum),
+        typePaiement: typePaiement || 'Cash',
+        type: 'frais_inscription',
+        note: `Frais d'inscription - ${etudiant.nomComplet}`,
+        anneeScolaire: etudiant.anneeScolaire,
+        creeParInscripteur: req.inscripteurId,
+        // Ajouter les champs requis pour le modèle Payment
+        nombreMois: 1,
+        moisDebut: moisDebut,
+        // Créer un tableau moisConcernes vide pour les frais d'inscription
+        moisConcernes: [{
+          mois: moisDebut.toISOString().slice(0, 7), // Format YYYY-MM
+          nomMois: `Frais inscription ${moisDebut.getFullYear()}`,
+          montantDu: etudiant.fraisInscription,
+          montantPaye: montantPayeNum,
+          montantRestant: Math.max(0, etudiant.fraisInscription - montantPayeNum),
+          payeComplet: (montantPayeNum >= etudiant.fraisInscription)
+        }]
+      };
+
+      await Payment.create(paymentData);
+    }
+
+    res.json({
+      success: true,
+      message: 'Frais d\'inscription mis à jour',
+      etudiant,
+      fraisInscriptionRestant: etudiant.fraisInscriptionRestant
+    });
+
+  } catch (err) {
+    console.error('Erreur frais inscription:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+// ============================================
+// 6. OBTENIR STATISTIQUES GLOBALES
+// ============================================
+app.get('/api/paiements-mensuels/statistiques', authInscripteur, async (req, res) => {
+  try {
+    const { anneeScolaire } = req.query;
+    const annee = anneeScolaire || '2025/2026';
+
+    // Utiliser la méthode statique du modèle
+    const stats = await Etudiant.getStatistiquesPaiement();
+    
+    // Obtenir les statistiques supplémentaires
+    const etudiants = await Etudiant.findVisible({ anneeScolaire: annee });
+    const paiements = await Payment.find({ 
+      anneeScolaire: annee,
+      type: 'mensuel' 
+    });
+
+    // Calculer les totaux mensuels
+    const totalMensualitesDues = etudiants.reduce((sum, e) => sum + ((e.mensualite || 0) * 10), 0);
+    const totalPaye = paiements.reduce((sum, p) => sum + p.montantPaye, 0);
+    const totalRestant = totalMensualitesDues - totalPaye;
+
+    // Statistiques par mois
+    const moisStats = {};
+    for (let i = 0; i < 10; i++) {
+      const moisPaye = paiements.reduce((sum, p) => {
+        const mois = p.moisConcernes?.find(mc => {
+          const moisIndex = parseInt(mc.mois.split('-')[1]) - 9;
+          return moisIndex === i;
+        });
+        return sum + (mois?.montantPaye || 0);
+      }, 0);
+      
+      const moisDu = etudiants.reduce((sum, e) => sum + (e.mensualite || 0), 0);
+      
+      moisStats[i] = {
+        du: moisDu,
+        paye: moisPaye,
+        reste: Math.max(0, moisDu - moisPaye),
+        pourcentage: moisDu > 0 ? Math.round((moisPaye / moisDu) * 100) : 0
+      };
+    }
+
+    res.json({
+      success: true,
+      statistiques: stats[0] || {},
+      totauxMensuels: {
+        totalMensualitesDues,
+        totalPaye,
+        totalRestant,
+        pourcentagePaye: totalMensualitesDues > 0 
+          ? Math.round((totalPaye / totalMensualitesDues) * 100) 
+          : 0
+      },
+      moisStats,
+      nombreEtudiants: etudiants.length,
+      nombrePaiements: paiements.length
+    });
+
+  } catch (err) {
+    console.error('Erreur statistiques:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+
+// ============================================
+// 7. SUPPRIMER UN PAIEMENT
+// ============================================
+app.delete('/api/paiements-mensuels/:id', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Paiement non trouvé'
+      });
+    }
+
+    // Vérifier les permissions (seulement créateur ou admin)
+    if (payment.creeParInscripteur?.toString() !== req.inscripteurId && 
+        !payment.creeParAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Non autorisé à supprimer ce paiement'
+      });
+    }
+
+    await Payment.findByIdAndDelete(id);
+
+    res.json({
+      success: true,
+      message: 'Paiement supprimé avec succès'
+    });
+
+  } catch (err) {
+    console.error('Erreur suppression:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+
+// ============================================
+// 8. OBTENIR NOTIFICATIONS DE CHÈQUES
+// ============================================
+app.get('/api/paiements-mensuels/notifications/cheques', authInscripteur, async (req, res) => {
+  try {
+    const { type = 'expiring', jours = 7 } = req.query;
+
+    let cheques;
+    
+    if (type === 'expired') {
+      cheques = await Payment.getChequesExpires();
+    } else {
+      cheques = await Payment.getChequesExpiresSoon(parseInt(jours));
+    }
+
+    // Compter par statut
+    const stats = {
+      total: cheques.length,
+      enAttente: cheques.filter(c => c.statutCheque === 'En attente').length,
+      encaisses: cheques.filter(c => c.statutCheque === 'Encaissé').length,
+      rejetes: cheques.filter(c => c.statutCheque === 'Rejeté').length,
+      expires: cheques.filter(c => c.statutCheque === 'Expiré').length
+    };
+
+    res.json({
+      success: true,
+      type,
+      cheques,
+      stats,
+      jours: type === 'expiring' ? jours : null
+    });
+
+  } catch (err) {
+    console.error('Erreur notifications chèques:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
+  }
+});
+
+// ============================================
+// 9. METTRE À JOUR STATUT D'UN CHÈQUE
+// ============================================
+app.patch('/api/paiements-mensuels/cheques/:id/statut', authInscripteur, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { statut } = req.body;
+
+    const statutsValides = ['En attente', 'Encaissé', 'Rejeté', 'Expiré'];
+    if (!statutsValides.includes(statut)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Statut invalide'
+      });
+    }
+
+    const payment = await Payment.findById(id);
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Paiement non trouvé'
+      });
+    }
+
+    if (payment.typePaiement !== 'Chèque') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ce n\'est pas un paiement par chèque'
+      });
+    }
+
+    await payment.updateStatutCheque(statut);
+
+    res.json({
+      success: true,
+      message: `Statut du chèque mis à jour: ${statut}`,
+      payment
+    });
+
   } catch (err) {
     console.error('Erreur mise à jour statut chèque:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
-
-// 8. SUPPRIMER UN PAIEMENT (DELETE)
-app.delete('/api/payments/:id', authInscripteur, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const payment = await Payment.findOneAndDelete({
-      _id: id,
-      creeParInscripteur: req.inscripteurId
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
     });
-
-    if (!payment) {
-      return res.status(404).json({ 
-        message: 'Paiement non trouvé ou non autorisé' 
-      });
-    }
-
-    res.json({ 
-      message: 'Paiement supprimé avec succès',
-      paymentId: id
-    });
-  } catch (err) {
-    console.error('Erreur suppression paiement:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
   }
 });
 
-// 9. OBTENIR LES STATISTIQUES GÉNÉRALES (GET)
-app.get('/api/payments/stats/general', authInscripteur, async (req, res) => {
+// ============================================
+// 10. GÉNÉRER RAPPORT PDF
+// ============================================
+app.get('/api/paiements-mensuels/rapport', authInscripteur, async (req, res) => {
   try {
-    const stats = await Payment.aggregate([
-      { $match: { creeParInscripteur: req.inscripteurId } },
-      {
-        $group: {
-          _id: null,
-          totalPaiements: { $sum: 1 },
-          totalMontant: { $sum: '$montantTotal' },
-          totalPaye: { $sum: '$montantPaye' },
-          totalRestant: { $sum: '$montantRestant' },
-          nombreEtudiants: { $addToSet: '$etudiantId' },
-          nombreChequesEnAttente: {
-            $sum: {
-              $cond: [
-                { $and: [
-                  { $eq: ['$typePaiement', 'Chèque'] },
-                  { $eq: ['$statutCheque', 'En attente'] }
-                ]},
-                1,
-                0
-              ]
-            }
-          }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          totalPaiements: 1,
-          totalMontant: 1,
-          totalPaye: 1,
-          totalRestant: 1,
-          nombreEtudiants: { $size: '$nombreEtudiants' },
-          nombreChequesEnAttente: 1,
-          pourcentagePaye: {
-            $cond: [
-              { $eq: ['$totalMontant', 0] },
-              0,
-              { $multiply: [{ $divide: ['$totalPaye', '$totalMontant'] }, 100] }
-            ]
-          }
-        }
-      }
-    ]);
+    const { type, mois, anneeScolaire } = req.query;
+    const annee = anneeScolaire || '2025/2026';
 
-    const result = stats[0] || {
-      totalPaiements: 0,
-      totalMontant: 0,
-      totalPaye: 0,
-      totalRestant: 0,
-      nombreEtudiants: 0,
-      nombreChequesEnAttente: 0,
-      pourcentagePaye: 0
-    };
+    const etudiants = await Etudiant.findVisible({ anneeScolaire: annee }).lean();
+    
+    let rapport = [];
+    const moisNoms = ['Septembre', 'Octobre', 'Novembre', 'Décembre', 
+                     'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin'];
 
-    res.json(result);
-  } catch (err) {
-    console.error('Erreur statistiques générales:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+    if (type === 'mensuel' && mois !== undefined) {
+      const moisIndex = parseInt(mois);
+      
+      rapport = await Promise.all(
+        etudiants.map(async (etudiant) => {
+          const paiements = await Payment.find({
+            etudiant: etudiant._id,
+            anneeScolaire: annee,
+            type: 'mensuel'
+          });
 
-// 10. RECHERCHER DES PAIEMENTS (GET)
-app.get('/api/payments/search', authInscripteur, async (req, res) => {
-  try {
-    const { query, type, statut, dateDebut, dateFin } = req.query;
-    
-    const filter = { creeParInscripteur: req.inscripteurId };
-    
-    // Recherche par nom ou téléphone
-    if (query) {
-      filter.$or = [
-        { etudiantNom: { $regex: query, $options: 'i' } },
-        { etudiantTelephone: { $regex: query, $options: 'i' } },
-        { numeroCheque: { $regex: query, $options: 'i' } }
-      ];
-    }
-    
-    // Filtre par type de paiement
-    if (type && ['Cash', 'Chèque', 'Virement', 'En ligne'].includes(type)) {
-      filter.typePaiement = type;
-    }
-    
-    // Filtre par statut chèque
-    if (statut && ['En attente', 'Encaissé', 'Rejeté', 'Expiré'].includes(statut)) {
-      filter.statutCheque = statut;
-    }
-    
-    // Filtre par date
-    if (dateDebut || dateFin) {
-      filter.createdAt = {};
-      if (dateDebut) filter.createdAt.$gte = new Date(dateDebut);
-      if (dateFin) filter.createdAt.$lte = new Date(dateFin);
-    }
-    
-    const payments = await Payment.find(filter)
-      .sort({ createdAt: -1 })
-      .lean();
-    
-    res.json(payments);
-  } catch (err) {
-    console.error('Erreur recherche paiements:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+          let montantPayeCeMois = 0;
+          
+          paiements.forEach(paiement => {
+            paiement.moisConcernes?.forEach(mc => {
+              const mcMoisIndex = parseInt(mc.mois.split('-')[1]) - 9;
+              if (mcMoisIndex === moisIndex) {
+                montantPayeCeMois += mc.montantPaye;
+              }
+            });
+          });
 
-// 11. OBTENIR LES PAIEMENTS PAR MOIS (STATISTIQUES MENSUELLES)
-app.get('/api/payments/stats/mensuel', authInscripteur, async (req, res) => {
-  try {
-    const { annee } = req.query;
-    const anneeFiltre = annee || '2025';
-    
-    const stats = await Payment.aggregate([
-      { 
-        $match: { 
-          creeParInscripteur: req.inscripteurId,
-          createdAt: {
-            $gte: new Date(`${anneeFiltre}-01-01`),
-            $lte: new Date(`${anneeFiltre}-12-31`)
-          }
-        } 
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m", date: "$createdAt" }
-          },
-          nombrePaiements: { $sum: 1 },
-          totalPaye: { $sum: '$montantPaye' },
-          moyennePaiement: { $avg: '$montantPaye' }
-        }
-      },
-      { $sort: { '_id': 1 } },
-      {
-        $project: {
-          mois: '$_id',
-          nombrePaiements: 1,
-          totalPaye: 1,
-          moyennePaiement: { $round: ['$moyennePaiement', 2] },
-          _id: 0
-        }
-      }
-    ]);
-    
-    res.json(stats);
-  } catch (err) {
-    console.error('Erreur statistiques mensuelles:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
+          return {
+            nomComplet: etudiant.nomComplet,
+            cours: etudiant.cours?.join(', ') || etudiant.niveau || '—',
+            mensualite: etudiant.mensualite || 0,
+            montantPaye: montantPayeCeMois,
+            montantRestant: Math.max(0, (etudiant.mensualite || 0) - montantPayeCeMois),
+            statut: montantPayeCeMois >= (etudiant.mensualite || 0) ? 'Payé' : 
+                    montantPayeCeMois > 0 ? 'Partiel' : 'Non payé'
+          };
+        })
+      );
+    } else if (type === 'frais-inscription') {
+      rapport = etudiants.map(etudiant => ({
+        nomComplet: etudiant.nomComplet,
+        cours: etudiant.cours?.join(', ') || etudiant.niveau || '—',
+        fraisTotal: etudiant.fraisInscription || 0,
+        fraisPaye: etudiant.fraisInscriptionMontantPaye || 0,
+        fraisRestant: Math.max(0, (etudiant.fraisInscription || 0) - (etudiant.fraisInscriptionMontantPaye || 0)),
+        statut: etudiant.fraisInscriptionPaye ? 'Payé' : 'Non payé'
+      }));
+    }
 
-// 12. METTRE À JOUR UN PAIEMENT (PUT)
-app.put('/api/payments/:id', authInscripteur, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-    
-    // Supprimer les champs qui ne doivent pas être mis à jour
-    delete updateData._id;
-    delete updateData.createdAt;
-    delete updateData.creeParInscripteur;
-    
-    // Recalculer les montants si nécessaire
-    if (updateData.prixParMois || updateData.nombreMois) {
-      const existingPayment = await Payment.findById(id);
-      const prixParMois = updateData.prixParMois || existingPayment.prixParMois;
-      const nombreMois = updateData.nombreMois || existingPayment.nombreMois;
-      updateData.montantTotal = prixParMois * nombreMois;
-    }
-    
-    if (updateData.montantPaye) {
-      const montantTotal = updateData.montantTotal || (await Payment.findById(id)).montantTotal;
-      updateData.montantRestant = Math.max(0, montantTotal - updateData.montantPaye);
-    }
-    
-    const payment = await Payment.findOneAndUpdate(
-      { 
-        _id: id, 
-        creeParInscripteur: req.inscripteurId 
-      },
-      updateData,
-      { new: true, runValidators: true }
-    );
-    
-    if (!payment) {
-      return res.status(404).json({ 
-        message: 'Paiement non trouvé ou non autorisé' 
-      });
-    }
-    
     res.json({
-      message: 'Paiement mis à jour avec succès',
-      payment
+      success: true,
+      type,
+      mois: type === 'mensuel' ? moisNoms[mois] : null,
+      anneeScolaire: annee,
+      rapport,
+      totaux: {
+        totalDu: rapport.reduce((sum, r) => sum + (r.mensualite || r.fraisTotal || 0), 0),
+        totalPaye: rapport.reduce((sum, r) => sum + r.montantPaye || r.fraisPaye || 0, 0),
+        totalRestant: rapport.reduce((sum, r) => sum + r.montantRestant || r.fraisRestant || 0, 0),
+        nombreEtudiants: rapport.length
+      }
     });
-  } catch (err) {
-    console.error('Erreur mise à jour paiement:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
-  }
-});
 
-// 13. OBTENIR LES ÉTUDIANTS UNIQUES (pour le dropdown)
-app.get('/api/payments/etudiants-uniques', authInscripteur, async (req, res) => {
-  try {
-    const etudiants = await Payment.aggregate([
-      { $match: { creeParInscripteur: req.inscripteurId } },
-      {
-        $group: {
-          _id: {
-            id: '$etudiantId',
-            nom: '$etudiantNom'
-          },
-          derniereClasse: { $last: '$etudiantCours' },
-          dernierTelephone: { $last: '$etudiantTelephone' },
-          totalPaye: { $sum: '$montantPaye' },
-          dernierPaiement: { $max: '$createdAt' }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          etudiantId: '$_id.id',
-          etudiantNom: '$_id.nom',
-          etudiantCours: { $arrayElemAt: ['$derniereClasse', 0] },
-          etudiantTelephone: '$dernierTelephone',
-          totalPaye: 1,
-          dernierPaiement: 1
-        }
-      },
-      { $sort: { etudiantNom: 1 } }
-    ]);
-    
-    res.json(etudiants);
   } catch (err) {
-    console.error('Erreur étudiants uniques:', err);
-    res.status(500).json({ message: 'Erreur serveur' });
+    console.error('Erreur génération rapport:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur',
+      error: err.message
+    });
   }
 });
 
