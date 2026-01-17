@@ -134,11 +134,7 @@ const SidebarProf = ({ onLogout }) => {
     },
 
 
-    {
-      path: '/professeur/AjouterBulletin',
-      label: 'Ajouter Bulletin',
-      icon: FilePlus2
-    },
+
     
   {   path: '/professeur/profil',
       label: 'Mot de passe',

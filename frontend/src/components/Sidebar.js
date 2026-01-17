@@ -116,32 +116,14 @@ const Sidebar = ({ onLogout }) => {
     
 
 
-    {
-      path: '/admin/historique-etudiant',
-      label: 'Historique Étudiant',
-      icon: BookOpen
-    },
+ 
 
     {
       path: '/notification-absences',
       label: 'Notification Absences',
       icon: AlertTriangle
     },
-    {
-      path: '/ajouter-paiement',
-      label: 'Nouveau Paiement',
-      icon: Plus
-    },
-    {
-      path: '/liste-paiements',
-      label: 'Paiements',
-      icon: CreditCard
-    },
-    {
-      path: '/paiements-exp',
-      label: 'Paiements Expirés',
-      icon: AlertTriangle
-    },
+
     {
       path: '/admin/seances',
       label: 'Séances',
@@ -172,11 +154,7 @@ const Sidebar = ({ onLogout }) => {
       label: 'Rapports',
       icon: FileText
     },
-    {
-      path: '/admin/Bulletin',
-      label: 'Bulletin',
-      icon: FileText
-    },
+   
     {
       path: '/badge-generator',
       label: 'Badge Generator',
