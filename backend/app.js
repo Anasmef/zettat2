@@ -679,7 +679,50 @@ app.get('/api/etudiants/par-niveau/:niveau', authProfesseur, async (req, res) =>
   }
 });
 
-/// ⏸️ ROUTE MAINTENANCE - Afficher la page avec ON/OFF
+// ========== 🔓 CONFIGURATION CORS ==========
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',      // Pour développement local
+    'http://localhost:5000',      // Pour développement local
+    'https://kastler.ma',         // Ton domaine de production
+    'https://www.kastler.ma',     // Avec www
+  ],
+  credentials: true,              // Autoriser les cookies
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+
+// ========== Middleware standard ==========
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ========== 🛑 MIDDLEWARE DE MAINTENANCE - À PLACER TOUT AU DÉBUT ==========
+app.use((req, res, next) => {
+  // Autoriser UNIQUEMENT les routes de maintenance
+  if (req.path === '/api/maintenance' || 
+      req.path === '/api/maintenance/stop' || 
+      req.path === '/api/maintenance/resume' ||
+      req.path === '/maintenance') {
+    return next();
+  }
+
+  // Si maintenance active, bloquer TOUT LE MONDE
+  if (global.maintenanceMode) {
+    return res.status(503).json({
+      message: '🔧 Le projet est en maintenance',
+      remainingTime: global.maintenanceTimer,
+      status: 'MAINTENANCE_MODE'
+    });
+  }
+
+  next();
+});
+
+// ========== ROUTES DE MAINTENANCE ==========
+
 app.get('/api/maintenance', (req, res) => {
   res.json({
     status: global.maintenanceMode || false,
@@ -687,28 +730,25 @@ app.get('/api/maintenance', (req, res) => {
   });
 });
 
-// 🔴 Route pour ACTIVER la maintenance (OFF)
 app.post('/api/maintenance/stop', (req, res) => {
   try {
-    const { duration } = req.body; // duration en minutes (1, 2, 3...)
+    const { duration } = req.body;
     
-    if (!duration || duration < 1) {
-      return res.status(400).json({ message: 'Durée invalide' });
+    if (!duration || duration < 1 || duration > 1440) {
+      return res.status(400).json({ message: 'Durée invalide (1-1440 minutes)' });
     }
 
     console.log(`🔴 Maintenance activée - ${duration} minute(s)`);
 
-    // Activer la maintenance
     global.maintenanceMode = true;
     global.maintenanceStartTime = Date.now();
-    global.maintenanceDuration = duration * 60 * 1000; // Convertir en millisecondes
+    global.maintenanceDuration = duration * 60 * 1000;
     global.maintenanceTimer = duration;
 
-    // Démarrer le décompte
     startMaintenanceTimer(duration);
 
     res.json({
-      message: `Maintenance activée pour ${duration} minute(s)`,
+      message: `✅ Maintenance activée pour ${duration} minute(s)`,
       status: 'OFF',
       remainingTime: duration
     });
@@ -718,25 +758,22 @@ app.post('/api/maintenance/stop', (req, res) => {
   }
 });
 
-// 🟢 Route pour DÉSACTIVER la maintenance (ON)
 app.post('/api/maintenance/resume', (req, res) => {
   try {
     console.log('🟢 Projet relancé');
 
-    // Arrêter la maintenance
     global.maintenanceMode = false;
     global.maintenanceTimer = null;
     global.maintenanceStartTime = null;
     global.maintenanceDuration = null;
 
-    // Annuler le timer s'il existe
     if (global.maintenanceInterval) {
       clearInterval(global.maintenanceInterval);
       global.maintenanceInterval = null;
     }
 
     res.json({
-      message: 'Projet relancé avec succès',
+      message: '✅ Projet relancé avec succès',
       status: 'ON',
       remainingTime: null
     });
@@ -746,7 +783,6 @@ app.post('/api/maintenance/resume', (req, res) => {
   }
 });
 
-// Fonction pour gérer le décompte
 function startMaintenanceTimer(durationMinutes) {
   if (global.maintenanceInterval) {
     clearInterval(global.maintenanceInterval);
@@ -760,41 +796,19 @@ function startMaintenanceTimer(durationMinutes) {
 
     console.log(`⏳ Maintenance: ${global.maintenanceTimer} minute(s) restante(s)`);
 
-    // Quand le temps est écoulé
     if (remainingSeconds <= 0) {
       clearInterval(global.maintenanceInterval);
       global.maintenanceMode = false;
       global.maintenanceTimer = null;
       global.maintenanceInterval = null;
-      console.log('✅ Maintenance terminée, projet relancé automatiquement');
+      console.log('✅ Maintenance terminée automatiquement');
     }
   }, 1000);
 }
 
-// 🛑 Middleware pour bloquer TOUTES les requêtes pendant la maintenance
-// À placer AVANT vos autres routes
-app.use((req, res, next) => {
-  // Autoriser UNIQUEMENT les routes de maintenance
-  if (req.path === '/api/maintenance' || 
-      req.path === '/api/maintenance/stop' || 
-      req.path === '/api/maintenance/resume' ||
-      req.path === '/maintenance') {
-    return next();
-  }
+console.log('✅ Middleware Maintenance + CORS configuré');
 
-  // Si maintenance active, bloquer TOUT
-  if (global.maintenanceMode) {
-    return res.status(503).json({
-      message: '🔧 Le projet est en maintenance',
-      remainingTime: global.maintenanceTimer,
-      status: 'MAINTENANCE_MODE'
-    });
-  }
-
-  next();
-});
-
-console.log('✅ Routes Maintenance ajoutées (Sans authentification)');
+// 🔹 RÉCUPÉRER LA MATIÈRE DU PROFESSEUR
 app.get('/api/professeur/ma-matiere', authProfesseur, async (req, res) => {
   try {
     const professeur = await Professeur.findById(req.professeurId).select('matiere cours');

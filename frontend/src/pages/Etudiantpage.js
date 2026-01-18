@@ -7,7 +7,10 @@ export default function MaintenancePage() {
   const [customMinutes, setCustomMinutes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const API_URL = 'http://localhost:5000/api';
+  // Adapter l'URL selon l'environnement
+  const API_URL = process.env.NODE_ENV === 'production' 
+    ? 'https://kastler.ma/api'  // Production
+    : '/api'; // Développement
   const durations = [1, 2, 3, 4, 5, 6, 10, 30];
 
   useEffect(() => {
