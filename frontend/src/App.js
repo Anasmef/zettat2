@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import ListeEtudiants from './pages/ListeEtudiants';
 
+import Etudiantpage from './pages/Etudiantpage';
 import NotificationAbsences from './pages/NotificationAbsences';
 import ListeCours from './pages/ListeCours';
 import AjouterPaiement from './pages/AjouterPaiement';
@@ -451,6 +452,7 @@ function AppContent() {
 <Route path="/etudiant/:id" element={<EtudiantPublic />} />
 
         <Route path="/dashboard/manager" element={<DashboardPaiementManager />} />
+        <Route path="/etudiants/pageprofil" element={<Etudiantpage />} />
 
         <Route path="/admin/inscripteurs" element={<InscripteurDashboard />} />
       </Routes>
