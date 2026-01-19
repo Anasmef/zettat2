@@ -7858,7 +7858,244 @@ app.put('/api/presences/:id', authProfesseur, async (req, res) => {
 const Notification = require('./models/Notification');
 const whatsappService = require('./services/whatsappService');
 const notificationQueue = require('./services/notificationQueue');
+ // ✅ API PRESENCES - النسخة الصحيحة
 
+app.post('/api/presences', authProfesseur, async (req, res) => {
+  try {
+    const { 
+      etudiant, 
+      cours, 
+      dateSession, 
+      present,
+      retardMinutes,
+      remarque, 
+      heure, 
+      periode 
+    } = req.body;
+
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`📋 REQUÊTE PRÉSENCE REÇUE`);
+    console.log(`   Étudiant: ${etudiant}`);
+    console.log(`   Cours: ${cours}`);
+    console.log(`   Date: ${dateSession}`);
+    console.log(`   Heure: ${heure}`);
+    console.log(`   Période: ${periode}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // Vérifier que ce professeur enseigne ce cours
+    const prof = await Professeur.findById(req.professeurId);
+    if (!prof.cours.includes(cours)) {
+      return res.status(403).json({ 
+        message: 'Vous ne pouvez pas marquer la présence pour ce cours.' 
+      });
+    }
+
+    // Récupérer les données de l'étudiant
+    const etudiantData = await Etudiant.findById(etudiant);
+    if (!etudiantData) {
+      return res.status(404).json({ message: 'Étudiant non trouvé.' });
+    }
+
+    console.log(`✅ Étudiant trouvé: ${etudiantData.nomComplet}`);
+    console.log(`   Père: ${etudiantData.telephonePere || '❌ N/A'}`);
+    console.log(`   Mère: ${etudiantData.telephoneMere || '❌ N/A'}`);
+    console.log(`   Tél: ${etudiantData.telephoneEtudiant || '❌ N/A'}\n`);
+
+    // ✅ CHERCHER UNE PRÉSENCE EXISTANTE (MÊME DATE/HEURE/PÉRIODE)
+    const existingPresence = await Presence.findOne({
+      etudiant: etudiant,
+      cours: cours,
+      dateSession: new Date(dateSession),
+      heure: heure,
+      periode: periode,
+      creePar: req.professeurId
+    });
+
+    let finalPresent = present || false;
+    let finalRetardMinutes = 0;
+    let notificationQueued = false;
+    let queueInfo = null;
+    let isUpdate = false;
+
+    // ========================================
+    // 🟡 CAS 1 : RETARD
+    // ========================================
+    if (retardMinutes && retardMinutes > 0) {
+      finalPresent = true;
+      finalRetardMinutes = Math.min(retardMinutes, 60);
+      
+      console.log(`🟡 CAS RETARD: ${finalRetardMinutes} min`);
+      
+      // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
+      if (!existingPresence) {
+        console.log(`   ➜ NOUVELLE présence: Ajout à la queue`);
+        queueInfo = await notificationQueue.ajouterNotification(
+          'retard',
+          etudiantData,
+          cours,
+          dateSession,
+          {
+            retardMinutes: finalRetardMinutes,
+            remarque: remarque || '',
+            creePar: req.professeurId
+          }
+        );
+        notificationQueued = true;
+      } else {
+        console.log(`   ➜ PRÉSENCE EXISTANTE: Mise à jour seulement`);
+        isUpdate = true;
+      }
+    } 
+    // ========================================
+    // 🔴 CAS 2 : ABSENCE
+    // ========================================
+    else if (!present) {
+      finalPresent = false;
+      finalRetardMinutes = 0;
+      
+      console.log(`🔴 CAS ABSENCE`);
+      
+      // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
+      if (!existingPresence) {
+        console.log(`   ➜ NOUVELLE présence: Ajout à la queue`);
+        queueInfo = await notificationQueue.ajouterNotification(
+          'absence',
+          etudiantData,
+          cours,
+          dateSession,
+          {
+            remarque: remarque || '',
+            creePar: req.professeurId
+          }
+        );
+        notificationQueued = true;
+        console.log(`   ✅ Notification ajoutée à la queue\n`);
+      } else {
+        console.log(`   ➜ PRÉSENCE EXISTANTE: Mise à jour seulement\n`);
+        isUpdate = true;
+      }
+    }
+    // ========================================
+    // ✅ CAS 3 : PRÉSENT
+    // ========================================
+    else if (present) {
+      finalPresent = true;
+      finalRetardMinutes = 0;
+      console.log(`✅ CAS PRÉSENT - Pas de notification\n`);
+    }
+
+    let presence;
+
+    // ✅ SI PRÉSENCE EXISTE : METTRE À JOUR
+    if (existingPresence) {
+      console.log(`🔄 MISE À JOUR présence existante`);
+      existingPresence.present = finalPresent;
+      existingPresence.retardMinutes = finalRetardMinutes;
+      existingPresence.remarque = remarque;
+      existingPresence.matiere = prof.matiere;
+      existingPresence.nomProfesseur = prof.nom;
+      
+      presence = await existingPresence.save();
+      console.log(`   ✅ Mise à jour réussie\n`);
+    } 
+    // ✅ SI NOUVELLE : CRÉER
+    else {
+      console.log(`➕ CRÉATION nouvelle présence`);
+      presence = new Presence({
+        etudiant,
+        cours,
+        dateSession: new Date(dateSession),
+        present: finalPresent,
+        retardMinutes: finalRetardMinutes,
+        remarque,
+        heure,
+        periode,
+        creePar: req.professeurId,
+        matiere: prof.matiere,
+        nomProfesseur: prof.nom   
+      });
+
+      await presence.save();
+      console.log(`   ✅ Création réussie\n`);
+    }
+
+    // ✅ RÉPONSE IMMÉDIATE
+    const response = {
+      success: true,
+      presence,
+      action: isUpdate ? 'updated' : 'created',
+      notification: notificationQueued ? {
+        statut: 'en_file',
+        message: 'Notification ajoutée à la file d\'attente',
+        positionQueue: queueInfo.positionQueue,
+        estimationEnvoi: `${Math.round(queueInfo.positionQueue * 5)} secondes`
+      } : {
+        statut: isUpdate ? 'mise_a_jour' : 'aucune',
+        message: isUpdate ? 'Présence mise à jour (pas de notification pour mise à jour)' : 'Étudiant présent à l\'heure'
+      }
+    };
+
+    console.log(`📤 RÉPONSE:`);
+    console.log(`   Action: ${response.action}`);
+    console.log(`   Notification: ${response.notification.statut}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    res.status(201).json(response);
+
+  } catch (err) {
+    console.error('\n❌ ERREUR:');
+    console.error(err);
+    console.error(`${'='.repeat(60)}\n`);
+    
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+});
+
+// ========================================
+// 📊 ROUTE POUR DÉBOGUER LA QUEUE
+// ========================================
+app.get('/api/notifications/queue/debug', authProfesseur, (req, res) => {
+  const stats = notificationQueue.getStats();
+  res.json({
+    success: true,
+    stats,
+    queue: notificationQueue.queue.map(n => ({
+      id: n.id,
+      type: n.type,
+      etudiant: n.etudiantData.nomComplet,
+      telephone_pere: n.etudiantData.telephonePere || '❌',
+      telephone_mere: n.etudiantData.telephoneMere || '❌',
+      timestamp: n.timestamp
+    }))
+  });
+});
+
+// ========================================
+// 🗑️ ROUTE POUR NETTOYER LES ANCIENNES PRESENCES
+// ========================================
+app.delete('/api/presences/cleanup', authProfesseur, async (req, res) => {
+  try {
+    const result = await Presence.deleteMany({
+      creePar: req.professeurId,
+      createdAt: {
+        $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) // Plus de 24h
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} presences supprimées`
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
 // Historique des notifications
 app.get('/api/notifications', authProfesseur, async (req, res) => {
   const { etudiant, type, dateDebut, dateFin } = req.query;
@@ -7911,153 +8148,7 @@ app.post('/api/notifications/:id/retry', authProfesseur, async (req, res) => {
   
   res.json({ success: true, message: 'Notification ajoutée à la queue' });
 });
-app.post('/api/presences', authProfesseur, async (req, res) => {
-  try {
-    const { 
-      etudiant, 
-      cours, 
-      dateSession, 
-      present,
-      retardMinutes,
-      remarque, 
-      heure, 
-      periode 
-    } = req.body;
 
-    // Vérifier que ce professeur enseigne ce cours
-    const prof = await Professeur.findById(req.professeurId);
-    if (!prof.cours.includes(cours)) {
-      return res.status(403).json({ 
-        message: 'Vous ne pouvez pas marquer la présence pour ce cours.' 
-      });
-    }
-
-    // Vérifier si déjà enregistré
-    const existingPresence = await Presence.findOne({
-      etudiant: etudiant,
-      cours: cours,
-      dateSession: new Date(dateSession),
-      heure: heure,
-      periode: periode,
-      creePar: req.professeurId
-    });
-
-    if (existingPresence) {
-      return res.status(409).json({ 
-        message: 'Cet étudiant est déjà enregistré pour cette séance.' 
-      });
-    }
-
-    // Récupérer les données de l'étudiant
-    const etudiantData = await Etudiant.findById(etudiant);
-    if (!etudiantData) {
-      return res.status(404).json({ message: 'Étudiant non trouvé.' });
-    }
-
-    // Logique de présence
-    let finalPresent = present || false;
-    let finalRetardMinutes = 0;
-    let notificationQueued = false;
-    let queueInfo = null;
-
-    // ========================================
-    // 🟡 CAS 1 : RETARD
-    // ========================================
-    if (retardMinutes && retardMinutes > 0) {
-      finalPresent = true;
-      finalRetardMinutes = Math.min(retardMinutes, 60);
-      
-      console.log(`🟡 Retard: ${etudiantData.nomComplet} - ${finalRetardMinutes} min`);
-      
-      // ✅ AJOUTER À LA QUEUE (sans attendre l'envoi)
-      queueInfo = await notificationQueue.ajouterNotification(
-        'retard',
-        etudiantData,
-        cours,
-        dateSession,
-        {
-          retardMinutes: finalRetardMinutes,
-          remarque: remarque || '',
-          creePar: req.professeurId
-        }
-      );
-      
-      notificationQueued = true;
-    } 
-    // ========================================
-    // 🔴 CAS 2 : ABSENCE
-    // ========================================
-    else if (!present) {
-      finalPresent = false;
-      finalRetardMinutes = 0;
-      
-      console.log(`🔴 Absence: ${etudiantData.nomComplet}`);
-      
-      // ✅ AJOUTER À LA QUEUE (sans attendre l'envoi)
-      queueInfo = await notificationQueue.ajouterNotification(
-        'absence',
-        etudiantData,
-        cours,
-        dateSession,
-        {
-          remarque: remarque || '',
-          creePar: req.professeurId
-        }
-      );
-      
-      notificationQueued = true;
-    }
-    // ========================================
-    // ✅ CAS 3 : PRÉSENT
-    // ========================================
-    else if (present) {
-      finalPresent = true;
-      finalRetardMinutes = 0;
-      console.log(`✅ Présent: ${etudiantData.nomComplet}`);
-    }
-
-    // ✅ ENREGISTRER LA PRÉSENCE IMMÉDIATEMENT
-    const presence = new Presence({
-      etudiant,
-      cours,
-      dateSession: new Date(dateSession),
-      present: finalPresent,
-      retardMinutes: finalRetardMinutes,
-      remarque,
-      heure,
-      periode,
-      creePar: req.professeurId,
-      matiere: prof.matiere,
-      nomProfesseur: prof.nom   
-    });
-
-    await presence.save();
-
-    // ✅ RÉPONSE IMMÉDIATE (sans attendre l'envoi WhatsApp)
-    res.status(201).json({
-      success: true,
-      presence,
-      notification: notificationQueued ? {
-        statut: 'en_file',
-        message: 'Notification ajoutée à la file d\'attente',
-        positionQueue: queueInfo.positionQueue,
-        estimationEnvoi: `${queueInfo.positionQueue * 20} secondes`
-      } : {
-        statut: 'aucune',
-        message: 'Étudiant présent à l\'heure'
-      }
-    });
-
-    console.log(`✅ Présence enregistrée pour ${etudiantData.nomComplet}`);
-
-  } catch (err) {
-    console.error('❌ Erreur création présence:', err);
-    res.status(500).json({ 
-      success: false,
-      error: err.message 
-    });
-  }
-});
 
 // ========================================
 // 📊 ROUTE POUR VOIR L'ÉTAT DE LA QUEUE
