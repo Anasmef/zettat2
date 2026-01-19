@@ -7857,7 +7857,60 @@ app.put('/api/presences/:id', authProfesseur, async (req, res) => {
 // ✅ API pour créer/modifier une présence avec NOTIFICATIONS WHATSAPP
 const Notification = require('./models/Notification');
 const whatsappService = require('./services/whatsappService');
+const notificationQueue = require('./services/notificationQueue');
 
+// Historique des notifications
+app.get('/api/notifications', authProfesseur, async (req, res) => {
+  const { etudiant, type, dateDebut, dateFin } = req.query;
+  
+  const filter = { creePar: req.professeurId };
+  if (etudiant) filter.etudiant = etudiant;
+  if (type) filter.type = type;
+  if (dateDebut || dateFin) {
+    filter.dateSession = {};
+    if (dateDebut) filter.dateSession.$gte = new Date(dateDebut);
+    if (dateFin) filter.dateSession.$lte = new Date(dateFin);
+  }
+  
+  const notifications = await Notification.find(filter)
+    .populate('etudiant', 'nomComplet niveau')
+    .sort({ createdAt: -1 })
+    .limit(100);
+  
+  res.json({ success: true, notifications });
+});
+
+// Statistiques
+app.get('/api/notifications/statistiques', authProfesseur, async (req, res) => {
+  const stats = await Notification.getStatistiques(req.professeurId);
+  res.json({ success: true, stats });
+});
+
+// Réessayer les échecs
+app.post('/api/notifications/:id/retry', authProfesseur, async (req, res) => {
+  const notification = await Notification.findById(req.params.id);
+  
+  if (!notification) {
+    return res.status(404).json({ message: 'Notification non trouvée' });
+  }
+  
+  await notification.reessayerEchecs();
+  
+  // Rajouter à la queue
+  await notificationQueue.ajouterNotification(
+    notification.type,
+    await Etudiant.findById(notification.etudiant),
+    notification.cours,
+    notification.dateSession,
+    {
+      retardMinutes: notification.retardMinutes,
+      remarque: notification.remarque,
+      creePar: notification.creePar
+    }
+  );
+  
+  res.json({ success: true, message: 'Notification ajoutée à la queue' });
+});
 app.post('/api/presences', authProfesseur, async (req, res) => {
   try {
     const { 
@@ -7879,7 +7932,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       });
     }
 
-    // VÉRIFIER SI CET ÉTUDIANT SPÉCIFIQUE EST DÉJÀ ENREGISTRÉ POUR CETTE SESSION
+    // Vérifier si déjà enregistré
     const existingPresence = await Presence.findOne({
       etudiant: etudiant,
       cours: cours,
@@ -7895,92 +7948,75 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       });
     }
 
-    // ✅ RÉCUPÉRER LES DONNÉES COMPLÈTES DE L'ÉTUDIANT
+    // Récupérer les données de l'étudiant
     const etudiantData = await Etudiant.findById(etudiant);
     if (!etudiantData) {
       return res.status(404).json({ message: 'Étudiant non trouvé.' });
     }
 
-    // Logique pour gérer les retards
+    // Logique de présence
     let finalPresent = present || false;
     let finalRetardMinutes = 0;
-    let notificationResult = null;
+    let notificationQueued = false;
+    let queueInfo = null;
 
     // ========================================
-    // 🟡 CAS 1 : RETARD (retardMinutes > 0)
+    // 🟡 CAS 1 : RETARD
     // ========================================
     if (retardMinutes && retardMinutes > 0) {
       finalPresent = true;
       finalRetardMinutes = Math.min(retardMinutes, 60);
       
-      console.log(`🟡 Étudiant en retard: ${etudiantData.nomComplet} - ${finalRetardMinutes} min`);
+      console.log(`🟡 Retard: ${etudiantData.nomComplet} - ${finalRetardMinutes} min`);
       
-      // ✅ ENVOYER NOTIFICATION DE RETARD
-      notificationResult = await whatsappService.notifierRetard(
-        etudiantData, 
-        cours, 
-        dateSession, 
-        finalRetardMinutes
+      // ✅ AJOUTER À LA QUEUE (sans attendre l'envoi)
+      queueInfo = await notificationQueue.ajouterNotification(
+        'retard',
+        etudiantData,
+        cours,
+        dateSession,
+        {
+          retardMinutes: finalRetardMinutes,
+          remarque: remarque || '',
+          creePar: req.professeurId
+        }
       );
-
-      // ✅ ENREGISTRER LA NOTIFICATION DANS LA BASE
-      await Notification.create({
-        etudiant: etudiant,
-        type: 'retard',
-        cours: cours,
-        dateSession: new Date(dateSession),
-        retardMinutes: finalRetardMinutes,
-        remarque: remarque || '',
-        destinataires: notificationResult.details.map(d => ({
-          relation: d.destinataire,
-          telephone: d.telephone,
-          statut: d.success ? 'envoyé' : 'échoué'
-        })),
-        creePar: req.professeurId
-      });
+      
+      notificationQueued = true;
     } 
     // ========================================
-    // 🔴 CAS 2 : ABSENCE (present = false)
+    // 🔴 CAS 2 : ABSENCE
     // ========================================
     else if (!present) {
       finalPresent = false;
       finalRetardMinutes = 0;
       
-      console.log(`🔴 Étudiant absent: ${etudiantData.nomComplet}`);
+      console.log(`🔴 Absence: ${etudiantData.nomComplet}`);
       
-      // ✅ ENVOYER NOTIFICATION D'ABSENCE
-      notificationResult = await whatsappService.notifierAbsence(
-        etudiantData, 
-        cours, 
-        dateSession, 
-        remarque
+      // ✅ AJOUTER À LA QUEUE (sans attendre l'envoi)
+      queueInfo = await notificationQueue.ajouterNotification(
+        'absence',
+        etudiantData,
+        cours,
+        dateSession,
+        {
+          remarque: remarque || '',
+          creePar: req.professeurId
+        }
       );
-
-      // ✅ ENREGISTRER LA NOTIFICATION DANS LA BASE
-      await Notification.create({
-        etudiant: etudiant,
-        type: 'absence',
-        cours: cours,
-        dateSession: new Date(dateSession),
-        remarque: remarque || '',
-        destinataires: notificationResult.details.map(d => ({
-          relation: d.destinataire,
-          telephone: d.telephone,
-          statut: d.success ? 'envoyé' : 'échoué'
-        })),
-        creePar: req.professeurId
-      });
+      
+      notificationQueued = true;
     }
     // ========================================
-    // ✅ CAS 3 : PRÉSENT (pas de notification)
+    // ✅ CAS 3 : PRÉSENT
     // ========================================
     else if (present) {
       finalPresent = true;
       finalRetardMinutes = 0;
-      console.log(`✅ Étudiant présent: ${etudiantData.nomComplet}`);
+      console.log(`✅ Présent: ${etudiantData.nomComplet}`);
     }
 
-    // Créer nouvel enregistrement de présence
+    // ✅ ENREGISTRER LA PRÉSENCE IMMÉDIATEMENT
     const presence = new Presence({
       etudiant,
       cours,
@@ -7997,23 +8033,22 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
 
     await presence.save();
 
-    // ✅ RÉPONSE AVEC INFO NOTIFICATION
+    // ✅ RÉPONSE IMMÉDIATE (sans attendre l'envoi WhatsApp)
     res.status(201).json({
       success: true,
       presence,
-      notification: notificationResult ? {
-        envoye: true,
-        messagesEnvoyes: notificationResult.messagesEnvoyes,
-        destinataires: notificationResult.details.map(d => ({
-          relation: d.destinataire,
-          telephone: d.telephone,
-          statut: d.success ? '✅ Envoyé' : '❌ Échoué'
-        }))
+      notification: notificationQueued ? {
+        statut: 'en_file',
+        message: 'Notification ajoutée à la file d\'attente',
+        positionQueue: queueInfo.positionQueue,
+        estimationEnvoi: `${queueInfo.positionQueue * 20} secondes`
       } : {
-        envoye: false,
-        raison: 'Étudiant présent à l\'heure'
+        statut: 'aucune',
+        message: 'Étudiant présent à l\'heure'
       }
     });
+
+    console.log(`✅ Présence enregistrée pour ${etudiantData.nomComplet}`);
 
   } catch (err) {
     console.error('❌ Erreur création présence:', err);
@@ -8022,6 +8057,17 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       error: err.message 
     });
   }
+});
+
+// ========================================
+// 📊 ROUTE POUR VOIR L'ÉTAT DE LA QUEUE
+// ========================================
+app.get('/api/notifications/queue/stats', authProfesseur, (req, res) => {
+  const stats = notificationQueue.getStats();
+  res.json({
+    success: true,
+    stats
+  });
 });
 
 // ✅ 1️⃣ API pour récupérer SEULEMENT les PRÉSENCES (sans retards)

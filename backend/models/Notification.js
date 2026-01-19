@@ -61,12 +61,12 @@ const notificationSchema = new mongoose.Schema(
       },
       statut: { 
         type: String, 
-        enum: ['envoyé', 'échoué', 'en attente'], 
-        default: 'envoyé' 
+        enum: ['envoyé', 'échoué', 'en_attente'], 
+        default: 'en_attente' 
       },
       dateEnvoi: { 
         type: Date, 
-        default: Date.now 
+        default: null 
       },
       messageId: {
         type: String,
@@ -88,13 +88,19 @@ const notificationSchema = new mongoose.Schema(
     // Métadonnées
     nbTentativesEnvoi: {
       type: Number,
-      default: 1,
-      min: 1
+      default: 0,
+      min: 0
     },
 
     derniereTentative: {
       type: Date,
-      default: Date.now
+      default: null
+    },
+
+    statutGlobal: {
+      type: String,
+      enum: ['en_attente', 'en_cours', 'envoyé', 'partiellement_envoyé', 'échoué'],
+      default: 'en_attente'
     }
   },
   { 
@@ -109,6 +115,7 @@ notificationSchema.index({ etudiant: 1, dateSession: -1 });
 notificationSchema.index({ type: 1, createdAt: -1 });
 notificationSchema.index({ creePar: 1, createdAt: -1 });
 notificationSchema.index({ 'destinataires.statut': 1 });
+notificationSchema.index({ statutGlobal: 1 });
 
 // ========================================
 // VIRTUALS
@@ -124,9 +131,15 @@ notificationSchema.virtual('nbMessagesEchoues').get(function() {
   return this.destinataires.filter(d => d.statut === 'échoué').length;
 });
 
+// Obtenir le nombre de messages en attente
+notificationSchema.virtual('nbMessagesEnAttente').get(function() {
+  return this.destinataires.filter(d => d.statut === 'en_attente').length;
+});
+
 // Vérifier si tous les messages ont été envoyés
 notificationSchema.virtual('tousEnvoyes').get(function() {
-  return this.destinataires.every(d => d.statut === 'envoyé');
+  return this.destinataires.length > 0 && 
+         this.destinataires.every(d => d.statut === 'envoyé');
 });
 
 // Obtenir un résumé textuel
@@ -134,6 +147,14 @@ notificationSchema.virtual('resume').get(function() {
   const typeTexte = this.type === 'absence' ? 'Absence' : `Retard de ${this.retardMinutes} min`;
   const dateTexte = this.dateSession.toLocaleDateString('fr-FR');
   return `${typeTexte} - ${this.cours} - ${dateTexte}`;
+});
+
+// Taux de réussite en pourcentage
+notificationSchema.virtual('tauxReussite').get(function() {
+  const total = this.destinataires.length;
+  if (total === 0) return 0;
+  const envoyes = this.nbMessagesEnvoyes;
+  return Math.round((envoyes / total) * 100);
 });
 
 // ========================================
@@ -151,6 +172,7 @@ notificationSchema.methods.marquerEnvoye = function(telephone, messageId = null)
     destinataire.messageId = messageId;
     destinataire.erreur = null;
   }
+  this.mettreAJourStatutGlobal();
   return this.save();
 };
 
@@ -164,6 +186,7 @@ notificationSchema.methods.marquerEchoue = function(telephone, erreur) {
     destinataire.dateEnvoi = new Date();
     destinataire.erreur = erreur;
   }
+  this.mettreAJourStatutGlobal();
   return this.save();
 };
 
@@ -173,6 +196,40 @@ notificationSchema.methods.marquerEchoue = function(telephone, erreur) {
 notificationSchema.methods.incrementerTentatives = function() {
   this.nbTentativesEnvoi += 1;
   this.derniereTentative = new Date();
+  return this.save();
+};
+
+/**
+ * Mettre à jour le statut global selon les destinataires
+ */
+notificationSchema.methods.mettreAJourStatutGlobal = function() {
+  const nbTotal = this.destinataires.length;
+  const nbEnvoyes = this.nbMessagesEnvoyes;
+  const nbEchoues = this.nbMessagesEchoues;
+  const nbEnAttente = this.nbMessagesEnAttente;
+
+  if (nbEnAttente === nbTotal) {
+    this.statutGlobal = 'en_attente';
+  } else if (nbEnvoyes === nbTotal) {
+    this.statutGlobal = 'envoyé';
+  } else if (nbEchoues === nbTotal) {
+    this.statutGlobal = 'échoué';
+  } else if (nbEnvoyes > 0 || nbEchoues > 0) {
+    this.statutGlobal = nbEnAttente > 0 ? 'en_cours' : 'partiellement_envoyé';
+  }
+};
+
+/**
+ * Réinitialiser les destinataires échoués pour réessayer
+ */
+notificationSchema.methods.reessayerEchecs = function() {
+  this.destinataires.forEach(d => {
+    if (d.statut === 'échoué') {
+      d.statut = 'en_attente';
+      d.erreur = null;
+    }
+  });
+  this.mettreAJourStatutGlobal();
   return this.save();
 };
 
@@ -266,6 +323,18 @@ notificationSchema.statics.getNotificationsEchouees = function(professeurId, lim
 };
 
 /**
+ * Obtenir les notifications en attente
+ */
+notificationSchema.statics.getNotificationsEnAttente = function(limite = 50) {
+  return this.find({
+    statutGlobal: { $in: ['en_attente', 'en_cours'] }
+  })
+    .populate('etudiant', 'nomComplet')
+    .sort({ createdAt: 1 })
+    .limit(limite);
+};
+
+/**
  * Obtenir l'historique des notifications d'un étudiant
  */
 notificationSchema.statics.getHistoriqueEtudiant = function(etudiantId, limite = 50) {
@@ -274,6 +343,35 @@ notificationSchema.statics.getHistoriqueEtudiant = function(etudiantId, limite =
     .sort({ dateSession: -1 })
     .limit(limite);
 };
+
+/**
+ * Obtenir le nombre de notifications par statut
+ */
+notificationSchema.statics.getStatutsCount = async function(professeurId) {
+  const match = professeurId ? { creePar: professeurId } : {};
+  
+  return this.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: '$statutGlobal',
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+};
+
+// ========================================
+// MIDDLEWARE
+// ========================================
+
+// Mettre à jour le statut global avant la sauvegarde
+notificationSchema.pre('save', function(next) {
+  if (this.isModified('destinataires')) {
+    this.mettreAJourStatutGlobal();
+  }
+  next();
+});
 
 // ========================================
 // CONFIGURATION
