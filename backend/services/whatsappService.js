@@ -3,23 +3,126 @@ const axios = require('axios');
 
 class WhatsAppService {
   constructor() {
-    // Configuration WasenderAPI
+    // Configuration Wasender
     this.apiToken = '6fb0a3f2b3ab2ac2afdd71f8a3c68f8614a515c922f769cf0f7f914a065cb513';
     this.baseUrl = 'https://www.wasenderapi.com/api';
+    
+    // 🛡️ Compteurs anti-spam
+    this.sentCount = 0;
+    this.lastResetTime = Date.now();
+    
+    // 📝 Templates variés pour absence (3 versions)
+    this.templatesAbsence = [
+      (nom, cours, date, remarque) => 
+`🔴 *Notification d'absence*
+
+Cher parent,
+
+Nous vous informons que *${nom}* était absent(e) au cours de *${cours}* le ${date}.
+
+${remarque ? `Remarque: ${remarque}` : ''}
+
+Pour toute question, contactez-nous.
+École Alfred Kastler`,
+
+      (nom, cours, date, remarque) => 
+`⚠️ *Alerte absence*
+
+Bonjour,
+
+Votre enfant *${nom}* n'a pas assisté à la séance de *${cours}* en date du ${date}.
+
+${remarque ? `Note: ${remarque}` : ''}
+
+Cordialement,
+Administration`,
+
+      (nom, cours, date, remarque) => 
+`📌 *Absence élève*
+
+Madame, Monsieur,
+
+Nous constatons l'absence de *${nom}* lors du cours de *${cours}* du ${date}.
+
+${remarque ? `Observation: ${remarque}` : ''}
+
+Bien à vous,
+Alfred Kastler`
+    ];
+
+    // 📝 Templates variés pour retard (3 versions)
+    this.templatesRetard = [
+      (nom, cours, date, minutes) => 
+`🟡 *Notification de retard*
+
+Cher parent,
+
+*${nom}* est arrivé(e) avec *${minutes} minutes de retard* au cours de *${cours}* le ${date}.
+
+Merci de veiller à la ponctualité.
+École Alfred Kastler`,
+
+      (nom, cours, date, minutes) => 
+`⏰ *Retard signalé*
+
+Bonjour,
+
+Votre enfant *${nom}* a été en retard de *${minutes} min* pour la séance de *${cours}* du ${date}.
+
+Nous comptons sur votre vigilance.
+L'administration`,
+
+      (nom, cours, date, minutes) => 
+`📍 *Arrivée tardive*
+
+Madame, Monsieur,
+
+Retard constaté: *${nom}* - *${minutes} minutes* au cours de *${cours}* le ${date}.
+
+Merci pour votre compréhension.
+Alfred Kastler`
+    ];
   }
 
   /**
-   * Envoyer un message WhatsApp via WasenderAPI
-   * @param {string} phone - Numéro de téléphone (ex: 0660079060 ou +212660079060)
-   * @param {string} message - Contenu du message
-   * @returns {Promise<Object>} Résultat de l'envoi
+   * 🔄 Réinitialiser le compteur toutes les heures
+   */
+  resetCounterIfNeeded() {
+    const oneHour = 60 * 60 * 1000;
+    if (Date.now() - this.lastResetTime > oneHour) {
+      this.sentCount = 0;
+      this.lastResetTime = Date.now();
+      console.log('🔄 Compteur anti-spam réinitialisé');
+    }
+  }
+
+  /**
+   * ⏸️ Pause intelligente selon le nombre de messages envoyés
+   */
+  async smartDelay() {
+    this.resetCounterIfNeeded();
+    this.sentCount++;
+
+    // Pause de 2 minutes tous les 5 messages (batch)
+    if (this.sentCount % 5 === 0) {
+      console.log(`⏸️ Pause anti-spam: 2 minutes (batch ${this.sentCount / 5})...`);
+      await this.delay(120000); // 2 minutes
+    } else {
+      // Délai standard entre messages: 18-22 secondes (aléatoire)
+      const delayTime = 18000 + Math.random() * 4000;
+      console.log(`⏱️ Attente: ${Math.round(delayTime / 1000)}s...`);
+      await this.delay(delayTime);
+    }
+  }
+
+  /**
+   * 📤 Envoyer un message WhatsApp via Wasender
    */
   async envoyerMessage(phone, message) {
     try {
-      // Nettoyer le numéro (supprimer espaces)
       let phoneFormate = phone.trim().replace(/\s+/g, '');
       
-      // Convertir au format international sans le +
+      // Format international sans +
       if (phoneFormate.startsWith('0')) {
         phoneFormate = '212' + phoneFormate.substring(1);
       } else if (phoneFormate.startsWith('+')) {
@@ -37,10 +140,11 @@ class WhatsAppService {
         headers: {
           'Authorization': `Bearer ${this.apiToken}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 30000 // 30 secondes timeout
       });
 
-      console.log(`✅ Message WhatsApp envoyé à ${phoneFormate} via WasenderAPI`);
+      console.log(`✅ Message envoyé à ${phoneFormate}`);
       return { 
         success: true, 
         data: response.data,
@@ -48,7 +152,7 @@ class WhatsAppService {
       };
       
     } catch (error) {
-      console.error(`❌ Erreur envoi WhatsApp:`, error.response?.data || error.message);
+      console.error(`❌ Erreur envoi:`, error.response?.data || error.message);
       return { 
         success: false, 
         error: error.response?.data?.message || error.message 
@@ -57,12 +161,14 @@ class WhatsAppService {
   }
 
   /**
-   * Envoyer une notification d'absence aux parents
-   * @param {Object} etudiant - Objet étudiant complet
-   * @param {string} cours - Nom du cours
-   * @param {Date} dateSession - Date de la session
-   * @param {string} remarque - Remarque optionnelle
-   * @returns {Promise<Object>} Résultats des envois
+   * 📋 Sélectionner un template aléatoire
+   */
+  getRandomTemplate(templates) {
+    return templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  /**
+   * 🔴 Notifier une absence avec anti-spam
    */
   async notifierAbsence(etudiant, cours, dateSession, remarque = '') {
     const nomEtudiant = etudiant.nomComplet;
@@ -73,23 +179,15 @@ class WhatsAppService {
       day: 'numeric'
     });
 
-    const message = `🔴 *NOTIFICATION D'ABSENCE*
-
-Cher parent,
-
-Votre enfant *${nomEtudiant}* était absent(e) au cours de *${cours}* le ${dateFormatee}.
-
-${remarque ? `Remarque: ${remarque}` : ''}
-
-Veuillez nous contacter pour toute question.
-
-École Alfred Kastler`;
-
     const resultats = [];
 
-    // Envoyer au père si numéro disponible
+    // 👨 Envoyer au père
     if (etudiant.telephonePere && etudiant.telephonePere.trim()) {
-      console.log(`📤 Envoi notification absence au père: ${etudiant.telephonePere}`);
+      // Template aléatoire pour le père
+      const template = this.getRandomTemplate(this.templatesAbsence);
+      const message = template(nomEtudiant, cours, dateFormatee, remarque);
+      
+      console.log(`📤 Envoi absence au père: ${etudiant.telephonePere}`);
       const result = await this.envoyerMessage(etudiant.telephonePere, message);
       resultats.push({ 
         destinataire: 'Père', 
@@ -97,13 +195,17 @@ Veuillez nous contacter pour toute question.
         ...result 
       });
       
-      // Petit délai pour éviter le spam
-      await this.delay(1000);
+      // Délai intelligent
+      await this.smartDelay();
     }
 
-    // Envoyer à la mère si numéro disponible
+    // 👩 Envoyer à la mère
     if (etudiant.telephoneMere && etudiant.telephoneMere.trim()) {
-      console.log(`📤 Envoi notification absence à la mère: ${etudiant.telephoneMere}`);
+      // Template différent pour la mère
+      const template = this.getRandomTemplate(this.templatesAbsence);
+      const message = template(nomEtudiant, cours, dateFormatee, remarque);
+      
+      console.log(`📤 Envoi absence à la mère: ${etudiant.telephoneMere}`);
       const result = await this.envoyerMessage(etudiant.telephoneMere, message);
       resultats.push({ 
         destinataire: 'Mère', 
@@ -111,12 +213,18 @@ Veuillez nous contacter pour toute question.
         ...result 
       });
       
-      await this.delay(1000);
+      // Délai plus long entre père et mère (30-35 secondes)
+      const longDelay = 30000 + Math.random() * 5000;
+      console.log(`⏱️ Pause père/mère: ${Math.round(longDelay / 1000)}s...`);
+      await this.delay(longDelay);
     }
 
-    // Si aucun parent n'a de numéro, envoyer à l'étudiant
+    // 👤 Fallback: étudiant si aucun parent
     if (resultats.length === 0 && etudiant.telephoneEtudiant) {
-      console.log(`📤 Envoi notification absence à l'étudiant: ${etudiant.telephoneEtudiant}`);
+      const template = this.getRandomTemplate(this.templatesAbsence);
+      const message = template(nomEtudiant, cours, dateFormatee, remarque);
+      
+      console.log(`📤 Envoi absence à l'étudiant: ${etudiant.telephoneEtudiant}`);
       const result = await this.envoyerMessage(etudiant.telephoneEtudiant, message);
       resultats.push({ 
         destinataire: 'Étudiant', 
@@ -125,7 +233,7 @@ Veuillez nous contacter pour toute question.
       });
     }
 
-    console.log(`✅ Notification absence envoyée pour ${nomEtudiant}: ${resultats.length} message(s)`);
+    console.log(`✅ Notification absence: ${nomEtudiant} - ${resultats.length} message(s)`);
 
     return {
       etudiant: nomEtudiant,
@@ -135,12 +243,7 @@ Veuillez nous contacter pour toute question.
   }
 
   /**
-   * Envoyer une notification de retard aux parents
-   * @param {Object} etudiant - Objet étudiant complet
-   * @param {string} cours - Nom du cours
-   * @param {Date} dateSession - Date de la session
-   * @param {number} retardMinutes - Nombre de minutes de retard
-   * @returns {Promise<Object>} Résultats des envois
+   * 🟡 Notifier un retard avec anti-spam
    */
   async notifierRetard(etudiant, cours, dateSession, retardMinutes) {
     const nomEtudiant = etudiant.nomComplet;
@@ -151,21 +254,14 @@ Veuillez nous contacter pour toute question.
       day: 'numeric'
     });
 
-    const message = `🟡 *NOTIFICATION DE RETARD*
-
-Cher parent,
-
-Votre enfant *${nomEtudiant}* est arrivé(e) avec *${retardMinutes} minutes de retard* au cours de *${cours}* le ${dateFormatee}.
-
-Merci de veiller à la ponctualité.
-
-École Alfred Kastler`;
-
     const resultats = [];
 
-    // Envoyer au père
+    // 👨 Père
     if (etudiant.telephonePere && etudiant.telephonePere.trim()) {
-      console.log(`📤 Envoi notification retard au père: ${etudiant.telephonePere}`);
+      const template = this.getRandomTemplate(this.templatesRetard);
+      const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
+      
+      console.log(`📤 Envoi retard au père: ${etudiant.telephonePere}`);
       const result = await this.envoyerMessage(etudiant.telephonePere, message);
       resultats.push({ 
         destinataire: 'Père', 
@@ -173,12 +269,15 @@ Merci de veiller à la ponctualité.
         ...result 
       });
       
-      await this.delay(1000);
+      await this.smartDelay();
     }
 
-    // Envoyer à la mère
+    // 👩 Mère
     if (etudiant.telephoneMere && etudiant.telephoneMere.trim()) {
-      console.log(`📤 Envoi notification retard à la mère: ${etudiant.telephoneMere}`);
+      const template = this.getRandomTemplate(this.templatesRetard);
+      const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
+      
+      console.log(`📤 Envoi retard à la mère: ${etudiant.telephoneMere}`);
       const result = await this.envoyerMessage(etudiant.telephoneMere, message);
       resultats.push({ 
         destinataire: 'Mère', 
@@ -186,12 +285,18 @@ Merci de veiller à la ponctualité.
         ...result 
       });
       
-      await this.delay(1000);
+      // Délai père/mère
+      const longDelay = 30000 + Math.random() * 5000;
+      console.log(`⏱️ Pause père/mère: ${Math.round(longDelay / 1000)}s...`);
+      await this.delay(longDelay);
     }
 
-    // Si aucun parent, envoyer à l'étudiant
+    // 👤 Fallback: étudiant
     if (resultats.length === 0 && etudiant.telephoneEtudiant) {
-      console.log(`📤 Envoi notification retard à l'étudiant: ${etudiant.telephoneEtudiant}`);
+      const template = this.getRandomTemplate(this.templatesRetard);
+      const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
+      
+      console.log(`📤 Envoi retard à l'étudiant: ${etudiant.telephoneEtudiant}`);
       const result = await this.envoyerMessage(etudiant.telephoneEtudiant, message);
       resultats.push({ 
         destinataire: 'Étudiant', 
@@ -200,7 +305,7 @@ Merci de veiller à la ponctualité.
       });
     }
 
-    console.log(`✅ Notification retard envoyée pour ${nomEtudiant}: ${resultats.length} message(s)`);
+    console.log(`✅ Notification retard: ${nomEtudiant} - ${resultats.length} message(s)`);
 
     return { 
       etudiant: nomEtudiant, 
@@ -210,8 +315,7 @@ Merci de veiller à la ponctualité.
   }
 
   /**
-   * Vérifier le statut de la session WhatsApp
-   * @returns {Promise<Object>}
+   * ✅ Vérifier le statut de la session
    */
   async verifierStatut() {
     try {
@@ -223,11 +327,11 @@ Merci de veiller à la ponctualité.
         }
       });
 
-      console.log('✅ Statut session WhatsApp:', response.data);
+      console.log('✅ Statut session:', response.data);
       return { success: true, data: response.data };
       
     } catch (error) {
-      console.error('❌ Erreur vérification statut:', error.response?.data || error.message);
+      console.error('❌ Erreur statut:', error.response?.data || error.message);
       return { 
         success: false, 
         error: error.response?.data?.message || error.message 
@@ -236,30 +340,37 @@ Merci de veiller à la ponctualité.
   }
 
   /**
-   * Tester la connexion WhatsApp
-   * @param {string} phone - Numéro de test
-   * @returns {Promise<Object>}
+   * 🧪 Tester la connexion
    */
   async testerConnexion(phone = '0660079060') {
-    const messageTest = `✅ *Test de connexion WhatsApp*
-    
+    const messageTest = `✅ *Test système WhatsApp*
+
 École Alfred Kastler
 
-Ce message confirme que le système de notification fonctionne correctement via WasenderAPI.
+Connexion Wasender opérationnelle.
 
-Date: ${new Date().toLocaleString('fr-FR')}`;
+${new Date().toLocaleString('fr-FR')}`;
     
     return await this.envoyerMessage(phone, messageTest);
   }
 
   /**
-   * Délai pour éviter le spam
-   * @param {number} ms - Millisecondes
+   * ⏱️ Délai simple
    */
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  /**
+   * 📊 Statistiques d'envoi
+   */
+  getStats() {
+    return {
+      messagesEnvoyes: this.sentCount,
+      derniereReinitialisation: new Date(this.lastResetTime).toLocaleString('fr-FR')
+    };
+  }
 }
 
-// Exporter une instance unique (singleton)
+// Export singleton
 module.exports = new WhatsAppService();
