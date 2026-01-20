@@ -1,19 +1,27 @@
 // ========================================
-// 🔒 ULTRA SAFE - 40 دقيقة لـ 30 رسالة
-// ❌ لا أخطاء 429 أبداً!
+// ✅ SOLUTION PRODUCTION - 50 رسالة / ساعة
+// NO STOP - NO SILENT BLOCK
 // ========================================
 
 const axios = require('axios');
 
-class WhatsAppService {
+class WhatsAppServicePRO {
   constructor() {
     this.apiToken = '6fb0a3f2b3ab2ac2afdd71f8a3c68f8614a515c922f769cf0f7f914a065cb513';
     this.baseUrl = 'https://www.wasenderapi.com/api';
     
     this.sentCount = 0;
-    this.lastResetTime = Date.now();
+    this.lastMessageTime = 0;
     
+    // ✅ الإعدادات الآمنة (6-8 ثواني + pause كل 10)
+    this.DELAY_MIN = 6000;    // 6 ثواني
+    this.DELAY_MAX = 8000;    // 8 ثواني
+    this.PAUSE_INTERVAL = 10; // كل 10 رسائل
+    this.PAUSE_DURATION = 360000; // 6 دقائق
+    
+    // 8 templates مختلفة (تغيير emoji + أول سطر + توقيع + طول)
     this.templatesAbsence = [
+      // Template 1
       (nom, cours, date, remarque) => 
 `🔴 *Notification d'absence*
 
@@ -21,37 +29,102 @@ Cher parent,
 
 Nous vous informons que *${nom}* était absent(e) au cours de *${cours}* le ${date}.
 
-${remarque ? `Remarque: ${remarque}` : ''}
+${remarque ? `Remarque: ${remarque}` : 'Pour toute question, contactez l\'école.'}
 
-Pour toute question, contactez-nous.
+Cordialement,
 École Alfred Kastler`,
 
+      // Template 2
       (nom, cours, date, remarque) => 
-`⚠️ *Alerte absence*
+`⚠️ *Alerte absence enfant*
 
 Bonjour,
 
-Votre enfant *${nom}* n'a pas assisté à la séance de *${cours}* en date du ${date}.
+Votre enfant *${nom}* n'a pas assisté à la séance de *${cours}* du ${date}.
 
 ${remarque ? `Note: ${remarque}` : ''}
 
-Cordialement,
-Administration`,
+L'administration`,
 
+      // Template 3
       (nom, cours, date, remarque) => 
-`📌 *Absence élève*
+`📌 *Absence scolaire constatée*
 
 Madame, Monsieur,
 
-Nous constatons l'absence de *${nom}* lors du cours de *${cours}* du ${date}.
+Absence: *${nom}* - Cours: *${cours}* - Date: ${date}
 
-${remarque ? `Observation: ${remarque}` : ''}
+${remarque ? `Observation: ${remarque}` : 'Nous apprécions votre vigilance.'}
 
 Bien à vous,
+Alfred Kastler`,
+
+      // Template 4
+      (nom, cours, date, remarque) => 
+`❌ *Absence non justifiée*
+
+Alert Parent!
+
+*${nom}* absent du cours *${cours}* (${date})
+
+${remarque ? `Détail: ${remarque}` : 'SVP contactez l\'école'}
+
+Adm. Scolaire`,
+
+      // Template 5
+      (nom, cours, date, remarque) => 
+`🚨 *Absence à signaler*
+
+Chère famille,
+
+L'élève *${nom}* n'a pas participé au cours de *${cours}* le ${date}.
+
+${remarque ? `Info: ${remarque}` : ''}
+
+Cordialement,
+École Kastler`,
+
+      // Template 6
+      (nom, cours, date, remarque) => 
+`📋 *Signalement absence*
+
+Bonjour à vous,
+
+Absence enregistrée: *${nom}* durant *${cours}* (${date})
+
+${remarque ? `Motif signalé: ${remarque}` : 'Merci de vérifier.'}
+
+Direction`,
+
+      // Template 7
+      (nom, cours, date, remarque) => 
+`⏱️ *Absence détectée*
+
+Chers parents,
+
+*${nom}* a manqué la session de *${cours}* le ${date}.
+
+${remarque ? `Raison: ${remarque}` : ''}
+
+Solidarité,
+Équipe pédagogique`,
+
+      // Template 8
+      (nom, cours, date, remarque) => 
+`✋ *Avis absence étudiant*
+
+Notification officielle,
+
+Absence de *${nom}* - Matière: *${cours}* - Jour: ${date}
+
+${remarque ? `${remarque}` : 'Nous restons disponibles.'}
+
+Respectueusement,
 Alfred Kastler`
     ];
 
     this.templatesRetard = [
+      // Template 1
       (nom, cours, date, minutes) => 
 `🟡 *Notification de retard*
 
@@ -62,6 +135,7 @@ Cher parent,
 Merci de veiller à la ponctualité.
 École Alfred Kastler`,
 
+      // Template 2
       (nom, cours, date, minutes) => 
 `⏰ *Retard signalé*
 
@@ -72,65 +146,127 @@ Votre enfant *${nom}* a été en retard de *${minutes} min* pour la séance de *
 Nous comptons sur votre vigilance.
 L'administration`,
 
+      // Template 3
       (nom, cours, date, minutes) => 
-`📍 *Arrivée tardive*
+`📍 *Arrivée tardive détectée*
 
 Madame, Monsieur,
 
-Retard constaté: *${nom}* - *${minutes} minutes* au cours de *${cours}* le ${date}.
+Retard: *${nom}* - *${minutes} minutes* au cours de *${cours}* le ${date}.
 
 Merci pour votre compréhension.
+Alfred Kastler`,
+
+      // Template 4
+      (nom, cours, date, minutes) => 
+`⚡ *Alert retard enfant*
+
+Notification,
+
+*${nom}* arrivé(e) avec ${minutes}min de retard en *${cours}* (${date})
+
+SVP prendre note.
+Adm.`,
+
+      // Template 5
+      (nom, cours, date, minutes) => 
+`🕐 *Retard cours scolaire*
+
+Famille,
+
+L'élève *${nom}* a manqué le début du cours *${cours}* (retard: ${minutes}min) le ${date}.
+
+Cordialement,
+École`,
+
+      // Template 6
+      (nom, cours, date, minutes) => 
+`📢 *Annonce retard élève*
+
+Bonjour à vous,
+
+Retard enregistré: *${nom}* - *${minutes} minutes* - Cours: *${cours}* (${date})
+
+Direction`,
+
+      // Template 7
+      (nom, cours, date, minutes) => 
+`⏳ *Pointage: Retard*
+
+Chers parents,
+
+*${nom}* arrivé tard (${minutes}min) à la séance de *${cours}* le ${date}.
+
+Équipe pédagogique`,
+
+      // Template 8
+      (nom, cours, date, minutes) => 
+`✋ *Retard à signaler*
+
+Notification officielle,
+
+*${nom}* - Retard: ${minutes} minutes - Matière: *${cours}* - Date: ${date}
+
+Merci de votre attention.
 Alfred Kastler`
     ];
   }
 
-  resetCounterIfNeeded() {
-    const oneHour = 60 * 60 * 1000;
-    if (Date.now() - this.lastResetTime > oneHour) {
-      this.sentCount = 0;
-      this.lastResetTime = Date.now();
-      console.log('🔄 Compteur anti-spam réinitialisé');
+  // ✅ NORMALIZE موحّد (ضروري جداً)
+  normalizePhone(phone) {
+    if (!phone) return null;
+    
+    let normalized = phone.trim().replace(/\s+/g, '');
+    
+    if (normalized.startsWith('0')) {
+      normalized = '212' + normalized.substring(1);
+    } else if (normalized.startsWith('+212')) {
+      normalized = normalized.substring(1);
+    } else if (normalized.startsWith('+')) {
+      normalized = normalized.substring(1);
     }
+    
+    return normalized;
   }
 
-  // 🔒 STRATÉGIE ULTRA SÛRE - ZÉRO ERREUR GARANTIE
+  // ✅ SMART DELAY (6-8 ثواني + pause كل 10)
   async smartDelay() {
-    this.resetCounterIfNeeded();
     this.sentCount++;
 
-    // Stratégie extrêmement conservative:
-    // - Chaque rسالة واحدة → 30 ثانية انتظار
-    // - كل 2 رسائل → pause 3 دقائق إضافية
-    // = ~40 دقيقة لـ 30 رسالة
-    // ✅ صفر أخطاء مضمونة!
-    
-    if (this.sentCount % 2 === 0) {
-      // Après chaque 2ème message: pause longue
-      console.log(`⏸️⏸️⏸️ PAUSE ULTRA-SÉCURITÉ: 180 secondes (3 minutes)...`);
-      await this.delay(180000); // 3 minutes
+    if (this.sentCount % this.PAUSE_INTERVAL === 0) {
+      console.log(`⏸️ PAUSE: 6 دقائق (بعد ${this.sentCount} رسائل)...`);
+      await this.delay(this.PAUSE_DURATION);
+      console.log(`✅ استئناف الإرسال...`);
     } else {
-      // Entre chaque message: attente longue et fixe
-      console.log(`⏱️ Attente GARANTIE: 30 secondes fixes...`);
-      await this.delay(30000); // 30 secondes
+      const delayTime = this.DELAY_MIN + Math.random() * (this.DELAY_MAX - this.DELAY_MIN);
+      const seconds = Math.round(delayTime / 1000);
+      console.log(`⏱️ انتظار ${seconds}ثواني (رسالة ${this.sentCount}/50)`);
+      await this.delay(delayTime);
     }
   }
 
+  // ✅ إرسال الرسالة (بسيط + آمن)
   async envoyerMessage(phone, message) {
     try {
-      let phoneFormate = phone.trim().replace(/\s+/g, '');
+      const phoneNormalized = this.normalizePhone(phone);
       
-      if (phoneFormate.startsWith('0')) {
-        phoneFormate = '212' + phoneFormate.substring(1);
-      } else if (phoneFormate.startsWith('+')) {
-        phoneFormate = phoneFormate.substring(1);
-      } else if (!phoneFormate.startsWith('212')) {
-        phoneFormate = '212' + phoneFormate;
+      if (!phoneNormalized) {
+        console.error(`❌ رقم غير صالح: ${phone}`);
+        return { success: false, error: 'رقم غير صالح' };
       }
+
+      // احترام الـ minimum delay
+      const now = Date.now();
+      const timeSinceLastMsg = now - this.lastMessageTime;
+      if (timeSinceLastMsg < 1000) {
+        await this.delay(1000 - timeSinceLastMsg);
+      }
+      this.lastMessageTime = Date.now();
 
       const url = `${this.baseUrl}/send-message`;
       
       const response = await axios.post(url, {
-        to: phoneFormate,
+        to: phoneNormalized,
         text: message
       }, {
         headers: {
@@ -140,7 +276,7 @@ Alfred Kastler`
         timeout: 30000
       });
 
-      console.log(`✅ Message CONFIRMÉ à ${phoneFormate}`);
+      console.log(`✅ رسالة أرسلت ل ${phoneNormalized}`);
       return { 
         success: true, 
         data: response.data,
@@ -148,7 +284,13 @@ Alfred Kastler`
       };
       
     } catch (error) {
-      console.error(`❌ Erreur envoi:`, error.response?.data || error.message);
+      console.error(`❌ خطأ: ${error.response?.data?.message || error.message}`);
+      
+      if (error.response?.status === 429) {
+        console.error(`⚠️ RATE LIMIT: انتظار 30 ثانية...`);
+        await this.delay(30000);
+      }
+      
       return { 
         success: false, 
         error: error.response?.data?.message || error.message 
@@ -156,10 +298,12 @@ Alfred Kastler`
     }
   }
 
+  // ✅ اختيار template عشوائي
   getRandomTemplate(templates) {
     return templates[Math.floor(Math.random() * templates.length)];
   }
 
+  // ✅ إشعار غياب
   async notifierAbsence(etudiant, cours, dateSession, remarque = '') {
     const nomEtudiant = etudiant.nomComplet;
     const dateFormatee = new Date(dateSession).toLocaleDateString('fr-FR', {
@@ -172,64 +316,67 @@ Alfred Kastler`
     const resultats = [];
     const numerosEnvoyes = new Set();
 
+    // ✅ PÈRE
     if (etudiant.telephonePere && etudiant.telephonePere.trim()) {
-      const phoneNormalize = etudiant.telephonePere.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephonePere);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesAbsence);
         const message = template(nomEtudiant, cours, dateFormatee, remarque);
         
-        console.log(`📤 Envoi absence au père: ${etudiant.telephonePere}`);
+        console.log(`📤 إرسال للأب: ${etudiant.telephonePere}`);
         const result = await this.envoyerMessage(etudiant.telephonePere, message);
         resultats.push({ 
-          destinataire: 'Père', 
+          destinataire: 'الأب', 
           telephone: etudiant.telephonePere,
           ...result 
         });
         
-        numerosEnvoyes.add(phoneNormalize);
+        numerosEnvoyes.add(phoneNorm);
         await this.smartDelay();
       }
     }
 
+    // ✅ الأم
     if (etudiant.telephoneMere && etudiant.telephoneMere.trim()) {
-      const phoneNormalize = etudiant.telephoneMere.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephoneMere);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesAbsence);
         const message = template(nomEtudiant, cours, dateFormatee, remarque);
         
-        console.log(`📤 Envoi absence à la mère: ${etudiant.telephoneMere}`);
+        console.log(`📤 إرسال للأم: ${etudiant.telephoneMere}`);
         const result = await this.envoyerMessage(etudiant.telephoneMere, message);
         resultats.push({ 
-          destinataire: 'Mère', 
+          destinataire: 'الأم', 
           telephone: etudiant.telephoneMere,
           ...result 
         });
         
-        numerosEnvoyes.add(phoneNormalize);
+        numerosEnvoyes.add(phoneNorm);
         await this.smartDelay();
       }
     }
 
+    // ✅ FALLBACK: الطالب
     if (resultats.length === 0 && etudiant.telephoneEtudiant) {
-      const phoneNormalize = etudiant.telephoneEtudiant.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephoneEtudiant);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesAbsence);
         const message = template(nomEtudiant, cours, dateFormatee, remarque);
         
-        console.log(`📤 Envoi absence à l'étudiant: ${etudiant.telephoneEtudiant}`);
+        console.log(`📤 إرسال للطالب: ${etudiant.telephoneEtudiant}`);
         const result = await this.envoyerMessage(etudiant.telephoneEtudiant, message);
         resultats.push({ 
-          destinataire: 'Étudiant', 
+          destinataire: 'الطالب', 
           telephone: etudiant.telephoneEtudiant,
           ...result 
         });
       }
     }
 
-    console.log(`✅ Notification absence: ${nomEtudiant} - ${resultats.length} message(s)`);
+    console.log(`✅ غياب: ${nomEtudiant} - ${resultats.length} رسالة(s) ✅`);
 
     return {
       etudiant: nomEtudiant,
@@ -238,6 +385,7 @@ Alfred Kastler`
     };
   }
 
+  // ✅ إشعار تأخر
   async notifierRetard(etudiant, cours, dateSession, retardMinutes) {
     const nomEtudiant = etudiant.nomComplet;
     const dateFormatee = new Date(dateSession).toLocaleDateString('fr-FR', {
@@ -250,64 +398,67 @@ Alfred Kastler`
     const resultats = [];
     const numerosEnvoyes = new Set();
 
+    // ✅ PÈRE
     if (etudiant.telephonePere && etudiant.telephonePere.trim()) {
-      const phoneNormalize = etudiant.telephonePere.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephonePere);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesRetard);
         const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
         
-        console.log(`📤 Envoi retard au père: ${etudiant.telephonePere}`);
+        console.log(`📤 تأخر - الأب: ${etudiant.telephonePere}`);
         const result = await this.envoyerMessage(etudiant.telephonePere, message);
         resultats.push({ 
-          destinataire: 'Père', 
+          destinataire: 'الأب', 
           telephone: etudiant.telephonePere, 
           ...result 
         });
         
-        numerosEnvoyes.add(phoneNormalize);
+        numerosEnvoyes.add(phoneNorm);
         await this.smartDelay();
       }
     }
 
+    // ✅ الأم
     if (etudiant.telephoneMere && etudiant.telephoneMere.trim()) {
-      const phoneNormalize = etudiant.telephoneMere.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephoneMere);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesRetard);
         const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
         
-        console.log(`📤 Envoi retard à la mère: ${etudiant.telephoneMere}`);
+        console.log(`📤 تأخر - الأم: ${etudiant.telephoneMere}`);
         const result = await this.envoyerMessage(etudiant.telephoneMere, message);
         resultats.push({ 
-          destinataire: 'Mère', 
+          destinataire: 'الأم', 
           telephone: etudiant.telephoneMere, 
           ...result 
         });
         
-        numerosEnvoyes.add(phoneNormalize);
+        numerosEnvoyes.add(phoneNorm);
         await this.smartDelay();
       }
     }
 
+    // ✅ FALLBACK: الطالب
     if (resultats.length === 0 && etudiant.telephoneEtudiant) {
-      const phoneNormalize = etudiant.telephoneEtudiant.trim();
+      const phoneNorm = this.normalizePhone(etudiant.telephoneEtudiant);
       
-      if (!numerosEnvoyes.has(phoneNormalize)) {
+      if (!numerosEnvoyes.has(phoneNorm)) {
         const template = this.getRandomTemplate(this.templatesRetard);
         const message = template(nomEtudiant, cours, dateFormatee, retardMinutes);
         
-        console.log(`📤 Envoi retard à l'étudiant: ${etudiant.telephoneEtudiant}`);
+        console.log(`📤 تأخر - الطالب: ${etudiant.telephoneEtudiant}`);
         const result = await this.envoyerMessage(etudiant.telephoneEtudiant, message);
         resultats.push({ 
-          destinataire: 'Étudiant', 
+          destinataire: 'الطالب', 
           telephone: etudiant.telephoneEtudiant, 
           ...result 
         });
       }
     }
 
-    console.log(`✅ Notification retard: ${nomEtudiant} - ${resultats.length} message(s)`);
+    console.log(`✅ تأخر: ${nomEtudiant} - ${resultats.length} رسالة(s) ✅`);
 
     return { 
       etudiant: nomEtudiant, 
@@ -316,36 +467,15 @@ Alfred Kastler`
     };
   }
 
-  async verifierStatut() {
-    try {
-      const url = `${this.baseUrl}/session-status`;
-      
-      const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${this.apiToken}`
-        }
-      });
-
-      console.log('✅ Statut session:', response.data);
-      return { success: true, data: response.data };
-      
-    } catch (error) {
-      console.error('❌ Erreur statut:', error.response?.data || error.message);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message 
-      };
-    }
-  }
-
+  // ✅ اختبار الاتصال
   async testerConnexion(phone = '0660079060') {
-    const messageTest = `✅ *Test système WhatsApp*
+    const messageTest = `✅ *اختبار نظام WhatsApp*
 
-École Alfred Kastler
+مدرسة ألفريد كاستلر
 
-Connexion Wasender opérationnelle.
+الاتصال بـ WasenderAPI يعمل بشكل صحيح.
 
-${new Date().toLocaleString('fr-FR')}`;
+${new Date().toLocaleString('ar-MA')}`;
     
     return await this.envoyerMessage(phone, messageTest);
   }
@@ -357,9 +487,9 @@ ${new Date().toLocaleString('fr-FR')}`;
   getStats() {
     return {
       messagesEnvoyes: this.sentCount,
-      derniereReinitialisation: new Date(this.lastResetTime).toLocaleString('fr-FR')
+      lastMessageTime: new Date(this.lastMessageTime).toLocaleString('ar-MA')
     };
   }
 }
 
-module.exports = new WhatsAppService();
+module.exports = new WhatsAppServicePRO();
