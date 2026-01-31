@@ -8541,6 +8541,75 @@ app.get('/api/presences/etudiant/:id', authAdminOrInscripteurOrPaiementManager, 
     res.status(500).json({ error: err.message });
   }
 });
+// Routes minimales pour SuiviAssiduiteEtudiants.jsx
+// À ajouter directement dans app.js
+
+// ============================================
+// ROUTES SUIVI ASSIDUITÉS
+// ============================================
+
+// GET tous les étudiants
+app.get('/api/suivi-assiduites/etudiants', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiants = await Etudiant.find({ hidden: { $ne: true } })
+      .select('_id nomComplet email niveau cours anneeScolaire')
+      .sort({ nomComplet: 1 });
+    
+    res.json(etudiants);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET toutes les présences
+app.get('/api/suivi-assiduites/presences', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const presences = await Presence.find()
+      .select('etudiant cours dateSession present retardMinutes periode')
+      .lean();
+    
+    res.json(presences);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET tous les rapports
+app.get('/api/suivi-assiduites/rapports', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const rapports = await Rapport.find()
+      .select('etudiant cours date descriptionIncident natureProbleme')
+      .lean();
+    
+    res.json(rapports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET présences d'un étudiant
+app.get('/api/suivi-assiduites/presences/etudiant/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const presences = await Presence.find({ etudiant: req.params.id }).sort({ dateSession: -1 });
+    res.json(presences);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET rapports d'un étudiant
+app.get('/api/suivi-assiduites/rapports/etudiant/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const rapports = await Rapport.find({ etudiant: req.params.id })
+      .populate('professeur', 'nomComplet')
+      .sort({ date: -1 });
+    
+    res.json(rapports);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ Modifier un étudiant
 
 // Route pour rechercher des étudiants

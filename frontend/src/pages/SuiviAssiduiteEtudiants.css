@@ -1,0 +1,71 @@
+/* 
+  CSS Minimal pour SuiviAssiduiteSimple.jsx
+  
+  NOTE: Le composant utilise les styles inline (style={{ }})
+  Donc ce fichier CSS n'est pas strictement nécessaire.
+  
+  Vous pouvez le créer si vous voulez ajouter des animations ou des hover effects.
+*/
+
+.liste-assiduites-container {
+  display: flex;
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.main-content {
+  flex: 1;
+}
+
+.header-section h2 {
+  margin-top: 0;
+}
+
+/* Animations optionnelles */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+table tbody tr {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .main-content {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 10px !important;
+  }
+
+  table {
+    font-size: 12px;
+  }
+}
+
+/* Optionnel: Scroll smooth */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Loading state */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%);
+  font-size: 18px;
+  color: #1e3a8a;
+}

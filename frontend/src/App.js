@@ -59,6 +59,7 @@ import SeancesProfesseur from './pages/SeancesProfesseur';
 import ContactPage from './pages/ContactPage';
 import CyclesPage from './pages/CyclesPage';
 import AdminMessages from './pages/AdminMessages';
+import Suiviassiduitesimple from './pages/Suiviassiduitesimple';
 import Propos from './pages/Propos';
 import AdminVieScolaire from './pages/AdminVieScolaire';
 import EcolePrimairePage from './pages/EcolePrimairePage';
@@ -424,6 +425,7 @@ function AppContent() {
         <Route path="/professeur/messages" element={<MessageProf />} />
 <Route path="/admin/autorisations" element={<AutorisationEtudiants />} />
 
+<Route path="/admin/suivi-assiduite-simple" element={<Suiviassiduitesimple />} />
 <Route path="/admin/professeursmanagement" element={<AdminProfManagement />} />
 
 <Route path="/professeur/reclamations" element={<ReclamationsProfesseur />} />
