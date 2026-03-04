@@ -129,6 +129,22 @@ const Sidebar = ({ onLogout }) => {
       label: 'Séances',
       icon: Clock
     },
+{
+      path: '/admin/historique-etudiant',
+      label: 'Historique Étudiant',
+      icon: FileText
+    },
+
+    {
+      path: '/admin/suivi-assiduite-simple',
+      label: 'Suivi Assiduité Simple',
+      icon: Users
+    },
+  {
+      path: '/admin/Bulletin',
+      label: 'Bulletins',
+      icon: FileText
+    },
     {
       path: '/admin/messages',
       label: 'Messages',

@@ -96,6 +96,7 @@ const SidebarProf = ({ onLogout }) => {
           icon: Clock
     
         },
+        
        {
       path: '/professeur/rapports',
       label: 'Mes Rapports',
@@ -116,6 +117,11 @@ const SidebarProf = ({ onLogout }) => {
       path: '/professeur/messages',
       label: 'messages',
       icon: MessageCircle
+    },
+      {
+      path: '/professeur/AjouterBulletin',
+      label: 'Ajouter un bulletin',
+      icon: FilePlus2
     },
     {
       path: '/evenements-prof',

@@ -116,7 +116,7 @@ const STUDENTS_BY_LEVEL = {
   ]
 };
 
-const AdminBulletinsExport = () => {
+const AdminBulletins = () => {
   const [bulletins, setBulletins] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
@@ -746,4 +746,4 @@ const styles = {
   }
 };
 
-export default AdminBulletinsExport;
+export default AdminBulletins;

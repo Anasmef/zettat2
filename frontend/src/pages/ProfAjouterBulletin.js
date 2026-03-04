@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ChevronRight } from 'lucide-react';
+import { Save, ChevronRight, ChevronLeft, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import Sidebar from '../components/SidebarProf';
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
-  };
+
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/login';
+};
+
 const ProfBulletinPage = () => {
   const [step, setStep] = useState('config');
   const [config, setConfig] = useState({
@@ -20,6 +22,8 @@ const ProfBulletinPage = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [niveaux, setNiveaux] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     fetchInitialData();
@@ -29,14 +33,12 @@ const ProfBulletinPage = () => {
     try {
       const token = localStorage.getItem('token');
 
-      // Récupérer matière du prof
       const profRes = await fetch('/api/professeur/ma-matiere', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const profData = await profRes.json();
       setConfig(prev => ({ ...prev, matiere: profData.matiere }));
 
-      // Récupérer les niveaux depuis la BD
       const niveauxRes = await fetch('/api/etudiants/niveaux-uniques', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -90,7 +92,7 @@ const ProfBulletinPage = () => {
     if (field === 'nombreControles') {
       const nombre = parseInt(value);
       setConfig(prev => ({ ...prev, [field]: nombre }));
-      
+
       setBulletins(prev => {
         const updated = {};
         Object.keys(prev).forEach(key => {
@@ -211,257 +213,590 @@ const ProfBulletinPage = () => {
         });
       }
 
-      alert('✅ Bulletins sauvegardés!');
-      setStep('config');
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setStep('config');
+        setSaveSuccess(false);
+      }, 2000);
     } catch (error) {
       console.error('Erreur:', error);
-      alert('❌ Erreur');
+      alert('❌ Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
     }
   };
 
+  const filteredEtudiants = etudiants.filter(et =>
+    et.nomComplet.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // CONFIG STEP
   if (step === 'config') {
     return (
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <h1 style={styles.title}>⚙️ Configuration</h1>
-          
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Matière</label>
-            <input type="text" value={config.matiere} disabled style={styles.inputDisabled} />
-          </div>
+      <div style={styles.pageContainer}>
+        <Sidebar onLogout={handleLogout} />
+        <div style={styles.mainContent}>
+          <div style={styles.configCard}>
+            <div style={styles.configHeader}>
+              <h1 style={styles.configTitle}>⚙️ Configuration des bulletins</h1>
+              <p style={styles.configSubtitle}>Définissez les paramètres de base pour commencer</p>
+            </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Niveau *</label>
-            <select value={config.niveau} onChange={(e) => handleConfigChange('niveau', e.target.value)} style={styles.select}>
-              <option value="">-- Sélectionner --</option>
-              {niveaux.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
+            <div style={styles.formContainer}>
+              <div style={styles.formGrid}>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Matière</label>
+                  <input
+                    type="text"
+                    value={config.matiere}
+                    disabled
+                    style={styles.inputDisabled}
+                  />
+                  <p style={styles.helperText}>Matière assignée à votre profil</p>
+                </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Nombre de Contrôles</label>
-            <select value={config.nombreControles} onChange={(e) => handleConfigChange('nombreControles', e.target.value)} style={styles.select}>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Niveau *</label>
+                  <select
+                    value={config.niveau}
+                    onChange={(e) => handleConfigChange('niveau', e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="">-- Sélectionner une classe --</option>
+                    {niveaux.map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                  <p style={styles.helperText}>Sélectionnez la classe des étudiants</p>
+                </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Semestre</label>
-            <select value={config.semestre} onChange={(e) => handleConfigChange('semestre', e.target.value)} style={styles.select}>
-              <option value="Premier semestre">Premier semestre</option>
-              <option value="Deuxième semestre">Deuxième semestre</option>
-            </select>
-          </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Nombre de Contrôles</label>
+                  <select
+                    value={config.nombreControles}
+                    onChange={(e) => handleConfigChange('nombreControles', e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="2">2 contrôles</option>
+                    <option value="3">3 contrôles</option>
+                    <option value="4">4 contrôles</option>
+                    <option value="5">5 contrôles</option>
+                  </select>
+                </div>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Année Scolaire</label>
-            <input type="text" value={config.anneeScolaire} onChange={(e) => handleConfigChange('anneeScolaire', e.target.value)} style={styles.select} />
-          </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Semestre</label>
+                  <select
+                    value={config.semestre}
+                    onChange={(e) => handleConfigChange('semestre', e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="Premier semestre">Premier semestre</option>
+                    <option value="Deuxième semestre">Deuxième semestre</option>
+                  </select>
+                </div>
 
-          <button
-            onClick={() => setStep('saisie')}
-            disabled={!config.niveau}
-            style={{...styles.button, ...(config.niveau ? {} : styles.buttonDisabled)}}
-          >
-            Continuer <ChevronRight size={18} />
-          </button>
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Année Scolaire</label>
+                  <input
+                    type="text"
+                    value={config.anneeScolaire}
+                    onChange={(e) => handleConfigChange('anneeScolaire', e.target.value)}
+                    style={styles.select}
+                  />
+                </div>
+              </div>
+
+              <div style={styles.infoBox}>
+                <AlertCircle size={20} style={{ color: '#3b82f6' }} />
+                <p style={styles.infoText}>Vous pouvez modifier ces paramètres à tout moment. Les notes seront sauvegardées avec ces paramètres.</p>
+              </div>
+
+              <button
+                onClick={() => setStep('saisie')}
+                disabled={!config.niveau}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonPrimary,
+                  ...(config.niveau ? {} : styles.buttonDisabled)
+                }}
+              >
+                Continuer vers la saisie
+                <ChevronRight size={20} style={{ marginLeft: '8px' }} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
+  // SAISIE STEP
   return (
-    <div style={styles.container}>
-            <Sidebar onLogout={handleLogout} />
-      
-      <div style={styles.card}>
-        <button onClick={() => setStep('config')} style={styles.backButton}>← Retour</button>
-        <h1 style={styles.title}>📝 Saisie des Notes</h1>
-        <p style={styles.subtitle}>{config.matiere} | {config.niveau} | {config.semestre}</p>
+    <div style={styles.pageContainer}>
+      <Sidebar onLogout={handleLogout} />
+      <div style={styles.mainContent}>
+        <div style={styles.header}>
+          <button
+            onClick={() => setStep('config')}
+            style={styles.backButton}
+          >
+            <ChevronLeft size={20} />
+            Retour à la configuration
+          </button>
+          <div style={styles.headerInfo}>
+            <h1 style={styles.pageTitle}>📝 Saisie des notes</h1>
+            <p style={styles.pageSubtitle}>
+              {config.matiere} • {config.niveau} • {config.semestre}
+            </p>
+          </div>
+        </div>
+
+        {saveSuccess && (
+          <div style={styles.successBanner}>
+            <CheckCircle size={20} style={{ color: '#10b981' }} />
+            <span>✅ Bulletins sauvegardés avec succès !</span>
+          </div>
+        )}
 
         {loading ? (
-          <p>Chargement...</p>
+          <div style={styles.loadingContainer}>
+            <Loader size={40} style={{ animation: 'spin 1s linear infinite' }} />
+            <p>Chargement des étudiants...</p>
+          </div>
         ) : etudiants.length === 0 ? (
-          <p>Aucun étudiant</p>
+          <div style={styles.emptyState}>
+            <AlertCircle size={40} />
+            <p>Aucun étudiant trouvé pour cette classe</p>
+          </div>
         ) : (
-          <>
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.headerRow}>
-                    <th style={styles.th}>Étudiant</th>
-                    <th style={styles.th}>Code Massar</th>
-                    <th style={styles.th}>Naissance</th>
-                    {Array(config.nombreControles).fill().map((_, i) => (
-                      <th key={i} style={styles.th}>C{i + 1}</th>
-                    ))}
-                    <th style={styles.th}>Activités</th>
-                    <th style={styles.th}>Observations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {etudiants.map(et => (
-                    <tr key={et._id}>
-                      <td style={styles.td}><strong>{et.nomComplet}</strong></td>
-                      <td style={styles.td}>{et.codeMassar}</td>
-                      <td style={styles.td}>{bulletins[et._id]?.dateNaissance}</td>
-                      {bulletins[et._id]?.controles.map((note, idx) => (
-                        <td key={idx} style={styles.td}>
+          <div style={styles.contentContainer}>
+            <div style={styles.searchContainer}>
+              <input
+                type="text"
+                placeholder="🔍 Rechercher un étudiant..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={styles.searchInput}
+              />
+              <p style={styles.resultCount}>
+                {filteredEtudiants.length} étudiant{filteredEtudiants.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            <div style={styles.tableContainer}>
+              <div style={styles.tableWrapper}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr style={styles.headerRow}>
+                      <th style={{ ...styles.th, minWidth: '180px' }}>Étudiant</th>
+                      <th style={{ ...styles.th, minWidth: '120px' }}>Code Massar</th>
+                      <th style={{ ...styles.th, minWidth: '120px' }}>Naissance</th>
+                      {Array(config.nombreControles).fill().map((_, i) => (
+                        <th key={i} style={{ ...styles.th, minWidth: '70px', textAlign: 'center' }}>C{i + 1}</th>
+                      ))}
+                      <th style={{ ...styles.th, minWidth: '80px', textAlign: 'center' }}>Activités</th>
+                      <th style={{ ...styles.th, minWidth: '150px' }}>Observations</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEtudiants.map((et, idx) => (
+                      <tr key={et._id} style={{ ...styles.row, backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+                        <td style={styles.td}>
+                          <strong style={styles.studentName}>{et.nomComplet}</strong>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.codeMassar}>{et.codeMassar || 'N/A'}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.dateText}>{bulletins[et._id]?.dateNaissance || 'N/A'}</span>
+                        </td>
+                        {bulletins[et._id]?.controles.map((note, idx) => (
+                          <td key={idx} style={{ ...styles.td, textAlign: 'center' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              value={note}
+                              onChange={(e) => handleNoteChange(et._id, idx, e.target.value)}
+                              style={styles.numberInput}
+                              placeholder="0"
+                            />
+                          </td>
+                        ))}
+                        <td style={{ ...styles.td, textAlign: 'center' }}>
                           <input
                             type="number"
                             min="0"
                             max="20"
-                            value={note}
-                            onChange={(e) => handleNoteChange(et._id, idx, e.target.value)}
-                            style={styles.input}
+                            value={bulletins[et._id]?.activitesIntegrees || ''}
+                            onChange={(e) => handleActivitesChange(et._id, e.target.value)}
+                            style={styles.numberInput}
+                            placeholder="0"
                           />
                         </td>
-                      ))}
-                      <td style={styles.td}>
-                        <input
-                          type="number"
-                          min="0"
-                          max="20"
-                          value={bulletins[et._id]?.activitesIntegrees || ''}
-                          onChange={(e) => handleActivitesChange(et._id, e.target.value)}
-                          style={styles.input}
-                        />
-                      </td>
-                      <td style={styles.td}>
-                        <input
-                          type="text"
-                          value={bulletins[et._id]?.observations || ''}
-                          onChange={(e) => handleObservationsChange(et._id, e.target.value)}
-                          style={styles.input}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <td style={styles.td}>
+                          <input
+                            type="text"
+                            value={bulletins[et._id]?.observations || ''}
+                            onChange={(e) => handleObservationsChange(et._id, e.target.value)}
+                            style={styles.textInput}
+                            placeholder="Ajouter une note..."
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <button onClick={handleSaveAll} disabled={saving} style={styles.button}>
-              <Save size={18} /> {saving ? 'Sauvegarde...' : 'Enregistrer'}
-            </button>
-          </>
+            <div style={styles.actionBar}>
+              <div style={styles.stats}>
+                <span style={styles.statItem}>Total: <strong>{etudiants.length}</strong></span>
+              </div>
+              <button
+                onClick={handleSaveAll}
+                disabled={saving}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonPrimary,
+                  ...(saving ? styles.buttonDisabled : {})
+                }}
+              >
+                {saving ? (
+                  <>
+                    <Loader size={18} style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
+                    Sauvegarde en cours...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} style={{ marginRight: '8px' }} />
+                    Enregistrer tous les bulletins
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
 
 const styles = {
-  container: {
+  pageContainer: {
+    display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f3f4f6',
-    padding: '20px'
+    backgroundColor: '#f8fafc'
   },
-  card: {
+  mainContent: {
+    flex: 1,
+    overflow: 'auto'
+  },
+  // CONFIG STYLES
+  configCard: {
+    maxWidth: '900px',
+    margin: '40px auto',
+    padding: '40px',
     backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '30px',
-    maxWidth: '1400px',
-    margin: '0 auto'
+    borderRadius: '16px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
   },
-  title: {
-    fontSize: '28px',
+  configHeader: {
+    marginBottom: '32px'
+  },
+  configTitle: {
+    fontSize: '32px',
     fontWeight: '700',
-    marginBottom: '20px'
+    marginBottom: '8px',
+    color: '#1e293b'
   },
-  subtitle: {
-    fontSize: '14px',
-    color: '#6b7280',
-    marginBottom: '20px'
+  configSubtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    lineHeight: '1.5'
+  },
+  formContainer: {
+    marginTop: '32px'
+  },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '24px',
+    marginBottom: '28px'
   },
   formGroup: {
-    marginBottom: '20px'
+    display: 'flex',
+    flexDirection: 'column'
   },
   label: {
-    display: 'block',
     fontSize: '14px',
     fontWeight: '600',
-    marginBottom: '8px'
+    color: '#1e293b',
+    marginBottom: '8px',
+    display: 'block'
   },
   input: {
-    width: '100%',
-    padding: '8px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
+    padding: '10px 12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
     fontSize: '14px',
-    boxSizing: 'border-box'
+    fontFamily: 'inherit',
+    transition: 'all 0.2s',
+    boxSizing: 'border-box',
+    ':focus': {
+      outline: 'none',
+      borderColor: '#3b82f6',
+      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+    }
   },
   inputDisabled: {
-    width: '100%',
-    padding: '8px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    backgroundColor: '#f9fafb',
-    color: '#6b7280'
+    padding: '10px 12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#f1f5f9',
+    color: '#64748b',
+    cursor: 'not-allowed'
   },
   select: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    fontSize: '14px'
+    padding: '10px 12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: 'white',
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxSizing: 'border-box'
   },
+  helperText: {
+    fontSize: '12px',
+    color: '#94a3b8',
+    marginTop: '6px'
+  },
+  infoBox: {
+    display: 'flex',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#eff6ff',
+    borderRadius: '12px',
+    marginBottom: '28px',
+    border: '1px solid #bfdbfe'
+  },
+  infoText: {
+    fontSize: '14px',
+    color: '#1e40af',
+    margin: 0,
+    lineHeight: '1.5'
+  },
+  // BUTTON STYLES
   button: {
-    width: '100%',
-    padding: '12px',
-    backgroundColor: '#3b82f6',
-    color: 'white',
+    padding: '12px 24px',
     border: 'none',
-    borderRadius: '6px',
-    fontSize: '16px',
+    borderRadius: '8px',
+    fontSize: '15px',
     fontWeight: '600',
     cursor: 'pointer',
-    marginTop: '20px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px'
+    transition: 'all 0.2s',
+    fontFamily: 'inherit',
+    width: '100%'
+  },
+  buttonPrimary: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    marginTop: '8px'
   },
   buttonDisabled: {
-    backgroundColor: '#d1d5db',
+    backgroundColor: '#cbd5e1',
+    color: '#94a3b8',
     cursor: 'not-allowed'
   },
   backButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
     backgroundColor: 'transparent',
-    border: 'none',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
     color: '#3b82f6',
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
-    marginBottom: '20px'
+    transition: 'all 0.2s',
+    fontFamily: 'inherit',
+    marginBottom: '24px'
+  },
+  // SAISIE STYLES
+  header: {
+    padding: '20px 32px',
+    backgroundColor: 'white',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  headerInfo: {
+    marginTop: '16px'
+  },
+  pageTitle: {
+    fontSize: '28px',
+    fontWeight: '700',
+    margin: '0 0 8px 0',
+    color: '#1e293b'
+  },
+  pageSubtitle: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: 0
+  },
+  successBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '16px 32px 0',
+    padding: '12px 16px',
+    backgroundColor: '#d1fae5',
+    border: '1px solid #6ee7b7',
+    borderRadius: '8px',
+    color: '#065f46',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '80px 32px',
+    color: '#64748b'
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '80px 32px',
+    color: '#94a3b8'
+  },
+  contentContainer: {
+    padding: '32px'
+  },
+  searchContainer: {
+    marginBottom: '24px'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '12px 16px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    fontSize: '14px',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s'
+  },
+  resultCount: {
+    fontSize: '12px',
+    color: '#94a3b8',
+    marginTop: '8px'
+  },
+  tableContainer: {
+    marginBottom: '32px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
   },
   tableWrapper: {
-    overflowX: 'auto',
-    marginBottom: '20px'
+    overflowX: 'auto'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse'
   },
   headerRow: {
-    backgroundColor: '#f9fafb'
+    backgroundColor: '#f1f5f9',
+    borderBottom: '2px solid #e2e8f0'
   },
   th: {
-    padding: '12px',
+    padding: '16px',
     textAlign: 'left',
-    fontSize: '12px',
+    fontSize: '13px',
     fontWeight: '700',
-    borderBottom: '2px solid #e5e7eb'
+    color: '#475569',
+    verticalAlign: 'middle'
+  },
+  row: {
+    borderBottom: '1px solid #e2e8f0',
+    transition: 'background-color 0.1s'
   },
   td: {
-    padding: '10px',
+    padding: '16px',
+    fontSize: '14px',
+    verticalAlign: 'middle'
+  },
+  studentName: {
+    color: '#1e293b'
+  },
+  codeMassar: {
+    fontSize: '12px',
+    color: '#64748b',
+    fontFamily: 'monospace'
+  },
+  dateText: {
     fontSize: '13px',
-    borderBottom: '1px solid #f3f4f6'
+    color: '#64748b'
+  },
+  numberInput: {
+    width: '100%',
+    padding: '8px 6px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    fontSize: '13px',
+    textAlign: 'center',
+    transition: 'all 0.2s',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit'
+  },
+  textInput: {
+    width: '100%',
+    padding: '8px 10px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '6px',
+    fontSize: '13px',
+    transition: 'all 0.2s',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit'
+  },
+  actionBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px 32px',
+    backgroundColor: 'white',
+    borderTop: '1px solid #e2e8f0',
+    borderRadius: '0 0 12px 12px',
+    gap: '16px',
+    flexWrap: 'wrap'
+  },
+  stats: {
+    display: 'flex',
+    gap: '24px',
+    fontSize: '14px',
+    color: '#64748b'
+  },
+  statItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   }
 };
 

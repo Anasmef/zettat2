@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import * as XLSX from 'xlsx-js-style';
-import Sidebar from '../components/Sidebar';
+import Sidebar from '../components/Sidebarmanager';
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -96,7 +96,7 @@ const VIEW = { LIST:'list', STUDENT:'student', CLASS:'class' };
 /* ═══════════════════════════════════════════════
    MAIN
 ═══════════════════════════════════════════════ */
-const HistoriqueEtudiant = () => {
+const MangerHistorique = () => {
   const [view,setView]                   = useState(VIEW.LIST);
   const [allStudents,setAllStudents]     = useState([]);
   const [loadingStudents,setLS]          = useState(false);
@@ -649,4 +649,4 @@ const HistoriqueEtudiant = () => {
   );
 };
 
-export default HistoriqueEtudiant;
+export default MangerHistorique;

@@ -108,6 +108,8 @@ import AdminQRGenerator
  from './pages/AdminQRGenerator';
  import PageAdminRapports from './pages/PageAdminRapports';
  import ManagerEtudiants from './pages/ManagerEtudiants';
+ import  MangerHistorique
+ from './pages/MangerHistorique';
 
  
 
@@ -434,8 +436,9 @@ function AppContent() {
 
  <Route path="/parent/absences" element={< ParentAbsences />} />  
  <Route path="/parent/rapports" element={< ParentRapports />} />  
-
 <Route path="/admin/historique-etudiant" element={<HistoriqueEtudiant />} />  
+
+<Route path="/manager/historique-etudiant" element={<MangerHistorique />} />  
 <Route path="/professeur/etudiants-autorises" element={<EtudiantsAutorisesProfesseur />} />
         {/* Routes Étudiant */}
         <Route path="/etudiant/messages" element={<MessageEtudiant />} />

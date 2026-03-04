@@ -93,6 +93,15 @@ const Sidebar = ({ onLogout }) => {
       icon: ClipboardList
     },
 
+
+    {
+      path: '/manager/historique-etudiant',
+      label: 'Historique Étudiant',
+      icon: FileText
+    }
+,
+
+
     {
       path: '/manager/etudiants',
       label: 'Étudiants',

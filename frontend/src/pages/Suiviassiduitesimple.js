@@ -3,6 +3,12 @@ import axios from 'axios';
 import { Eye, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './SuiviAssiduiteEtudiants.css';
+import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
+
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  window.location.href = '/login';
+};
 
 const SuiviAssiduiteEtudiants = () => {
   const [etudiants, setEtudiants] = useState([]);
@@ -165,7 +171,8 @@ const SuiviAssiduiteEtudiants = () => {
       background: 'linear-gradient(135deg, #EBF8FF 0%, #E0F2FE 100%)',
       minHeight: '100vh',
       padding: '30px 20px'
-    }}>
+    }}>        <Sidebar onLogout={handleLogout} />
+
       <div className="main-wrapper" style={{ maxWidth: '1400px', margin: '0 auto' }}>
         
         {/* HEADER */}
