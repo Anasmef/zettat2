@@ -82,7 +82,7 @@ const notificationSchema = new mongoose.Schema(
     creePar: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: 'Professeur', 
-      required: true 
+      required: false 
     },
 
     // Métadonnées

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye, LogOut as LogOutIcon } from 'lucide-react';
+import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye } from 'lucide-react';
 import SidebarProf from '../components/Sidebarmanager';
 
 const AdminQRPage = () => {
@@ -13,12 +13,10 @@ const AdminQRPage = () => {
   useEffect(() => {
     fetchPointages();
     fetchQRCodesActifs();
-    
     const interval = setInterval(() => {
       fetchPointages();
       fetchQRCodesActifs();
     }, 60000);
-    
     return () => clearInterval(interval);
   }, []);
 
@@ -28,13 +26,8 @@ const AdminQRPage = () => {
       const res = await fetch('/api/admin/pointages', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPointages(data);
-      }
-    } catch (error) {
-      console.error('Erreur pointages:', error);
-    }
+      if (res.ok) setPointages(await res.json());
+    } catch (error) { console.error('Erreur pointages:', error); }
   };
 
   const fetchQRCodesActifs = async () => {
@@ -47,30 +40,20 @@ const AdminQRPage = () => {
         const data = await res.json();
         setQrCodesActifs(data.qrCodesActifs);
       }
-    } catch (error) {
-      console.error('Erreur QR codes:', error);
-    }
+    } catch (error) { console.error('Erreur QR codes:', error); }
   };
 
   const genererQR = async () => {
     setLoading(true);
     setMessage({ type: '', text: '' });
-    
     try {
       const token = localStorage.getItem('token');
       const res = await fetch('/api/admin/generate-qr', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}`
-        })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}` })
       });
-
       const data = await res.json();
-      
       if (data.success) {
         setQrCode(data.qrCode);
         setMessage({ type: 'success', text: data.message || 'QR Code généré avec succès!' });
@@ -92,13 +75,10 @@ const AdminQRPage = () => {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
-
       if (res.ok) {
         setMessage({ type: 'success', text: 'QR Code supprimé' });
         fetchQRCodesActifs();
-        if (qrCode && qrCode.id === qrId) {
-          setQrCode(null);
-        }
+        if (qrCode && qrCode.id === qrId) setQrCode(null);
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Erreur suppression' });
@@ -118,135 +98,292 @@ const AdminQRPage = () => {
     window.location.href = '/login';
   };
 
-  const cardStyle = {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    borderRadius: '16px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
-    transition: 'all 0.3s ease'
-  };
-
-  const buttonPrimaryStyle = {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px'
-  };
-
-  const inputStyle = {
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-    borderRadius: '12px',
-    padding: '12px 16px',
-    fontSize: '14px',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    backdropFilter: 'blur(5px)',
-    transition: 'all 0.3s ease',
-    outline: 'none'
-  };
-
   return (
-    <div style={{ 
+    <div style={{
       minHeight: '100vh',
-      backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #a6dbff 25%, #f3e8ff 100%)',
-      padding: '40px 20px',
+      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f3e8ff 100%)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
     }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      <style>{`
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .qr-card {
+          background: rgba(255,255,255,0.95);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-radius: 16px;
+          box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+          animation: fadeIn 0.4s ease;
+        }
+        
+        .btn-primary {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          width: 100%;
+          padding: 14px 20px;
+          font-size: 15px;
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
 
-        <SidebarProf />
+        .btn-danger {
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 8px 12px;
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          transition: background 0.2s;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .btn-danger:hover { background: #dc2626; }
 
-        {/* Header */}
-        <div style={{ 
-          ...cardStyle,
-          padding: '40px',
-          marginBottom: '40px',
-          textAlign: 'center'
-        }}>
+        .btn-download {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 18px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.3s ease;
+          margin-top: 12px;
+        }
+        .btn-download:hover { transform: translateY(-1px); }
+
+        .qr-input {
+          width: 100%;
+          padding: 12px 16px;
+          border: 2px solid #e5e7eb;
+          border-radius: 12px;
+          font-size: 14px;
+          background: white;
+          transition: border-color 0.2s;
+          outline: none;
+          box-sizing: border-box;
+        }
+        .qr-input:focus { border-color: #667eea; }
+
+        .stat-card {
+          text-align: center;
+          padding: 16px 12px;
+          border-radius: 14px;
+          color: white;
+        }
+        .stat-value { font-size: 26px; font-weight: 700; margin-bottom: 2px; }
+        .stat-label { font-size: 12px; font-weight: 500; opacity: 0.9; }
+
+        .pointage-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px 16px;
+          border-radius: 12px;
+          margin-bottom: 8px;
+          flex-wrap: wrap;
+          gap: 8px;
+          transition: background 0.2s;
+        }
+        .pointage-row:hover { background: rgba(248,250,252,0.9) !important; }
+
+        /* ===== RESPONSIVE ===== */
+        .page-wrapper {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 20px 16px;
+        }
+
+        .page-header {
+          text-align: center;
+          padding: 28px 20px;
+          margin-bottom: 24px;
+        }
+
+        .main-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+          margin-bottom: 24px;
+        }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+        }
+
+        .qr-active-item {
+          background: rgba(255,255,255,0.8);
+          border: 1px solid rgba(255,255,255,0.3);
+          border-left: 4px solid #10b981;
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 14px;
+        }
+
+        .qr-active-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .qr-active-meta {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-bottom: 10px;
+        }
+
+        .qr-image-wrapper {
+          margin-top: 24px;
+          padding: 20px;
+          text-align: center;
+          background: rgba(255,255,255,0.6);
+          border-radius: 14px;
+          border: 2px dashed rgba(102,126,234,0.3);
+        }
+
+        .pointage-info { flex: 1; min-width: 0; }
+        .pointage-name { font-weight: 600; color: #1a202c; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pointage-email { font-size: 13px; color: #64748b; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pointage-times { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+        .time-block { text-align: right; }
+        .time-label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
+        .time-value { font-size: 14px; font-weight: 600; }
+
+        .section-title {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .section-title h2, .section-title h3 {
+          margin: 0;
+          color: #1a202c;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+        .badge {
+          background: #667eea;
+          color: white;
+          padding: 3px 10px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        /* Tablet */
+        @media (max-width: 900px) {
+          .main-grid {
+            grid-template-columns: 1fr;
+          }
+          .page-header h1 { font-size: 24px; }
+        }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+          .page-wrapper { padding: 12px; }
+          .page-header { padding: 20px 16px; margin-bottom: 16px; }
+          .page-header h1 { font-size: 20px; }
+          .page-header p { font-size: 13px; }
+          .qr-card { border-radius: 12px; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .stat-value { font-size: 22px; }
+          .stat-card { padding: 12px 8px; }
+          .pointage-row { padding: 12px; }
+          .pointage-times { gap: 10px; }
+          .time-value { font-size: 13px; }
+          .main-grid { gap: 16px; }
+          .qr-active-header { flex-direction: column; }
+          .btn-danger { width: 100%; justify-content: center; }
+          .qr-image-wrapper img { width: 160px !important; height: 160px !important; }
+          .section-title h2, .section-title h3 { font-size: 17px; }
+        }
+
+        @media (max-width: 380px) {
+          .stats-grid { grid-template-columns: 1fr 1fr; }
+          .stat-value { font-size: 20px; }
+        }
+      `}</style>
+
+      <SidebarProf onLogout={handleLogout} />
+
+      <div className="page-wrapper">
+
+        {/* ── HEADER ── */}
+        <div className="qr-card page-header">
           <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: '64px', height: '64px', borderRadius: '50%',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            marginBottom: '20px'
+            marginBottom: '16px'
           }}>
-            <QrCode size={40} style={{ color: 'white' }} />
+            <QrCode size={32} color="white" />
           </div>
-          <h1 style={{ 
-            margin: '0 0 10px 0', 
-            color: '#1a202c',
-            fontSize: '32px',
-            fontWeight: '700',
+          <h1 style={{
+            margin: '0 0 8px 0', fontWeight: '700',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
           }}>
             Générateur QR Code
           </h1>
-          <p style={{ 
-            margin: 0, 
-            color: '#64748b', 
-            fontSize: '16px',
-            fontWeight: '500'
-          }}>
-            Système de pointage - UN QR par jour (20 heures)
+          <p style={{ margin: 0, color: '#64748b', fontSize: '14px', fontWeight: '500' }}>
+            Système de pointage — UN QR par jour (20 heures)
           </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'start' }}>
-          
-          {/* Génération QR */}
-          <div style={{ ...cardStyle, padding: '32px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: '24px'
-            }}>
-              <Plus size={24} style={{ color: '#667eea', marginRight: '12px' }} />
-              <h2 style={{ margin: 0, color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
-                QR Code du Jour
-              </h2>
+        {/* ── MAIN GRID ── */}
+        <div className="main-grid">
+
+          {/* ── COLONNE GAUCHE : Génération ── */}
+          <div className="qr-card" style={{ padding: '24px' }}>
+            <div className="section-title">
+              <Plus size={22} color="#667eea" />
+              <h2>QR Code du Jour</h2>
             </div>
 
+            {/* Message */}
             {message.text && (
               <div style={{
-                padding: '16px 20px',
-                borderRadius: '12px',
-                marginBottom: '24px',
-                backgroundColor: message.type === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                padding: '14px 16px', borderRadius: '10px', marginBottom: '20px',
+                backgroundColor: message.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
                 color: message.type === 'success' ? '#15803d' : '#dc2626',
-                border: `1px solid ${message.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
+                border: `1px solid ${message.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '500'
               }}>
-                {message.type === 'success' ? 
-                  <CheckCircle size={20} /> :
-                  <AlertTriangle size={20} />
-                }
-                <span style={{ fontWeight: '500' }}>{message.text}</span>
+                {message.type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
+                {message.text}
               </div>
             )}
 
-            <div style={{ marginBottom: '32px' }}>
-              <label style={{ 
-                display: 'block', 
-                marginBottom: '8px', 
-                fontWeight: '600',
-                color: '#374151',
-                fontSize: '14px'
-              }}>
+            {/* Input */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151', fontSize: '13px' }}>
                 Description (Optionnel)
               </label>
               <input
@@ -254,309 +391,128 @@ const AdminQRPage = () => {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="ex: Pointage matinée"
-                style={{
-                  ...inputStyle,
-                  width: '100%'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#667eea'}
-                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)'}
+                className="qr-input"
               />
-              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>
                 ⚠️ Un seul QR code par jour, valable 20 heures
               </p>
             </div>
 
-            <button
-              onClick={genererQR}
-              disabled={loading}
-              style={{
-                ...buttonPrimaryStyle,
-                width: '100%',
-                padding: '16px',
-                fontSize: '16px',
-                opacity: loading ? 0.7 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer'
-              }}
-              onMouseEnter={(e) => !loading && (e.target.style.transform = 'translateY(-2px)')}
-              onMouseLeave={(e) => !loading && (e.target.style.transform = 'translateY(0)')}
-            >
+            {/* Bouton */}
+            <button onClick={genererQR} disabled={loading} className="btn-primary">
               {loading ? (
                 <>
-                  <div style={{
-                    width: '20px',
-                    height: '20px',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTop: '2px solid white',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite'
-                  }}></div>
+                  <div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                   Génération...
                 </>
               ) : (
-                <>
-                  <QrCode size={20} />
-                  Générer/Récupérer QR du Jour
-                </>
+                <><QrCode size={18} /> Générer / Récupérer QR du Jour</>
               )}
             </button>
 
-            {/* QR Code généré */}
+            {/* QR Code affiché */}
             {qrCode && (
-              <div style={{ 
-                marginTop: '32px',
-                padding: '24px',
-                textAlign: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.5)',
-                borderRadius: '16px',
-                border: '2px dashed rgba(102, 126, 234, 0.3)'
-              }}>
-                <img
-                  src={qrCode.dataURL}
-                  alt="QR Code"
-                  style={{ 
-                    width: '200px', 
-                    height: '200px', 
-                    borderRadius: '12px',
-                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)'
-                  }}
-                />
-                <div style={{ marginTop: '16px' }}>
-                  <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0', fontWeight: '500' }}>
-                    <strong>Description:</strong> {qrCode.description}
+              <div className="qr-image-wrapper">
+                <img src={qrCode.dataURL} alt="QR Code" style={{ width: '190px', height: '190px', borderRadius: '12px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }} />
+                <div style={{ marginTop: '14px' }}>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '6px 0' }}>
+                    <strong>Description :</strong> {qrCode.description}
                   </p>
-                  <p style={{ fontSize: '14px', color: '#64748b', margin: '8px 0', fontWeight: '500' }}>
-                    <strong>Expire le:</strong> {new Date(qrCode.expiresAt).toLocaleString('fr-FR')}
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '6px 0' }}>
+                    <strong>Expire le :</strong> {new Date(qrCode.expiresAt).toLocaleString('fr-FR')}
                   </p>
-                  <button
-                    onClick={telechargerQR}
-                    style={{
-                      ...buttonPrimaryStyle,
-                      padding: '12px 20px',
-                      fontSize: '14px',
-                      marginTop: '16px'
-                    }}
-                  >
-                    <Download size={16} />
-                    Télécharger
+                  <button onClick={telechargerQR} className="btn-download">
+                    <Download size={15} /> Télécharger
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Statistiques et QR actifs */}
+          {/* ── COLONNE DROITE : Stats + QR actifs ── */}
           <div>
-            
-            {/* Statistiques */}
+
+            {/* Stats */}
             {pointages && (
-              <div style={{ ...cardStyle, padding: '32px', marginBottom: '32px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  marginBottom: '24px'
-                }}>
-                  <BarChart3 size={24} style={{ color: '#667eea', marginRight: '12px' }} />
-                  <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
-                    Statistiques du Jour
-                  </h3>
+              <div className="qr-card" style={{ padding: '24px', marginBottom: '20px' }}>
+                <div className="section-title">
+                  <BarChart3 size={22} color="#667eea" />
+                  <h3>Statistiques du Jour</h3>
                 </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '20px', 
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-                    borderRadius: '16px',
-                    color: 'white',
-                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
-                      {pointages.stats.presents}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Présents</div>
+
+                <div className="stats-grid">
+                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}>
+                    <div className="stat-value">{pointages.stats.presents}</div>
+                    <div className="stat-label">Présents</div>
                   </div>
-                  
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '20px', 
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', 
-                    borderRadius: '16px',
-                    color: 'white',
-                    boxShadow: '0 4px 15px rgba(239, 68, 68, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
-                      {pointages.stats.absents}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Absents</div>
+                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 15px rgba(239,68,68,0.3)' }}>
+                    <div className="stat-value">{pointages.stats.absents}</div>
+                    <div className="stat-label">Absents</div>
                   </div>
-                  
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '20px', 
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', 
-                    borderRadius: '16px',
-                    color: 'white',
-                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
-                      {pointages.stats.sansSortie || 0}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Sans Sortie</div>
+                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 15px rgba(245,158,11,0.3)' }}>
+                    <div className="stat-value">{pointages.stats.sansSortie || 0}</div>
+                    <div className="stat-label">Sans Sortie</div>
                   </div>
-                  
-                  <div style={{ 
-                    textAlign: 'center', 
-                    padding: '20px', 
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', 
-                    borderRadius: '16px',
-                    color: 'white',
-                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '28px', fontWeight: '700', marginBottom: '4px' }}>
-                      {pointages.stats.tauxPresence}%
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '500', opacity: 0.9 }}>Taux Présence</div>
+                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' }}>
+                    <div className="stat-value">{pointages.stats.tauxPresence}%</div>
+                    <div className="stat-label">Taux Présence</div>
                   </div>
                 </div>
-                
-                <div style={{ 
-                  fontSize: '14px', 
-                  color: '#64748b', 
-                  textAlign: 'center', 
-                  marginTop: '16px',
-                  fontWeight: '500'
-                }}>
-                  Total: {pointages.stats.totalProfesseurs} professeurs
-                </div>
+
+                <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginTop: '12px', marginBottom: 0, fontWeight: '500' }}>
+                  Total : {pointages.stats.totalProfesseurs} professeurs
+                </p>
               </div>
             )}
 
             {/* QR Codes Actifs */}
-            <div style={{ ...cardStyle, padding: '32px' }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '24px'
-              }}>
-                <Clock size={24} style={{ color: '#667eea', marginRight: '12px' }} />
-                <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
-                  QR Code Actif
-                </h3>
-                <span style={{
-                  marginLeft: '12px',
-                  backgroundColor: '#667eea',
-                  color: 'white',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  fontSize: '12px',
-                  fontWeight: '600'
-                }}>
-                  {qrCodesActifs.length}
-                </span>
+            <div className="qr-card" style={{ padding: '24px' }}>
+              <div className="section-title">
+                <Clock size={22} color="#667eea" />
+                <h3>QR Code Actif</h3>
+                <span className="badge">{qrCodesActifs.length}</span>
               </div>
 
               {qrCodesActifs.length === 0 ? (
-                <div style={{ 
-                  textAlign: 'center', 
-                  color: '#64748b', 
-                  padding: '40px 20px',
-                  backgroundColor: 'rgba(248, 250, 252, 0.8)',
-                  borderRadius: '16px'
-                }}>
-                  <QrCode size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
-                  <p style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>Aucun QR code actif</p>
-                  <p style={{ margin: '8px 0 0 0', fontSize: '14px', opacity: 0.7 }}>
-                    Générez le QR code du jour
-                  </p>
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '32px 16px', background: 'rgba(248,250,252,0.8)', borderRadius: '12px' }}>
+                  <QrCode size={44} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '500' }}>Aucun QR code actif</p>
+                  <p style={{ margin: 0, fontSize: '13px', opacity: 0.7 }}>Générez le QR code du jour</p>
                 </div>
               ) : (
-                <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
                   {qrCodesActifs.map((qr) => (
-                    <div
-                      key={qr.id}
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderLeft: `4px solid #10b981`,
-                        borderRadius: '12px',
-                        padding: '20px',
-                        marginBottom: '16px',
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{ 
-                            margin: '0 0 8px 0', 
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: '#1a202c'
-                          }}>
+                    <div key={qr.id} className="qr-active-item">
+                      <div className="qr-active-header">
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '600', color: '#1a202c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {qr.description}
                           </h4>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                            <span style={{ 
-                              fontSize: '13px', 
-                              color: '#64748b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <Clock size={14} />
-                              {qr.tempsRestant} min restantes
+                          <div className="qr-active-meta">
+                            <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={13} /> {qr.tempsRestant} min restantes
                             </span>
-                            <span style={{ 
-                              fontSize: '13px', 
-                              color: '#64748b',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <Eye size={14} />
-                              {qr.scansCount} scans
+                            <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Eye size={13} /> {qr.scansCount} scans
                             </span>
                           </div>
                         </div>
-                        
-                        <button
-                          onClick={() => supprimerQR(qr.id)}
-                          style={{
-                            backgroundColor: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
-                        >
-                          <Trash2 size={14} />
-                          Supprimer
+                        <button onClick={() => supprimerQR(qr.id)} className="btn-danger">
+                          <Trash2 size={13} /> Supprimer
                         </button>
                       </div>
-                      
-                      <div style={{
-                        width: '100%',
-                        height: '6px',
-                        backgroundColor: 'rgba(226, 232, 240, 0.8)',
-                        borderRadius: '3px',
-                        overflow: 'hidden'
-                      }}>
+
+                      {/* Barre de progression */}
+                      <div style={{ width: '100%', height: '5px', backgroundColor: 'rgba(226,232,240,0.8)', borderRadius: '3px', overflow: 'hidden' }}>
                         <div style={{
                           width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 1200) * 100))}%`,
                           height: '100%',
-                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' : 
-                                     qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
-                                     'linear-gradient(90deg, #10b981, #059669)',
-                          transition: 'all 0.3s ease'
-                        }}></div>
+                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' :
+                                       qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' :
+                                       'linear-gradient(90deg, #10b981, #059669)',
+                          borderRadius: '3px',
+                          transition: 'width 0.3s ease'
+                        }} />
                       </div>
                     </div>
                   ))}
@@ -566,65 +522,41 @@ const AdminQRPage = () => {
           </div>
         </div>
 
-        {/* Liste des pointages récents */}
+        {/* ── POINTAGES RÉCENTS ── */}
         {pointages && pointages.pointages.length > 0 && (
-          <div style={{ ...cardStyle, padding: '32px', marginTop: '40px' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: '24px'
-            }}>
-              <Users size={24} style={{ color: '#667eea', marginRight: '12px' }} />
-              <h3 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1a202c' }}>
-                Pointages Récents
-              </h3>
+          <div className="qr-card" style={{ padding: '24px' }}>
+            <div className="section-title">
+              <Users size={22} color="#667eea" />
+              <h3>Pointages Récents</h3>
             </div>
-            
-            <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
               {pointages.pointages.slice(0, 10).map((pointage, index) => (
                 <div
                   key={index}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '16px 20px',
-                    backgroundColor: index % 2 === 0 ? 'rgba(248, 250, 252, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-                    borderRadius: '12px',
-                    marginBottom: '8px',
-                    transition: 'all 0.3s ease'
-                  }}
+                  className="pointage-row"
+                  style={{ backgroundColor: index % 2 === 0 ? 'rgba(248,250,252,0.8)' : 'rgba(255,255,255,0.8)' }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: '600', color: '#1a202c', fontSize: '16px' }}>
-                      {pointage.nomProfesseur}
-                    </div>
-                    <div style={{ fontSize: '14px', color: '#64748b', marginTop: '4px' }}>
-                      {pointage.emailProfesseur}
-                    </div>
+                  <div className="pointage-info">
+                    <div className="pointage-name">{pointage.nomProfesseur}</div>
+                    <div className="pointage-email">{pointage.emailProfesseur}</div>
                   </div>
-                  
-                  <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Entrée</div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>
-                        {pointage.heureEntree}
-                      </div>
+
+                  <div className="pointage-times">
+                    <div className="time-block">
+                      <div className="time-label">Entrée</div>
+                      <div className="time-value" style={{ color: '#10b981' }}>{pointage.heureEntree}</div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '2px' }}>Sortie</div>
-                      <div style={{ fontSize: '14px', fontWeight: '600', color: pointage.heureSortie ? '#ef4444' : '#9ca3af' }}>
+                    <div className="time-block">
+                      <div className="time-label">Sortie</div>
+                      <div className="time-value" style={{ color: pointage.heureSortie ? '#ef4444' : '#9ca3af' }}>
                         {pointage.heureSortie || '--:--'}
                       </div>
                     </div>
                     {pointage.tempsPresence > 0 && (
                       <div style={{
-                        fontSize: '12px',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        fontWeight: '600',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        color: '#2563eb'
+                        fontSize: '12px', padding: '5px 10px', borderRadius: '20px', fontWeight: '600',
+                        backgroundColor: 'rgba(59,130,246,0.1)', color: '#2563eb', whiteSpace: 'nowrap'
                       }}>
                         {Math.floor(pointage.tempsPresence / 60)}h {pointage.tempsPresence % 60}min
                       </div>
@@ -636,15 +568,6 @@ const AdminQRPage = () => {
           </div>
         )}
       </div>
-      
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
     </div>
   );
 };

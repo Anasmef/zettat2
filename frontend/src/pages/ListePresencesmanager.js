@@ -261,11 +261,13 @@ const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
     // };
 
     // ✅ SOLUTION : Mettre à jour seulement les champs modifiés
+    const updatedPresence = response.data.presence; // ✅ objet présence du backend
+
     updatedSessions[sessionIndex].presences[presenceIndex] = {
       ...updatedSessions[sessionIndex].presences[presenceIndex],
-      present: response.data.present,
-      retardMinutes: response.data.retardMinutes,
-      remarque: response.data.remarque
+      present: updatedPresence.present,           // ✅
+      retardMinutes: updatedPresence.retardMinutes, // ✅
+      remarque: updatedPresence.remarque           // ✅
       // Garder les autres propriétés intactes (etudiant, _id, etc.)
     };
 
@@ -282,8 +284,9 @@ const handleSaveEdit = async (presenceId, sessionIndex, presenceIndex) => {
     setFilteredSessions(updatedSessions);
     setGroupedSessions(updatedSessions);
     
+    // ✅ Forcer le refresh du modal
     if (sessionActive) {
-      setSessionActive(updatedSessions[sessionIndex]);
+      setSessionActive({ ...updatedSessions[sessionIndex] });
     }
 
     setEditingPresence(null);

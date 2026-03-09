@@ -7924,7 +7924,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       finalPresent = true;
       finalRetardMinutes = Math.min(retardMinutes, 60);
       
-      console.log(`🟡 CAS RETARD: ${finalRetardMinutes} min`);
+      console.log(`🟡 CAS RETARD: ${finalRetardMinutes} min | Période: ${periode}`);
       
       // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
       if (!existingPresence) {
@@ -7937,6 +7937,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
           {
             retardMinutes: finalRetardMinutes,
             remarque: remarque || '',
+            periode: periode || '',        // ✅ AJOUTÉ
             creePar: req.professeurId
           }
         );
@@ -7953,7 +7954,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       finalPresent = false;
       finalRetardMinutes = 0;
       
-      console.log(`🔴 CAS ABSENCE`);
+      console.log(`🔴 CAS ABSENCE | Période: ${periode}`);
       
       // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
       if (!existingPresence) {
@@ -7965,11 +7966,12 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
           dateSession,
           {
             remarque: remarque || '',
+            periode: periode || '',        // ✅ AJOUTÉ
             creePar: req.professeurId
           }
         );
         notificationQueued = true;
-        console.log(`   ✅ Notification ajoutée à la queue\n`);
+        console.log(`   ✅ Notification ajoutée à la queue [${periode}]\n`);
       } else {
         console.log(`   ➜ PRÉSENCE EXISTANTE: Mise à jour seulement\n`);
         isUpdate = true;
@@ -8028,7 +8030,8 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
         statut: 'en_file',
         message: 'Notification ajoutée à la file d\'attente',
         positionQueue: queueInfo.positionQueue,
-        estimationEnvoi: `${Math.round(queueInfo.positionQueue * 5)} secondes`
+        estimationEnvoi: `${Math.round(queueInfo.positionQueue * 5)} secondes`,
+        periode: periode   // ✅ info dans la réponse aussi
       } : {
         statut: isUpdate ? 'mise_a_jour' : 'aucune',
         message: isUpdate ? 'Présence mise à jour (pas de notification pour mise à jour)' : 'Étudiant présent à l\'heure'
@@ -8038,6 +8041,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
     console.log(`📤 RÉPONSE:`);
     console.log(`   Action: ${response.action}`);
     console.log(`   Notification: ${response.notification.statut}`);
+    console.log(`   Période: ${periode}`);
     console.log(`${'='.repeat(60)}\n`);
 
     res.status(201).json(response);
@@ -8053,7 +8057,6 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
     });
   }
 });
-
 // ========================================
 // 📊 ROUTE POUR DÉBOGUER LA QUEUE
 // ========================================
@@ -8340,26 +8343,45 @@ app.delete('/api/presences/:id', authAdminOrInscripteurOrPaiementManager, async 
 
 
 
-// Route PUT pour modifier une présence (Admin)
 app.put('/api/admin/presences/:id', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { id } = req.params;
     const { present, retardMinutes, remarque } = req.body;
 
-    const presence = await Presence.findById(id);
+    // ✅ Convertir present en boolean (peut arriver comme string "true"/"false")
+    const presentBool = present === true || present === 'true';
+
+    // Trouver la présence + données étudiant
+    const presence = await Presence.findById(id).populate('etudiant');
     if (!presence) {
       return res.status(404).json({ message: 'Présence non trouvée.' });
     }
 
-    // Logique de mise à jour pour admin
+    const etudiantData = presence.etudiant;
+    const periode = presence.periode || '';
+
+    // ── Sauvegarder l'ancien statut pour comparer ──
+    const ancienStatut = {
+      present: presence.present,
+      retardMinutes: presence.retardMinutes
+    };
+
+    // ========================================
+    // Mise à jour de la présence
+    // ========================================
     if (retardMinutes && retardMinutes > 0) {
-      presence.present = true;
-      presence.retardMinutes = Math.min(retardMinutes, 60);
-    } else if (present) {
-      presence.present = true;
-      presence.retardMinutes = 0;
+      // CAS RETARD avec minutes
+      presence.present       = true;
+      presence.retardMinutes = Math.max(15, Math.min(Number(retardMinutes), 60));
+
+    } else if (presentBool) {
+      // ✅ CAS ABSENT → PRÉSENT (sans retard spécifié)
+      presence.present       = true;
+      presence.retardMinutes = 15; // ✅ auto 15 min en BDD
+
     } else {
-      presence.present = false;
+      // CAS ABSENT
+      presence.present       = false;
       presence.retardMinutes = 0;
     }
 
@@ -8367,10 +8389,110 @@ app.put('/api/admin/presences/:id', authAdminOrInscripteurOrPaiementManager, asy
       presence.remarque = remarque;
     }
 
+    // ✅ UN SEUL save - tout est déjà correct ici
     await presence.save();
-    res.json(presence);
+
+    // ── Nouveau statut après sauvegarde ──
+    const nouveauStatut = {
+      present:       presence.present,
+      retardMinutes: presence.retardMinutes
+    };
+
+    const statutChange =
+      ancienStatut.present       !== nouveauStatut.present ||
+      ancienStatut.retardMinutes !== nouveauStatut.retardMinutes;
+
+    // ========================================
+    // LOGIQUE NOTIFICATIONS
+    //
+    //  absent  → présent (15min auto) : message RETARD 15 min
+    //  absent  → retard X min         : message RETARD X min
+    //  présent → absent               : message ABSENCE
+    //  présent → retard               : message RETARD
+    //  inchangé                       : rien
+    // ========================================
+    let typeNotif   = null;
+    let retardFinal = nouveauStatut.retardMinutes;
+
+    if (statutChange) {
+      if (nouveauStatut.retardMinutes > 0) {
+        // → Retard (avec minutes)
+        typeNotif = 'retard';
+
+      } else if (!nouveauStatut.present) {
+        // → Absent
+        typeNotif = 'absence';
+      }
+      // présent + retard=0 ne devrait plus arriver avec la logique ci-dessus
+    }
+
+    // ── Envoyer notification si nécessaire ──
+    if (typeNotif) {
+      setImmediate(async () => {
+        try {
+          if (typeNotif === 'retard') {
+            console.log(`📤 [Admin] RETARD [${periode}] → ${etudiantData.nomComplet} (${retardFinal} min)`);
+            await notificationQueue.ajouterNotification(
+              'retard',
+              etudiantData,
+              presence.cours,
+              presence.dateSession,
+              {
+                retardMinutes: retardFinal,
+                remarque:      presence.remarque || '',
+                periode:       periode,
+                creePar:       req.adminId || null
+              }
+            );
+          } else {
+            console.log(`📤 [Admin] ABSENCE [${periode}] → ${etudiantData.nomComplet}`);
+            await notificationQueue.ajouterNotification(
+              'absence',
+              etudiantData,
+              presence.cours,
+              presence.dateSession,
+              {
+                remarque: presence.remarque || '',
+                periode:  periode,
+                creePar:  req.adminId || null
+              }
+            );
+          }
+        } catch (notifErr) {
+          console.error(`❌ [Admin] Erreur notification:`, notifErr.message);
+        }
+      });
+
+      // ✅ Recharger depuis BDD → données fraîches (present=true, retardMinutes=15)
+      const presenceFraiche = await Presence.findById(id);
+
+      return res.json({
+        success: true,
+        presence: presenceFraiche,
+        notification: {
+          statut:  'envoi_en_cours',
+          type:    typeNotif,
+          periode: periode,
+          message: typeNotif === 'retard'
+            ? `Message retard (${retardFinal} min) [${periode}] envoyé aux parents`
+            : `Message absence [${periode}] envoyé aux parents`
+        }
+      });
+    }
+
+    // Pas de notification
+    const presenceFraiche = await Presence.findById(id);
+    res.json({
+      success:  true,
+      presence: presenceFraiche,
+      notification: {
+        statut:  'aucune',
+        message: 'Statut inchangé - pas de notification'
+      }
+    });
 
   } catch (err) {
+    console.error('❌ Erreur PUT /api/admin/presences:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -8692,7 +8814,9 @@ app.get('/api/etudiants/par-cours/:coursNom', authAdminOrInscripteurOrPaiementMa
   }
 });
 
+
 // Route pour créer présence en tant qu'admin/inscripteur
+
 app.post('/api/presences/manuel', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const { 

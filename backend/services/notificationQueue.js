@@ -20,13 +20,14 @@ class NotificationQueue {
   async ajouterNotification(type, etudiantData, cours, dateSession, options = {}) {
     const notification = {
       id: Date.now() + Math.random(),
-      type, // 'absence' ou 'retard'
+      type,
       etudiantData,
       cours,
       dateSession,
       retardMinutes: options.retardMinutes || 0,
       remarque: options.remarque || '',
-      creePar: options.creePar,
+      periode: options.periode || '',       // ✅ matin ou soir
+      creePar: options.creePar || null,     // ✅ optionnel - pas required
       timestamp: new Date()
     };
 
@@ -34,10 +35,9 @@ class NotificationQueue {
     this.stats.total++;
     this.stats.enAttente++;
 
-    console.log(`📥 Notification ajoutée à la queue: ${type} - ${etudiantData.nomComplet}`);
+    console.log(`📥 Notification [${type}] [${notification.periode}] ajoutée: ${etudiantData.nomComplet}`);
     console.log(`📊 Queue: ${this.queue.length} notification(s) en attente`);
 
-    // Démarrer le traitement si pas déjà en cours
     if (!this.isProcessing) {
       this.traiterQueue();
     }
@@ -72,7 +72,6 @@ class NotificationQueue {
         this.stats.echoues++;
       }
 
-      // Afficher progression
       console.log(`📊 Progression: ${this.stats.envoyes}/${this.stats.total} envoyés | ${this.queue.length} restants\n`);
     }
 
@@ -84,10 +83,10 @@ class NotificationQueue {
    * 📤 Envoyer une notification
    */
   async envoyerNotification(notification) {
-    const { type, etudiantData, cours, dateSession, retardMinutes, remarque, creePar } = notification;
+    const { type, etudiantData, cours, dateSession, retardMinutes, remarque, periode, creePar } = notification;
 
-    // Créer d'abord l'enregistrement en BDD avec statut "en_attente"
-    const notificationDoc = await Notification.create({
+    // ✅ Construire l'objet Notification - creePar optionnel
+    const notifData = {
       etudiant: etudiantData._id,
       type,
       cours,
@@ -111,26 +110,34 @@ class NotificationQueue {
           statut: 'en_attente'
         }] : [])
       ],
-      creePar,
       statutGlobal: 'en_cours'
-    });
+    };
+
+    // ✅ Ajouter creePar SEULEMENT s'il existe (évite l'erreur required)
+    if (creePar) {
+      notifData.creePar = creePar;
+    }
+
+    const notificationDoc = await Notification.create(notifData);
 
     let result;
 
-    // Envoyer selon le type
+    // ✅ Envoyer avec periode (matin/soir)
     if (type === 'absence') {
       result = await whatsappService.notifierAbsence(
         etudiantData,
         cours,
         dateSession,
-        remarque
+        remarque,
+        periode    // ✅ passé à whatsappService
       );
     } else if (type === 'retard') {
       result = await whatsappService.notifierRetard(
         etudiantData,
         cours,
         dateSession,
-        retardMinutes
+        retardMinutes,
+        periode    // ✅ passé à whatsappService
       );
     }
 
@@ -145,7 +152,6 @@ class NotificationQueue {
       }
     }
 
-    // Incrémenter le compteur de tentatives
     await notificationDoc.incrementerTentatives();
 
     return result;
@@ -175,5 +181,4 @@ class NotificationQueue {
   }
 }
 
-// Export singleton
 module.exports = new NotificationQueue();
