@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { 
   BookOpen, 
   Calendar, 
@@ -36,7 +36,10 @@ const AjouterPresence = () => {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
-  const [showInfoModal, setShowInfoModal] = useState(true); // true = s'affiche automatiquement
+  const [showInfoModal, setShowInfoModal] = useState(true);
+
+  // ✅ Protection double-clic
+  const isSubmittingRef = useRef(false);
 
   const navigate = useNavigate();
 
@@ -82,7 +85,6 @@ const AjouterPresence = () => {
       * { box-sizing: border-box !important; }
       html, body { overflow-x: hidden !important; width: 100% !important; }
       
-      /* Affichage par défaut - Desktop */
       .desktop-view { display: block !important; }
       .mobile-view { display: none !important; }
       
@@ -107,10 +109,8 @@ const AjouterPresence = () => {
       }
       
       @media (max-width: 768px) {
-        /* Cacher desktop, afficher mobile */
         .desktop-view { display: none !important; }
         .mobile-view { display: block !important; }
-        
         .main-content { padding: 12px !important; }
         .form-content { padding: 16px !important; }
         .card-header { padding: 16px 20px !important; }
@@ -120,10 +120,8 @@ const AjouterPresence = () => {
       }
       
       @media (max-width: 480px) {
-        /* Forcer mobile view sur petits écrans */
         .desktop-view { display: none !important; }
         .mobile-view { display: block !important; }
-        
         .main-content { padding: 8px !important; }
         .form-content { padding: 12px !important; }
         .title { font-size: 20px !important; }
@@ -155,12 +153,11 @@ const AjouterPresence = () => {
     }
   }, [selectedHoraire]);
 
-  // Vérifier si tous les champs sont remplis
   const areAllFieldsFilled = useCallback(() => {
     return Boolean(selectedCours && dateSession && heureDebut && heureFin);
   }, [selectedCours, dateSession, heureDebut, heureFin]);
 
-  // Charger les étudiants avec debounce (optimisation mobile)
+  // Charger les étudiants
   useEffect(() => {
     if (!areAllFieldsFilled()) {
       setPresences([]);
@@ -171,14 +168,13 @@ const AjouterPresence = () => {
     setIsLoadingStudents(true);
     setMessage('');
 
-    // Debounce: attendre 800ms avant de charger
     const timeoutId = setTimeout(async () => {
       try {
         const token = localStorage.getItem('token');
         
         const res = await axios.get('/api/professeur/etudiants', {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 15000 // 15 secondes pour connexion lente
+          timeout: 15000
         });
 
         const filtered = res.data.filter(et => et.cours.includes(selectedCours));
@@ -226,17 +222,21 @@ const AjouterPresence = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (isSubmitting || isLoadingStudents) return;
+    // ✅ Double protection contre le double-clic
+    if (isSubmitting || isLoadingStudents || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     const token = localStorage.getItem('token');
 
     if (!selectedCours || !dateSession || !heureDebut || !heureFin) {
       setMessage('error');
+      isSubmittingRef.current = false;
       return;
     }
 
     if (heureFin <= heureDebut) {
       setMessage('error');
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -246,7 +246,8 @@ const AjouterPresence = () => {
     const heure = `${heureDebut}-${heureFin}`;
 
     try {
-      const promises = presences.map(pres => {
+      // ✅ for...of بدل Promise.all - يرسل واحد واحد بالترتيب
+      for (const pres of presences) {
         const dataToSend = {
           etudiant: pres.etudiant,
           cours: selectedCours,
@@ -258,14 +259,12 @@ const AjouterPresence = () => {
           periode
         };
 
-        return axios.post('/api/presences', dataToSend, {
+        await axios.post('/api/presences', dataToSend, {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 20000
         });
-      });
+      }
 
-      await Promise.all(promises);
-      
       setMessage('success');
       setTimeout(() => {
         window.location.reload();
@@ -285,6 +284,7 @@ const AjouterPresence = () => {
       }
       
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -771,14 +771,14 @@ const AjouterPresence = () => {
                 )}
               </div>
             )}
-   
           </div>
         </div>
       </div>
-         <ModalMessageProf 
-      isOpen={showInfoModal} 
-      onClose={() => setShowInfoModal(false)} 
-    />
+
+      <ModalMessageProf 
+        isOpen={showInfoModal} 
+        onClose={() => setShowInfoModal(false)} 
+      />
     </div>
   );
 };

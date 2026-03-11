@@ -1,41 +1,75 @@
 const mongoose = require('mongoose');
 
 const presenceSchema = new mongoose.Schema({
-  etudiant: { type: mongoose.Schema.Types.ObjectId, ref: 'Etudiant', required: true },
+  etudiant: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Etudiant', 
+    required: true 
+  },
 
-  cours: { type: String, required: true }, // أو ObjectId إذا عدلت النظام
+  cours: { 
+    type: String, 
+    required: true 
+  },
 
-  dateSession: { type: Date, required: true },
+  dateSession: { 
+    type: Date, 
+    required: true 
+  },
 
-  present: { type: Boolean, default: false },
+  present: { 
+    type: Boolean, 
+    default: false 
+  },
 
-    retardMinutes: {
+  retardMinutes: {
     type: Number,
     default: 0,
     min: 0,
-    max: 60 // Maximum 1 heure de retard
+    max: 60
   },
 
-  remarque: { type: String },
+  remarque: { 
+    type: String 
+  },
 
-  creePar: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+  creePar: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Admin' 
+  },
 
-  // 🕒 الوقت الفعلي (hh:mm)
   heure: {
     type: String,
-    required: false // يمكنك جعله مطلوب إذا أردت
+    required: false
   },
 
-  // 🌅 matin أو soir
   periode: {
     type: String,
     enum: ['matin', 'soir'],
     required: true
-  }
-  ,matiere: { type: String },
-nomProfesseur: { type: String },
-
+  },
+  
+  matiere: { 
+    type: String 
+  },
+  
+  nomProfesseur: { 
+    type: String 
+  },
 
 }, { timestamps: true });
+
+// ✅ يمنع تكرار نفس الحضور
+presenceSchema.index(
+  { 
+    etudiant: 1, 
+    cours: 1, 
+    dateSession: 1, 
+    heure: 1, 
+    periode: 1,
+    creePar: 1
+  },
+  { unique: true }
+);
 
 module.exports = mongoose.model('Presence', presenceSchema);
