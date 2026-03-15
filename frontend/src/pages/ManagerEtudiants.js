@@ -1100,6 +1100,29 @@ const handleConfirmDelete = async (e) => {
                           <Eye size={12} />
                           Voir
                         </button>
+
+                        <button 
+                          onClick={() => handleEdit(e)}
+                          title="Modifier"
+                          style={{
+                            background: '#f59e0b',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            minWidth: '70px',
+                            justifyContent: 'center',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <Edit size={12} />
+                          Modifier
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1202,6 +1225,14 @@ const handleConfirmDelete = async (e) => {
               title="Voir détails"
             >
               <Eye size={16} />
+            </button>
+
+            <button 
+              onClick={() => handleEdit(e)}
+              className="btn-carte btn-modifier"
+              title="Modifier"
+            >
+              <Edit size={16} />
             </button>
           </div>
         </div>
