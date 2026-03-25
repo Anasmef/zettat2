@@ -471,9 +471,10 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
   const header = [
     'Étudiant', 
     'Statut', 
-    'Retard (min)', 
+    'Retard',
     'Nb Absences', 
     'Nb Retards',
+    'Tél Étudiant',
     'Tél Mère', 
     'Tél Père', 
     'Remarque'
@@ -481,10 +482,11 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
   
   const colWidths = [
     { wch: 28 }, // Étudiant
-    { wch: 12 }, // Statut
-    { wch: 12 }, // Retard
+    { wch: 10 }, // Statut
+    { wch: 8 },  // Retard
     { wch: 12 }, // Nb Absences
     { wch: 12 }, // Nb Retards
+    { wch: 15 }, // Tél Étudiant
     { wch: 15 }, // Tél Mère
     { wch: 15 }, // Tél Père
     { wch: 40 }  // Remarque
@@ -597,6 +599,7 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
             const token = localStorage.getItem('token');
             let telMere = '—';
             let telPere = '—';
+            let telEtudiant = '—';
             
             try {
               const etudiantResponse = await axios.get(`/api/etudiants/${p.etudiant?._id}`, {
@@ -604,6 +607,7 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
               });
               telMere = etudiantResponse.data.telephoneMere || '—';
               telPere = etudiantResponse.data.telephonePere || '—';
+              telEtudiant = etudiantResponse.data.telephoneEtudiant || '—';
             } catch (error) {
               console.error('Erreur récupération étudiant:', error);
             }
@@ -614,6 +618,7 @@ const exportDailyPresences = async (date, professorName = null, statusFilter = '
               p.retardMinutes || 0,
               stats.nbAbsences,
               stats.nbRetards,
+              telEtudiant,
               telMere,
               telPere,
               p.remarque || ''

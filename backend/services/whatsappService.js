@@ -272,6 +272,121 @@ Merci de votre attention.
   }
 
   // ============================================
+  // ✅ TEMPLATES ANNIVERSAIRE bilingues FR + AR
+  // ============================================
+  buildAnniversaireMessage(nom) {
+    const templates = [
+
+      () =>
+`🎂 *Joyeux anniversaire ! | عيد ميلاد سعيد !*
+――――――――――――――――――――
+🇫🇷 *Français :*
+Cher parent, toute l'équipe de l'école Alfred Kastler est heureuse de souhaiter un
+🎉 *Joyeux anniversaire à ${nom} !* 🎉
+Nous lui souhaitons une journée pleine de joie, de bonheur et de réussite scolaire 🌟
+
+🇲🇦 *العربية :*
+ولي الأمر الكريم، يسعد فريق مؤسسة ألفريد كاستلر أن يتقدم بأحر التهاني بمناسبة عيد ميلاد
+🎉 *${nom}* 🎉
+نتمنى له/لها يوماً مليئاً بالفرح والسعادة والتوفيق الدراسي 🌟
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🌟 *Anniversaire élève | عيد ميلاد تلميذ*
+――――――――――――――――――――
+🇫🇷 Toute l'équipe pédagogique félicite *${nom}* pour son anniversaire 🎂
+Que cette nouvelle année soit synonyme de succès et de bonheur ! 🎊
+
+🇲🇦 يُهنئ الفريق التربوي كامل التلميذ(ة) *${nom}* بعيد ميلاده/ها 🎂
+نتمنى أن يكون هذا العام حافلاً بالنجاح والسعادة ! 🎊
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🎊 *Joyeux anniversaire | مبروك عيد الميلاد*
+――――――――――――――――――――
+🇫🇷 L'école Alfred Kastler souhaite un très
+🎂 *Joyeux anniversaire à ${nom}* 🎂
+Beaucoup de bonheur, de santé et de réussite ! ✨
+
+🇲🇦 تُهدي مؤسسة ألفريد كاستلر أجمل التهاني لـ
+🎂 *${nom}* بمناسبة عيد ميلاده/ها 🎂
+كل عام وأنتم بخير، وعمر مديد بالصحة والنجاح ! ✨
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🎈 *Bonne fête ! | كل عام وأنتم بخير !*
+――――――――――――――――――――
+🇫🇷 Cher parent, nous avons la joie de vous informer que
+*${nom}* fête son anniversaire aujourd'hui 🎂
+Toute l'équipe lui souhaite une magnifique journée pleine de rires et de bonheur ! 🥳
+
+🇲🇦 ولي الأمر الكريم، يسعدنا إعلامكم بأن
+*${nom}* يحتفل/تحتفل بعيد ميلاده/ها اليوم 🎂
+يتمنى له/لها الفريق كامل يوماً رائعاً مليئاً بالضحكات والسعادة ! 🥳
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🥳 *Célébration anniversaire | احتفال عيد الميلاد*
+――――――――――――――――――――
+🇫🇷 *${nom}* souffle ses bougies aujourd'hui ! 🕯️🎂
+L'équipe d'Alfred Kastler lui adresse ses vœux les plus chaleureux.
+Santé, bonheur et excellence scolaire ! 💫
+
+🇲🇦 *${nom}* ينفخ/تنفخ الشموع اليوم ! 🕯️🎂
+يبعث فريق ألفريد كاستلر بأصدق التمنيات.
+صحة، سعادة وتميز دراسي ! 💫
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🎁 *Joyeux anniversaire ! | عيد ميلاد مبارك !*
+――――――――――――――――――――
+🇫🇷 En ce jour spécial, l'école Alfred Kastler tient à féliciter
+🌸 *${nom}* 🌸
+pour son anniversaire et lui souhaite tout le bonheur du monde ! 🌈
+
+🇲🇦 في هذا اليوم المميز، تتقدم مؤسسة ألفريد كاستلر بالتهنئة لـ
+🌸 *${nom}* 🌸
+بمناسبة عيد ميلاده/ها وتتمنى له/لها كل السعادة ! 🌈
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`⭐ *Happy Birthday ! | عيد ميلاد سعيد !*
+――――――――――――――――――――
+🇫🇷 *${nom}*, toute la famille Alfred Kastler te souhaite un
+🎂 *Joyeux anniversaire* 🎂
+Que tes rêves se réalisent et que cette année t'apporte joie et succès ! 🌟
+
+🇲🇦 *${nom}*، تتمنى لك عائلة ألفريد كاستلر كاملة
+🎂 *عيد ميلاد سعيد* 🎂
+لتتحقق أحلامك وتكون هذه السنة مليئة بالفرح والنجاح ! 🌟
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
+
+      () =>
+`🌈 *Félicitations ! | مبروك !*
+――――――――――――――――――――
+🇫🇷 Cher parent, c'est avec grand plaisir que nous vous souhaitons
+un *joyeux anniversaire pour ${nom}* ! 🎂🎉
+Que cette belle journée soit le début d'une année remplie de succès ! ✨
+
+🇲🇦 ولي الأمر الكريم، يسعدنا أن نُهنئكم بمناسبة
+عيد ميلاد *${nom}* ! 🎂🎉
+نتمنى أن يكون هذا اليوم الجميل بداية عام مليء بالنجاحات ! ✨
+――――――――――――――――――――
+🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`
+
+    ];
+
+    return templates[Math.floor(Math.random() * templates.length)]();
+  }
+
+  // ============================================
   // NORMALIZE PHONE
   // ============================================
   normalizePhone(phone) {
@@ -501,6 +616,58 @@ Merci de votre attention.
 
     const ok = resultats.filter(r => r.success).length;
     console.log(`✅ Retard [${periode}] ${nom}: ${ok}/${resultats.length} envoyé(s)`);
+    return { etudiant: nom, messagesEnvoyes: resultats.length, details: resultats };
+  }
+
+  // ============================================
+  // ✅ NOTIFIER ANNIVERSAIRE - PÈRE + MÈRE + ÉTUDIANT
+  // ============================================
+  async notifierAnniversaire(etudiant) {
+    const nom = etudiant.nomComplet;
+    const resultats = [];
+    const dejaSent = new Set();
+
+    // ── PÈRE ──
+    if (etudiant.telephonePere?.trim()) {
+      const norm = this.normalizePhone(etudiant.telephonePere);
+      if (!dejaSent.has(norm)) {
+        const msg = this.buildAnniversaireMessage(nom);
+        console.log(`🎂 [Anniversaire→Père] ${etudiant.telephonePere}`);
+        const r = await this.envoyerMessage(etudiant.telephonePere, msg);
+        resultats.push({ destinataire: 'Père', telephone: etudiant.telephonePere, ...r });
+        dejaSent.add(norm);
+        await this.smartDelay();
+      }
+    }
+
+    // ── MÈRE ──
+    if (etudiant.telephoneMere?.trim()) {
+      const norm = this.normalizePhone(etudiant.telephoneMere);
+      if (!dejaSent.has(norm)) {
+        const msg = this.buildAnniversaireMessage(nom);
+        console.log(`🎂 [Anniversaire→Mère] ${etudiant.telephoneMere}`);
+        const r = await this.envoyerMessage(etudiant.telephoneMere, msg);
+        resultats.push({ destinataire: 'Mère', telephone: etudiant.telephoneMere, ...r });
+        dejaSent.add(norm);
+        await this.smartDelay();
+      }
+    }
+
+    // ── ÉTUDIANT (toujours envoyé, pas juste fallback) ──
+    if (etudiant.telephoneEtudiant?.trim()) {
+      const norm = this.normalizePhone(etudiant.telephoneEtudiant);
+      if (!dejaSent.has(norm)) {
+        const msg = this.buildAnniversaireMessage(nom);
+        console.log(`🎂 [Anniversaire→Étudiant] ${etudiant.telephoneEtudiant}`);
+        const r = await this.envoyerMessage(etudiant.telephoneEtudiant, msg);
+        resultats.push({ destinataire: 'Étudiant', telephone: etudiant.telephoneEtudiant, ...r });
+        dejaSent.add(norm);
+        await this.smartDelay();
+      }
+    }
+
+    const ok = resultats.filter(r => r.success).length;
+    console.log(`✅ Anniversaire ${nom}: ${ok}/${resultats.length} envoyé(s)`);
     return { etudiant: nom, messagesEnvoyes: resultats.length, details: resultats };
   }
 

@@ -10,7 +10,9 @@ const QRCodeGen = require('qrcode');
 const Parent = require('./models/Parent'); // ← AJOUTER CETTE LIGNE
 const pdfMake = require('pdfmake');
 const ListeNoire = require('./models/ListeNoire');
-
+const Notification = require('./models/Notification');
+const whatsappService = require('./services/whatsappService');
+const notificationQueue = require('./services/notificationQueue');
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
 const Rapport = require('./models/Rapport'); // 👈 importe ton modèle
@@ -69,8 +71,13 @@ mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
-.then(() => console.log('✅ Connexion à MongoDB réussie'))
+.then(() => {
+  console.log('✅ Connexion à MongoDB réussie');
+  require('./services/birthdayCron');
+})
 .catch((err) => console.error('❌ Erreur MongoDB:', err));
+
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/'); // مجلد الصور
@@ -7855,9 +7862,7 @@ app.put('/api/presences/:id', authProfesseur, async (req, res) => {
 });
 
 // ✅ API pour créer/modifier une présence avec NOTIFICATIONS WHATSAPP
-const Notification = require('./models/Notification');
-const whatsappService = require('./services/whatsappService');
-const notificationQueue = require('./services/notificationQueue');
+
  // ✅ API PRESENCES - النسخة الصحيحة
 
 app.post('/api/presences', authProfesseur, async (req, res) => {

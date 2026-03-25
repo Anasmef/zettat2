@@ -57,7 +57,7 @@ const AjouterRapport = () => {
     'Autre'
   ];
 
-  // Charger les cours au montage
+  // ✅ Charger les cours au montage
   useEffect(() => {
     const fetchCours = async () => {
       try {
@@ -69,11 +69,13 @@ const AjouterRapport = () => {
           return;
         }
 
-        const res = await axios.get('/api/rapports/professeur/mes-cours', {
+        // ✅ تبديل الراوت
+        const res = await axios.get('/api/professeur/mes-cours', {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 15000
         });
 
+        console.log('✅ Cours chargés:', res.data); // للديباغ
         setCours(res.data);
       } catch (error) {
         console.error('❌ Erreur chargement cours:', error);
@@ -84,7 +86,7 @@ const AjouterRapport = () => {
     fetchCours();
   }, [navigate]);
 
-  // Charger les étudiants quand un cours est sélectionné
+  // ✅ Charger les étudiants quand un cours est sélectionné
   useEffect(() => {
     if (!selectedCours) {
       setEtudiants([]);
@@ -98,15 +100,20 @@ const AjouterRapport = () => {
       try {
         const token = localStorage.getItem('token');
         
-        const res = await axios.get(`/api/rapports/professeur/etudiants/${selectedCours}`, {
+        // ✅ جلب كاع الإيتوديان ومن بعد فيلتري
+        const res = await axios.get('/api/professeur/etudiants', {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 15000
         });
 
-        setEtudiants(res.data);
+        // ✅ فيلتري الإيتوديان حسب الكورس
+        const filtered = res.data.filter(et => et.cours.includes(selectedCours));
+        console.log('✅ Étudiants filtrés:', filtered); // للديباغ
+        
+        setEtudiants(filtered);
         setIsLoadingStudents(false);
       } catch (error) {
-        console.error('Erreur chargement étudiants:', error);
+        console.error('❌ Erreur chargement étudiants:', error);
         setIsLoadingStudents(false);
         setMessage('error_students');
       }

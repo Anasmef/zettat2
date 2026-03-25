@@ -26,8 +26,8 @@ class NotificationQueue {
       dateSession,
       retardMinutes: options.retardMinutes || 0,
       remarque: options.remarque || '',
-      periode: options.periode || '',       // ✅ matin ou soir
-      creePar: options.creePar || null,     // ✅ optionnel - pas required
+      periode: options.periode || '',
+      creePar: options.creePar || null,
       timestamp: new Date()
     };
 
@@ -85,7 +85,13 @@ class NotificationQueue {
   async envoyerNotification(notification) {
     const { type, etudiantData, cours, dateSession, retardMinutes, remarque, periode, creePar } = notification;
 
-    // ✅ Construire l'objet Notification - creePar optionnel
+    // ✅ Pour anniversaire : pas de document Notification créé (pas de cours/dateSession)
+    if (type === 'anniversaire') {
+      const result = await whatsappService.notifierAnniversaire(etudiantData);
+      return result;
+    }
+
+    // ✅ Construire l'objet Notification pour absence/retard
     const notifData = {
       etudiant: etudiantData._id,
       type,
@@ -113,7 +119,7 @@ class NotificationQueue {
       statutGlobal: 'en_cours'
     };
 
-    // ✅ Ajouter creePar SEULEMENT s'il existe (évite l'erreur required)
+    // ✅ Ajouter creePar SEULEMENT s'il existe
     if (creePar) {
       notifData.creePar = creePar;
     }
@@ -122,14 +128,13 @@ class NotificationQueue {
 
     let result;
 
-    // ✅ Envoyer avec periode (matin/soir)
     if (type === 'absence') {
       result = await whatsappService.notifierAbsence(
         etudiantData,
         cours,
         dateSession,
         remarque,
-        periode    // ✅ passé à whatsappService
+        periode
       );
     } else if (type === 'retard') {
       result = await whatsappService.notifierRetard(
@@ -137,7 +142,7 @@ class NotificationQueue {
         cours,
         dateSession,
         retardMinutes,
-        periode    // ✅ passé à whatsappService
+        periode
       );
     }
 
