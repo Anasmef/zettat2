@@ -24,7 +24,9 @@ const adminSchema = new mongoose.Schema({
     actif: {
         type: Boolean,
         default: true
-    }
+    },
+    minutesAcces: { type: Number, default: 0 },
+lastSeen: { type: Date }
 }, { timestamps: true });
 
 adminSchema.methods.comparePassword = function (mot) {

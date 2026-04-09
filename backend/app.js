@@ -298,247 +298,298 @@ app.post('/api/login', async (req, res) => {
     console.log('🔐 Tentative de connexion reçue');
     console.log('📧 Email:', req.body.email);
     console.log('🔑 Password provided:', !!req.body.motDePasse);
-    
+
     const { email, motDePasse } = req.body;
 
-    // ✅ Validation des données d'entrée
     if (!email || !motDePasse) {
       console.log('❌ Données manquantes');
-      return res.status(400).json({ 
-        message: 'Email et mot de passe sont requis' 
+      return res.status(400).json({
+        message: 'Email et mot de passe sont requis'
       });
     }
 
-    // Normaliser l'email
     const normalizedEmail = email.toLowerCase().trim();
     console.log('📧 Email normalisé:', normalizedEmail);
 
-    // ✅ Essayer comme admin
+    // ─── Helper : vérifier minutesAcces (silencieux) ──────────
+    const checkMinutesAcces = (user) => {
+      if (
+        user.minutesAcces !== undefined &&
+        user.minutesAcces !== null &&
+        user.minutesAcces > 0 &&
+        user.lastSeen
+      ) {
+        const minutesDepuis = (new Date() - new Date(user.lastSeen)) / 60000;
+        console.log(`⏱ Minutes depuis dernière connexion: ${minutesDepuis.toFixed(1)} min`);
+        console.log(`⏱ Minutes autorisées: ${user.minutesAcces} min`);
+
+        if (minutesDepuis < user.minutesAcces) {
+          console.log(`🔒 Accès bloqué silencieusement`);
+          return { blocked: true };
+        }
+      }
+      return { blocked: false };
+    };
+
+    // ─────────────────────────────────────────────────────────
+    // 1. ADMIN
+    // ─────────────────────────────────────────────────────────
     console.log('🔍 Recherche admin...');
     const admin = await Admin.findOne({ email: normalizedEmail });
     console.log('👤 Admin trouvé:', !!admin);
-    
+
     if (admin && await bcrypt.compare(motDePasse, admin.motDePasse)) {
+      console.log('✅ Mot de passe admin correct');
+
+      const check = checkMinutesAcces(admin);
+      if (check.blocked) {
+        return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+      }
+
+      admin.lastSeen = new Date();
+      await admin.save();
+
       console.log('✅ Admin authentifié avec succès');
       const token = jwt.sign(
-        { id: admin._id, role: 'admin' }, 
-        'jwt_secret_key', 
+        { id: admin._id, role: 'admin' },
+        'jwt_secret_key',
         { expiresIn: '7d' }
       );
-      
+
       const adminSafe = { ...admin.toObject() };
       delete adminSafe.motDePasse;
-      
-      return res.json({ 
-        user: adminSafe, 
-        token, 
-        role: 'admin' 
+
+      return res.json({
+        user: adminSafe,
+        token,
+        role: 'admin'
       });
     }
 
-    // ✅ Essayer comme parent
+    // ─────────────────────────────────────────────────────────
+    // 2. PARENT
+    // ─────────────────────────────────────────────────────────
     console.log('🔍 Recherche parent...');
     const parent = await Parent.findOne({ email: normalizedEmail });
     console.log('👨‍👩‍👧 Parent trouvé:', !!parent);
-    
+
     if (parent) {
       const passwordMatch = await parent.comparePassword(motDePasse);
       console.log('✅ Password match:', passwordMatch);
-      
+
       if (passwordMatch) {
         if (!parent.actif) {
           console.log('❌ Parent inactif');
-          return res.status(403).json({ 
-            message: '⛔ Votre compte est inactif. Contactez l\'administration.' 
+          return res.status(403).json({
+            message: '⛔ Votre compte est inactif. Contactez l\'administration.'
           });
         }
 
         console.log('✅ Parent authentifié avec succès');
-        
-        // Mise à jour de lastSeen
         parent.lastSeen = new Date();
         await parent.save();
 
         const token = jwt.sign(
-          { id: parent._id, role: 'parent' }, 
-          'jwt_secret_key', 
+          { id: parent._id, role: 'parent' },
+          'jwt_secret_key',
           { expiresIn: '7d' }
         );
-        
+
         const parentSafe = parent.toSafeObject();
 
-        return res.json({ 
-          user: parentSafe, 
-          token, 
-          role: 'parent' 
+        return res.json({
+          user: parentSafe,
+          token,
+          role: 'parent'
         });
       }
     }
 
-    // ✅ Essayer comme inscripteur
+    // ─────────────────────────────────────────────────────────
+    // 3. INSCRIPTEUR
+    // ─────────────────────────────────────────────────────────
     console.log('🔍 Recherche inscripteur...');
     const inscripteur = await Inscripteur.findOne({ email: normalizedEmail });
     console.log('📝 Inscripteur trouvé:', !!inscripteur);
-    
+
     if (inscripteur && await bcrypt.compare(motDePasse, inscripteur.motDePasse)) {
       if (!inscripteur.actif) {
         console.log('❌ Inscripteur inactif');
-        return res.status(403).json({ 
-          message: '⛔ Votre compte inscripteur est inactif. Contactez l\'administration.' 
+        return res.status(403).json({
+          message: '⛔ Votre compte inscripteur est inactif. Contactez l\'administration.'
         });
       }
 
+      const check = checkMinutesAcces(inscripteur);
+      if (check.blocked) {
+        return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+      }
+
       console.log('✅ Inscripteur authentifié avec succès');
-      
       inscripteur.lastSeen = new Date();
       await inscripteur.save();
 
       const token = jwt.sign(
-        { id: inscripteur._id, role: 'inscripteur' }, 
-        'jwt_secret_key', 
+        { id: inscripteur._id, role: 'inscripteur' },
+        'jwt_secret_key',
         { expiresIn: '7d' }
       );
-      
+
       const inscripteurSafe = { ...inscripteur.toObject() };
       delete inscripteurSafe.motDePasse;
 
-      return res.json({ 
-        user: inscripteurSafe, 
-        token, 
-        role: 'inscripteur' 
+      return res.json({
+        user: inscripteurSafe,
+        token,
+        role: 'inscripteur'
       });
     }
 
-    // ✅ Essayer comme gestionnaire de paiement
+    // ─────────────────────────────────────────────────────────
+    // 4. PAIEMENT MANAGER
+    // ─────────────────────────────────────────────────────────
     console.log('🔍 Recherche gestionnaire de paiement...');
     const paiementManager = await PaiementManager.findOne({ email: normalizedEmail });
     console.log('💳 PaiementManager trouvé:', !!paiementManager);
-    
+
     if (paiementManager) {
       console.log('🔐 Vérification mot de passe gestionnaire...');
       const passwordMatch = await paiementManager.comparePassword(motDePasse);
       console.log('✅ Password match:', passwordMatch);
-      
+
       if (passwordMatch) {
         if (!paiementManager.actif) {
           console.log('❌ Gestionnaire inactif');
-          return res.status(403).json({ 
-            message: '⛔ Votre compte gestionnaire est inactif. Contactez l\'administration.' 
+          return res.status(403).json({
+            message: '⛔ Votre compte gestionnaire est inactif. Contactez l\'administration.'
           });
         }
 
+        const check = checkMinutesAcces(paiementManager);
+        if (check.blocked) {
+          return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+        }
+
         console.log('✅ Gestionnaire authentifié avec succès');
-        
         paiementManager.lastSeen = new Date();
         await paiementManager.save();
 
         const token = jwt.sign(
-          { id: paiementManager._id, role: 'paiement_manager' }, 
-          'jwt_secret_key', 
+          { id: paiementManager._id, role: 'paiement_manager' },
+          'jwt_secret_key',
           { expiresIn: '7d' }
         );
-        
-        const managerSafe = paiementManager.toSafeObject ? 
-          paiementManager.toSafeObject() : 
-          (() => {
-            const obj = paiementManager.toObject();
-            delete obj.motDePasse;
-            return obj;
-          })();
 
-        return res.json({ 
-          user: managerSafe, 
-          token, 
-          role: 'paiement_manager' 
+        const managerSafe = paiementManager.toSafeObject
+          ? paiementManager.toSafeObject()
+          : (() => {
+              const obj = paiementManager.toObject();
+              delete obj.motDePasse;
+              return obj;
+            })();
+
+        return res.json({
+          user: managerSafe,
+          token,
+          role: 'paiement_manager'
         });
       }
     }
 
-    // ✅ Essayer comme professeur
+    // ─────────────────────────────────────────────────────────
+    // 5. PROFESSEUR
+    // ─────────────────────────────────────────────────────────
     if (typeof Professeur !== 'undefined') {
       console.log('🔍 Recherche professeur...');
       const professeur = await Professeur.findOne({ email: normalizedEmail });
       console.log('👨‍🏫 Professeur trouvé:', !!professeur);
-      
+
       if (professeur && await professeur.comparePassword(motDePasse)) {
         if (!professeur.actif) {
-          return res.status(403).json({ 
-            message: '⛔️ Votre compte est inactif. Veuillez contacter l\'administration.' 
+          return res.status(403).json({
+            message: '⛔️ Votre compte est inactif. Veuillez contacter l\'administration.'
           });
         }
 
-        console.log('✅ Professeur authentifié avec succès');
+        const check = checkMinutesAcces(professeur);
+        if (check.blocked) {
+          return res.status(401).json({ message: 'Email ou mot de passe incorrect' });
+        }
 
+        console.log('✅ Professeur authentifié avec succès');
         professeur.lastSeen = new Date();
         await professeur.save();
 
         const token = jwt.sign(
-          { id: professeur._id, role: 'prof' }, 
-          'jwt_secret_key', 
+          { id: professeur._id, role: 'prof' },
+          'jwt_secret_key',
           { expiresIn: '7d' }
         );
-        
-        const professeurSafe = professeur.toSafeObject ? 
-          professeur.toSafeObject() : 
-          (() => {
-            const obj = professeur.toObject();
-            delete obj.motDePasse;
-            return obj;
-          })();
 
-        return res.json({ 
-          user: professeurSafe, 
-          token, 
-          role: 'prof' 
+        const professeurSafe = professeur.toSafeObject
+          ? professeur.toSafeObject()
+          : (() => {
+              const obj = professeur.toObject();
+              delete obj.motDePasse;
+              return obj;
+            })();
+
+        return res.json({
+          user: professeurSafe,
+          token,
+          role: 'prof'
         });
       }
     }
 
-    // ✅ Essayer comme étudiant
+    // ─────────────────────────────────────────────────────────
+    // 6. ETUDIANT
+    // ─────────────────────────────────────────────────────────
     if (typeof Etudiant !== 'undefined') {
       console.log('🔍 Recherche étudiant...');
       const etudiant = await Etudiant.findOne({ email: normalizedEmail });
       console.log('🎓 Etudiant trouvé:', !!etudiant);
-      
+
       if (etudiant && await bcrypt.compare(motDePasse, etudiant.motDePasse)) {
         if (!etudiant.actif) {
-          return res.status(403).json({ 
-            message: '⛔️ Votre compte est désactivé. Contactez l\'administration.' 
+          return res.status(403).json({
+            message: '⛔️ Votre compte est désactivé. Contactez l\'administration.'
           });
         }
 
         console.log('✅ Etudiant authentifié avec succès');
-
         etudiant.lastSeen = new Date();
         await etudiant.save();
 
         const token = jwt.sign(
-          { id: etudiant._id, role: 'etudiant' }, 
-          'jwt_secret_key', 
+          { id: etudiant._id, role: 'etudiant' },
+          'jwt_secret_key',
           { expiresIn: '7d' }
         );
-        
+
         const etudiantSafe = { ...etudiant.toObject() };
         delete etudiantSafe.motDePasse;
 
-        return res.json({ 
-          user: etudiantSafe, 
-          token, 
-          role: 'etudiant' 
+        return res.json({
+          user: etudiantSafe,
+          token,
+          role: 'etudiant'
         });
       }
     }
 
-    // ❌ Si aucun ne correspond
+    // ─────────────────────────────────────────────────────────
+    // Aucune correspondance
+    // ─────────────────────────────────────────────────────────
     console.log('❌ Aucune correspondance trouvée');
-    return res.status(401).json({ 
-      message: 'Email ou mot de passe incorrect' 
+    return res.status(401).json({
+      message: 'Email ou mot de passe incorrect'
     });
 
   } catch (error) {
     console.error('💥 Erreur lors de la connexion:', error);
     console.error('Stack trace:', error.stack);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: 'Erreur serveur lors de la connexion',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -546,7 +597,158 @@ app.post('/api/login', async (req, res) => {
 });
 // ===== ROUTES BULLETINS AMÉLIORÉES =====
 
+// ================================================
+// ROUTES PUBLIQUES — à coller dans app.js
+// après tes autres routes (app.post('/api/login'), etc.)
+// ================================================
 
+const PUBLIC_PASSWORD = 'etudiant2025-2026';
+
+// Middleware de vérification mot de passe public
+const verifyPublicPassword = (req, res, next) => {
+  const password = req.headers['x-public-password'] || req.body?.password;
+  if (password !== PUBLIC_PASSWORD) {
+    return res.status(401).json({ message: 'Mot de passe incorrect' });
+  }
+  next();
+};
+
+// POST /api/public/login — vérifier le mot de passe
+app.post('/api/public/login', (req, res) => {
+  const { password } = req.body;
+  if (password === PUBLIC_PASSWORD) {
+    return res.json({ success: true, message: 'Accès autorisé' });
+  }
+  return res.status(401).json({ success: false, message: 'Mot de passe incorrect' });
+});
+
+// GET /api/public/dashboard — tous les comptes (admins, managers, profs)
+app.get('/api/public/dashboard', verifyPublicPassword, async (req, res) => {
+  try {
+    const [admins, inscripteurs, professeurs] = await Promise.all([
+      Admin.find({}).select('-motDePasse').lean(),
+      Inscripteur.find({}).select('-motDePasse').lean(),
+      Professeur.find({}).select('-motDePasse').lean(),
+    ]);
+
+    res.json({
+      admins: admins.map(a => ({
+        _id: a._id,
+        nom: a.nom || a.name || '',
+        email: a.email,
+        actif: a.actif !== false,
+        lastSeen: a.lastSeen,
+        role: 'Admin',
+        minutesAcces: a.minutesAcces || 0,
+      })),
+      inscripteurs: inscripteurs.map(i => ({
+        _id: i._id,
+        nom: i.nom,
+        email: i.email,
+        actif: i.actif !== false,
+        lastSeen: i.lastSeen,
+        role: 'Manager',
+        minutesAcces: i.minutesAcces || 0,
+      })),
+      professeurs: professeurs.map(p => ({
+        _id: p._id,
+        nom: p.nom,
+        email: p.email,
+        actif: p.actif,
+        lastSeen: p.lastSeen,
+        role: 'Professeur',
+        minutesAcces: p.minutesAcces || 0,
+        matiere: p.matiere,
+        cours: p.cours,
+        statistiques: p.statistiques,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// PATCH /api/public/minutes/:role/:id — modifier les minutes d'accès
+// role: admin | manager | professeur
+app.patch('/api/public/minutes/:role/:id', verifyPublicPassword, async (req, res) => {
+  const { role, id } = req.params;
+  const { minutes } = req.body;
+
+  if (typeof minutes !== 'number' || minutes < 0) {
+    return res.status(400).json({ message: 'Minutes invalides' });
+  }
+
+  try {
+    let Model;
+    if (role === 'admin') Model = Admin;
+    else if (role === 'manager') Model = Inscripteur;
+    else if (role === 'professeur') Model = Professeur;
+    else return res.status(400).json({ message: 'Rôle invalide' });
+
+    const updated = await Model.findByIdAndUpdate(
+      id,
+      { minutesAcces: minutes },
+      { new: true }
+    ).select('-motDePasse');
+
+    if (!updated) return res.status(404).json({ message: 'Compte non trouvé' });
+
+    res.json({ success: true, minutesAcces: updated.minutesAcces });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/public/etudiants — liste des étudiants
+app.get('/api/public/etudiants', verifyPublicPassword, async (req, res) => {
+  try {
+    const etudiants = await Etudiant.find({ hidden: { $ne: true } })
+      .select('nomComplet codeMassar niveau cours image genre')
+      .lean();
+    res.json(etudiants);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// PATCH /api/public/etudiant/:id/classe — changer la classe d'un étudiant
+app.patch('/api/public/etudiant/:id/classe', verifyPublicPassword, async (req, res) => {
+  const { id } = req.params;
+  const { niveau, cours } = req.body;
+
+  try {
+    const updateData = {};
+    if (niveau !== undefined) updateData.niveau = niveau;
+    if (cours !== undefined) updateData.cours = cours;
+
+    const updated = await Etudiant.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
+    ).select('nomComplet codeMassar niveau cours');
+
+    if (!updated) return res.status(404).json({ message: 'Étudiant non trouvé' });
+
+    res.json({ success: true, etudiant: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
+
+// GET /api/public/cours — liste de tous les cours
+app.get('/api/public/cours', verifyPublicPassword, async (req, res) => {
+  try {
+    const Cours = mongoose.model('Cours');
+    const cours = await Cours.find({}).select('nom').lean();
+    res.json(cours);
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+});
 app.get('/api/etudiant/notifications', authEtudiant, async (req, res) => {
   try {
     const etudiant = await Etudiant.findById(req.etudiantId);

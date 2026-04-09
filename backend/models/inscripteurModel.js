@@ -26,7 +26,7 @@ const inscripteurSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
     required: true
-  },
+  },minutesAcces: { type: Number, default: 0 },
   lastSeen: {
     type: Date,
     default: Date.now

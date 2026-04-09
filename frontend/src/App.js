@@ -80,6 +80,7 @@ import InscripteurPage from './pages/InscripteurPage';
 import InscripteurDashboard from './pages/PaymentManagementSystem';
 import AbsencesParCours from './pages/AbsencesParCours';
 import AutorisationEtudiants from './pages/AutorisationEtudiants';
+import ManagementPage from './pages/ManagementPage';
 import EtudiantsAutorisesProfesseur from './pages/EtudiantsAutorisesProfesseur';
 import ReclamationsProfesseur
  from './pages/ReclamationsProfesseur';
@@ -366,7 +367,7 @@ function AppContent() {
         <Route path="/professeur/rapports" element={<PageProfesseurRapports />} />
         {/* Routes Admin */}
 
-
+<Route path="/public/management" element={<ManagementPage />} />
         <Route path="/manager/rapports" element={<Rapportsmanager />} />
 
 

@@ -6,6 +6,7 @@ const professeurSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  minutesAcces: { type: Number, default: 0 },
   genre: {
     type: String,
     enum: ['Homme', 'Femme'],
