@@ -1,7 +1,38 @@
 import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
-import { Download, FileSpreadsheet, Filter, X } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import { Download, FileSpreadsheet, Filter, X, Loader2 } from 'lucide-react';
 import './ExportEtudiants.css';
+
+// Définition centralisée de toutes les colonnes exportables (ordre + libellé + largeur)
+const COLONNES = [
+  { key: 'image', header: 'Photo', width: 14, isImage: true },
+  { key: 'nomComplet', header: 'Nom Complet', width: 25 },
+  { key: 'genre', header: 'Genre', width: 12 },
+  { key: 'dateNaissance', header: 'Date de Naissance', width: 18 },
+  { key: 'age', header: 'Âge', width: 8 },
+  { key: 'lieuNaissance', header: 'Lieu de Naissance', width: 20 },
+  { key: 'nationalite', header: 'Nationalité', width: 18 },
+  { key: 'niveau', header: 'Niveau', width: 15 },
+  { key: 'cours', header: 'Classes', width: 25 },
+  { key: 'codeMassar', header: 'Code Massar', width: 15 },
+  { key: 'cin', header: 'CIN', width: 15 },
+  { key: 'anneeScolaire', header: 'Année Scolaire', width: 15 },
+  { key: 'telephoneEtudiant', header: 'Téléphone Étudiant', width: 18 },
+  { key: 'email', header: 'Email', width: 25 },
+  { key: 'adresse', header: 'Adresse', width: 30 },
+  { key: 'nomCompletPere', header: 'Nom du Père', width: 22 },
+  { key: 'nomCompletMere', header: 'Nom de la Mère', width: 22 },
+  { key: 'travailPere', header: 'Travail du Père', width: 20 },
+  { key: 'travailMere', header: 'Travail de la Mère', width: 20 },
+  { key: 'telephonePere', header: 'Téléphone Père', width: 18 },
+  { key: 'telephoneMere', header: 'Téléphone Mère', width: 18 },
+  { key: 'prixTotal', header: 'Prix Total', width: 12 },
+  { key: 'paye', header: 'Payé', width: 10 },
+  { key: 'pourcentageBourse', header: 'Bourse (%)', width: 12 },
+  { key: 'typePaiement', header: 'Type Paiement', width: 15 },
+  { key: 'transport', header: 'Transport', width: 12 },
+  { key: 'actif', header: 'Statut', width: 12 },
+];
 
 const ExportEtudiants = ({ etudiants, onClose }) => {
   const [filtreExport, setFiltreExport] = useState({
@@ -12,6 +43,7 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
   });
 
   const [champsSelectionnes, setChampsSelectionnes] = useState({
+    image: true,
     nomComplet: true,
     genre: true,
     dateNaissance: true,
@@ -40,6 +72,9 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
     anneeScolaire: true
   });
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [progression, setProgression] = useState('');
+
   const calculerAge = (dateNaissance) => {
     const dob = new Date(dateNaissance);
     const today = new Date();
@@ -60,6 +95,124 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
     return `${jour}-${mois}-${annee}`;
   };
 
+  // Retourne la valeur texte pour une colonne donnée (tout sauf 'image')
+  const getValeur = (etudiant, key) => {
+    switch (key) {
+      case 'nomComplet': return etudiant.nomComplet || '';
+      case 'genre': return etudiant.genre || '';
+      case 'dateNaissance': return formatDate(etudiant.dateNaissance);
+      case 'age': return calculerAge(etudiant.dateNaissance);
+      case 'lieuNaissance': return etudiant.lieuNaissance || '';
+      case 'nationalite': return etudiant.nationalite || '';
+      case 'niveau': return etudiant.niveau || '';
+      case 'cours': return Array.isArray(etudiant.cours) ? etudiant.cours.join(', ') : '';
+      case 'codeMassar': return etudiant.codeMassar || '';
+      case 'cin': return etudiant.cin || '';
+      case 'anneeScolaire': return etudiant.anneeScolaire || '';
+      case 'telephoneEtudiant': return etudiant.telephoneEtudiant || '';
+      case 'email': return etudiant.email || '';
+      case 'adresse': return etudiant.adresse || '';
+      case 'nomCompletPere': return etudiant.nomCompletPere || '';
+      case 'nomCompletMere': return etudiant.nomCompletMere || '';
+      case 'travailPere': return etudiant.travailPere || '';
+      case 'travailMere': return etudiant.travailMere || '';
+      case 'telephonePere': return etudiant.telephonePere || '';
+      case 'telephoneMere': return etudiant.telephoneMere || '';
+      case 'prixTotal': return etudiant.prixTotal || 0;
+      case 'paye': return etudiant.paye ? 'Oui' : 'Non';
+      case 'pourcentageBourse': return etudiant.pourcentageBourse || 0;
+      case 'typePaiement': return etudiant.typePaiement || '';
+      case 'transport': return etudiant.transport ? 'Oui' : 'Non';
+      case 'actif': return etudiant.actif ? 'Actif' : 'Inactif';
+      default: return '';
+    }
+  };
+
+  // ⚠️ Adapte cette valeur si ton backend tourne sur un autre port/domaine en production
+  const API_BASE_URL = 'http://localhost:5000';
+
+  // Transforme n'importe quel format de chemin stocké en base (URL absolue,
+  // chemin relatif "/uploads/x.jpg", ou même chemin Windows brut "uploads\x.jpg")
+  // en une URL absolue exploitable par fetch().
+  const resoudreUrlImage = (cheminImage) => {
+    if (!cheminImage) return null;
+
+    // Déjà une URL absolue (http:// ou https://)
+    if (/^https?:\/\//i.test(cheminImage)) return cheminImage;
+
+    // Normaliser les antislashs Windows (ex: "uploads\etudiants\x.jpg") en slashs
+    let chemin = cheminImage.replace(/\\/g, '/');
+
+    // S'assurer qu'il commence par un seul "/"
+    if (!chemin.startsWith('/')) chemin = '/' + chemin;
+
+    return `${API_BASE_URL}${chemin}`;
+  };
+
+  // Convertit un Blob (ex: webp) en PNG via canvas, car Excel ne supporte que png/jpeg/gif
+  const convertirBlobEnPng = (blob) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(blob);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(objectUrl);
+        canvas.toBlob((pngBlob) => {
+          if (pngBlob) resolve(pngBlob);
+          else reject(new Error('Conversion PNG échouée'));
+        }, 'image/png');
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Image illisible par le navigateur (format non supporté)'));
+      };
+      img.src = objectUrl;
+    });
+  };
+
+  // Récupère le buffer + extension utilisables par ExcelJS pour une URL d'image donnée.
+  // Lève une erreur explicite si l'URL ne renvoie pas réellement une image.
+  const recupererImagePourExcel = async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} pour ${url}`);
+    }
+
+    let blob = await response.blob();
+
+    // Vérification cruciale : si le serveur ne renvoie pas une image (ex: du HTML
+    // parce que l'URL est relative et tape sur le frontend au lieu du backend),
+    // on le détecte ici au lieu de laisser Excel afficher une cellule vide.
+    if (!blob.type || !blob.type.startsWith('image/')) {
+      throw new Error(
+        `Le contenu récupéré n'est pas une image (content-type: "${blob.type || 'inconnu'}"). ` +
+        `Vérifie que l'URL "${url}" est bien absolue (http://localhost:5000/...) et accessible directement dans un nouvel onglet.`
+      );
+    }
+
+    // Excel/ExcelJS ne supportent que png, jpeg, gif — on convertit le reste (webp, etc.)
+    let extension;
+    if (blob.type === 'image/png') extension = 'png';
+    else if (blob.type === 'image/gif') extension = 'gif';
+    else if (blob.type === 'image/jpeg' || blob.type === 'image/jpg') extension = 'jpeg';
+    else {
+      // Format non supporté nativement (ex: webp) -> conversion en PNG
+      blob = await convertirBlobEnPng(blob);
+      extension = 'png';
+    }
+
+    const buffer = await blob.arrayBuffer();
+    if (!buffer || buffer.byteLength === 0) {
+      throw new Error('Image vide après téléchargement');
+    }
+
+    return { buffer, extension };
+  };
+
   const filtrerEtudiants = () => {
     let resultats = [...etudiants];
 
@@ -73,7 +226,7 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
       resultats = resultats.filter(e => e.actif === (filtreExport.actif === 'true'));
     }
     if (filtreExport.classe) {
-      resultats = resultats.filter(e => 
+      resultats = resultats.filter(e =>
         e.cours && e.cours.some(c => c.toLowerCase().includes(filtreExport.classe.toLowerCase()))
       );
     }
@@ -104,81 +257,122 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
     setChampsSelectionnes(newState);
   };
 
-  const exporterExcel = () => {
+  const exporterExcel = async () => {
     const etudiantsFiltres = filtrerEtudiants();
-    
+
     if (etudiantsFiltres.length === 0) {
       alert('Aucun étudiant à exporter avec les filtres sélectionnés');
       return;
     }
 
-    // Préparer les données pour l'export
-    const donnees = etudiantsFiltres.map(etudiant => {
-      const ligne = {};
-      
-      if (champsSelectionnes.nomComplet) ligne['Nom Complet'] = etudiant.nomComplet || '';
-      if (champsSelectionnes.genre) ligne['Genre'] = etudiant.genre || '';
-      if (champsSelectionnes.dateNaissance) ligne['Date de Naissance'] = formatDate(etudiant.dateNaissance);
-      if (champsSelectionnes.age) ligne['Âge'] = calculerAge(etudiant.dateNaissance);
-      if (champsSelectionnes.lieuNaissance) ligne['Lieu de Naissance'] = etudiant.lieuNaissance || '';
-      if (champsSelectionnes.nationalite) ligne['Nationalité'] = etudiant.nationalite || '';
-      if (champsSelectionnes.niveau) ligne['Niveau'] = etudiant.niveau || '';
-      if (champsSelectionnes.telephoneEtudiant) ligne['Téléphone Étudiant'] = etudiant.telephoneEtudiant || '';
-      if (champsSelectionnes.codeMassar) ligne['Code Massar'] = etudiant.codeMassar || '';
-      if (champsSelectionnes.cin) ligne['CIN'] = etudiant.cin || '';
-      if (champsSelectionnes.email) ligne['Email'] = etudiant.email || '';
-      if (champsSelectionnes.cours) ligne['Classes'] = (Array.isArray(etudiant.cours) ? etudiant.cours.join(', ') : '');
-      if (champsSelectionnes.nomCompletPere) ligne['Nom du Père'] = etudiant.nomCompletPere || '';
-      if (champsSelectionnes.nomCompletMere) ligne['Nom de la Mère'] = etudiant.nomCompletMere || '';
-      if (champsSelectionnes.travailPere) ligne['Travail du Père'] = etudiant.travailPere || '';
-      if (champsSelectionnes.travailMere) ligne['Travail de la Mère'] = etudiant.travailMere || '';
-      if (champsSelectionnes.telephonePere) ligne['Téléphone Père'] = etudiant.telephonePere || '';
-      if (champsSelectionnes.telephoneMere) ligne['Téléphone Mère'] = etudiant.telephoneMere || '';
-      if (champsSelectionnes.adresse) ligne['Adresse'] = etudiant.adresse || '';
-      if (champsSelectionnes.transport) ligne['Transport'] = etudiant.transport ? 'Oui' : 'Non';
-      if (champsSelectionnes.actif) ligne['Statut'] = etudiant.actif ? 'Actif' : 'Inactif';
-      if (champsSelectionnes.prixTotal) ligne['Prix Total'] = etudiant.prixTotal || 0;
-      if (champsSelectionnes.paye) ligne['Payé'] = etudiant.paye ? 'Oui' : 'Non';
-      if (champsSelectionnes.pourcentageBourse) ligne['Bourse (%)'] = etudiant.pourcentageBourse || 0;
-      if (champsSelectionnes.typePaiement) ligne['Type Paiement'] = etudiant.typePaiement || '';
-      if (champsSelectionnes.anneeScolaire) ligne['Année Scolaire'] = etudiant.anneeScolaire || '';
+    setIsExporting(true);
+    setProgression('Préparation du fichier...');
 
-      return ligne;
-    });
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'École';
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet('Étudiants');
 
-    // Créer le fichier Excel
-    const ws = XLSX.utils.json_to_sheet(donnees);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Étudiants');
+      const colonnesActives = COLONNES.filter(c => champsSelectionnes[c.key]);
+      worksheet.columns = colonnesActives.map(c => ({ header: c.header, key: c.key, width: c.width }));
 
-    // Ajuster la largeur des colonnes
-    const colWidths = Object.keys(donnees[0] || {}).map(key => ({
-      wch: Math.max(key.length, 15)
-    }));
-    ws['!cols'] = colWidths;
+      // Style de l'en-tête
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0369A1' } };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      headerRow.height = 22;
 
-    // Générer le nom du fichier avec la date
-    const date = new Date();
-    const nomFichier = `Etudiants_${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}.xlsx`;
+      const includeImage = !!champsSelectionnes.image;
+      const imageColIndex = includeImage
+        ? colonnesActives.findIndex(c => c.key === 'image')
+        : -1;
 
-    // Télécharger le fichier
-    XLSX.writeFile(wb, nomFichier);
+      // 1) Ajouter toutes les lignes de données texte
+      etudiantsFiltres.forEach(etudiant => {
+        const rowData = {};
+        colonnesActives.forEach(col => {
+          if (col.key !== 'image') {
+            rowData[col.key] = getValeur(etudiant, col.key);
+          }
+        });
+        worksheet.addRow(rowData);
+      });
 
-    alert(`✅ ${etudiantsFiltres.length} étudiant(s) exporté(s) avec succès!`);
+      // 2) Ajouter les images (asynchrone, une par une pour éviter de saturer le navigateur)
+      if (includeImage) {
+        for (let i = 0; i < etudiantsFiltres.length; i++) {
+          const etudiant = etudiantsFiltres[i];
+          const rowNumber = i + 2; // ligne 1 = en-tête
+          const row = worksheet.getRow(rowNumber);
+          row.height = 55;
+
+          const urlImage = resoudreUrlImage(etudiant.image);
+
+          if (urlImage) {
+            setProgression(`Traitement image ${i + 1}/${etudiantsFiltres.length}...`);
+            try {
+              const { buffer, extension } = await recupererImagePourExcel(urlImage);
+
+              const imageId = workbook.addImage({ buffer, extension });
+              worksheet.addImage(imageId, {
+                tl: { col: imageColIndex, row: rowNumber - 1 },
+                ext: { width: 45, height: 45 },
+                editAs: 'oneCell'
+              });
+            } catch (err) {
+              // Log détaillé pour diagnostiquer précisément (URL, statut, content-type...)
+              console.error(`❌ Image non intégrée pour "${etudiant.nomComplet}" (URL résolue: ${urlImage}):`, err.message);
+              row.getCell(imageColIndex + 1).value = 'Photo indisponible';
+            }
+          } else {
+            row.getCell(imageColIndex + 1).value = 'Aucune photo';
+          }
+        }
+      }
+
+      setProgression('Génération du fichier Excel...');
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blobFile = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blobFile);
+
+      const date = new Date();
+      const nomFichier = `Etudiants_${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}.xlsx`;
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = nomFichier;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      alert(`✅ ${etudiantsFiltres.length} étudiant(s) exporté(s) avec succès!`);
+    } catch (err) {
+      console.error('Erreur export Excel:', err);
+      alert("❌ Une erreur est survenue lors de l'export. Vérifiez la console pour plus de détails.");
+    } finally {
+      setIsExporting(false);
+      setProgression('');
+    }
   };
 
   const niveauxDisponibles = [...new Set(etudiants.map(e => e.niveau))].filter(Boolean);
   const classesDisponibles = [...new Set(etudiants.flatMap(e => e.cours || []))];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={isExporting ? undefined : onClose}>
       <div className="modal-content export-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
             <FileSpreadsheet size={24} className="inline mr-2" />
             Exporter les étudiants vers Excel
           </h3>
-          <button className="btn-fermer-modal" onClick={onClose}>
+          <button className="btn-fermer-modal" onClick={onClose} disabled={isExporting}>
             <X size={20} />
           </button>
         </div>
@@ -261,6 +455,16 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
             </div>
 
             <div className="champs-grid">
+              <h5>🖼️ Photo</h5>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={champsSelectionnes.image}
+                  onChange={() => handleToggleChamp('image')}
+                />
+                <span>Photo de l'étudiant (insérée dans la cellule)</span>
+              </label>
+
               <h5>📋 Informations de base</h5>
               <label className="checkbox-label">
                 <input
@@ -485,12 +689,21 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
         </div>
 
         <div className="modal-actions">
-          <button onClick={onClose} className="btn-annuler">
+          <button onClick={onClose} className="btn-annuler" disabled={isExporting}>
             Annuler
           </button>
-          <button onClick={exporterExcel} className="btn-exporter">
-            <Download size={18} className="inline mr-2" />
-            Exporter vers Excel
+          <button onClick={exporterExcel} className="btn-exporter" disabled={isExporting}>
+            {isExporting ? (
+              <>
+                <Loader2 size={18} className="inline mr-2 animate-spin" />
+                {progression || 'Génération...'}
+              </>
+            ) : (
+              <>
+                <Download size={18} className="inline mr-2" />
+                Exporter vers Excel
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -8,6 +8,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.10.0",
+    "exceljs": "^4.4.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
@@ -27,7 +28,7 @@
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },
-"scripts": {
+  "scripts": {
     "start": "set NODE_OPTIONS=--max-old-space-size=4096 && react-scripts start",
     "build": "set NODE_OPTIONS=--max-old-space-size=4096 && react-scripts build",
     "test": "react-scripts test",
