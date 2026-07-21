@@ -128,89 +128,16 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
     }
   };
 
-  // ⚠️ Adapte cette valeur si ton backend tourne sur un autre port/domaine en production
-  const API_BASE_URL = 'http://localhost:5000';
-
-  // Transforme n'importe quel format de chemin stocké en base (URL absolue,
-  // chemin relatif "/uploads/x.jpg", ou même chemin Windows brut "uploads\x.jpg")
-  // en une URL absolue exploitable par fetch().
-  const resoudreUrlImage = (cheminImage) => {
-    if (!cheminImage) return null;
-
-    // Déjà une URL absolue (http:// ou https://)
-    if (/^https?:\/\//i.test(cheminImage)) return cheminImage;
-
-    // Normaliser les antislashs Windows (ex: "uploads\etudiants\x.jpg") en slashs
-    let chemin = cheminImage.replace(/\\/g, '/');
-
-    // S'assurer qu'il commence par un seul "/"
-    if (!chemin.startsWith('/')) chemin = '/' + chemin;
-
-    return `${API_BASE_URL}${chemin}`;
-  };
-
-  // Convertit un Blob (ex: webp) en PNG via canvas, car Excel ne supporte que png/jpeg/gif
-  const convertirBlobEnPng = (blob) => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(blob);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(objectUrl);
-        canvas.toBlob((pngBlob) => {
-          if (pngBlob) resolve(pngBlob);
-          else reject(new Error('Conversion PNG échouée'));
-        }, 'image/png');
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Image illisible par le navigateur (format non supporté)'));
-      };
-      img.src = objectUrl;
-    });
-  };
-
-  // Récupère le buffer + extension utilisables par ExcelJS pour une URL d'image donnée.
-  // Lève une erreur explicite si l'URL ne renvoie pas réellement une image.
-  const recupererImagePourExcel = async (url) => {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} pour ${url}`);
-    }
-
-    let blob = await response.blob();
-
-    // Vérification cruciale : si le serveur ne renvoie pas une image (ex: du HTML
-    // parce que l'URL est relative et tape sur le frontend au lieu du backend),
-    // on le détecte ici au lieu de laisser Excel afficher une cellule vide.
-    if (!blob.type || !blob.type.startsWith('image/')) {
-      throw new Error(
-        `Le contenu récupéré n'est pas une image (content-type: "${blob.type || 'inconnu'}"). ` +
-        `Vérifie que l'URL "${url}" est bien absolue (http://localhost:5000/...) et accessible directement dans un nouvel onglet.`
-      );
-    }
-
-    // Excel/ExcelJS ne supportent que png, jpeg, gif — on convertit le reste (webp, etc.)
-    let extension;
-    if (blob.type === 'image/png') extension = 'png';
-    else if (blob.type === 'image/gif') extension = 'gif';
-    else if (blob.type === 'image/jpeg' || blob.type === 'image/jpg') extension = 'jpeg';
-    else {
-      // Format non supporté nativement (ex: webp) -> conversion en PNG
-      blob = await convertirBlobEnPng(blob);
-      extension = 'png';
-    }
-
-    const buffer = await blob.arrayBuffer();
-    if (!buffer || buffer.byteLength === 0) {
-      throw new Error('Image vide après téléchargement');
-    }
-
-    return { buffer, extension };
+  // Détermine l'extension d'image attendue par ExcelJS (jpeg | png | gif)
+  const obtenirExtensionImage = (blob, url) => {
+    if (blob.type === 'image/png') return 'png';
+    if (blob.type === 'image/gif') return 'gif';
+    if (blob.type === 'image/jpeg' || blob.type === 'image/jpg') return 'jpeg';
+    // Fallback : deviner à partir de l'extension de l'URL
+    const ext = (url.split('.').pop() || '').toLowerCase().split('?')[0];
+    if (ext === 'png') return 'png';
+    if (ext === 'gif') return 'gif';
+    return 'jpeg';
   };
 
   const filtrerEtudiants = () => {
@@ -308,12 +235,14 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
           const row = worksheet.getRow(rowNumber);
           row.height = 55;
 
-          const urlImage = resoudreUrlImage(etudiant.image);
-
-          if (urlImage) {
+          if (etudiant.image) {
             setProgression(`Traitement image ${i + 1}/${etudiantsFiltres.length}...`);
             try {
-              const { buffer, extension } = await recupererImagePourExcel(urlImage);
+              const response = await fetch(etudiant.image);
+              if (!response.ok) throw new Error('Réponse HTTP non valide');
+              const blob = await response.blob();
+              const buffer = await blob.arrayBuffer();
+              const extension = obtenirExtensionImage(blob, etudiant.image);
 
               const imageId = workbook.addImage({ buffer, extension });
               worksheet.addImage(imageId, {
@@ -322,8 +251,7 @@ const ExportEtudiants = ({ etudiants, onClose }) => {
                 editAs: 'oneCell'
               });
             } catch (err) {
-              // Log détaillé pour diagnostiquer précisément (URL, statut, content-type...)
-              console.error(`❌ Image non intégrée pour "${etudiant.nomComplet}" (URL résolue: ${urlImage}):`, err.message);
+              console.error(`Erreur chargement image pour ${etudiant.nomComplet}:`, err);
               row.getCell(imageColIndex + 1).value = 'Photo indisponible';
             }
           } else {
