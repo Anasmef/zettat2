@@ -218,7 +218,8 @@ const handleDeleteRappel = async (id) => {
       setAdmin(adminData.admin);
       
       // Validation des données
-      const etudiantsValid = Array.isArray(etudiants) ? etudiants : [];
+      const etudiantsValid = (Array.isArray(etudiants) ? etudiants : [])
+        .filter(e => e.anneeScolaire === '2026/2027');
       const coursValid = Array.isArray(cours) ? cours : [];
       const paiementsValid = Array.isArray(paiements) ? paiements : [];
       const evenementsValid = Array.isArray(evenements) ? evenements : [];

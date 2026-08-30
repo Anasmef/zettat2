@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 
 // Import des pages
-
+import FicheSante from './pages/FicheSante';
 import ParentBulletins from './pages/ParentBulletins';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -377,7 +377,7 @@ function AppContent() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />
         <Route path="/manager/etudiants" element={<ManagerEtudiants />} />
-
+<Route path="/etudiants/:id/fiche-sante" element={<FicheSante />} />
 
 
         <Route path="/notification-absences" element={<NotificationAbsences />} />

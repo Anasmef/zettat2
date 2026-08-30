@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const DocumentEtudiant = require('./models/DocumentEtudiant');
+
 const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
@@ -11513,7 +11515,147 @@ app.patch('/api/paiements-mensuels/cheques/:id/statut', authInscripteur, async (
     });
   }
 });
+// ⚠️ Ne pas oublier en haut de app.js (si pas deja fait) :
+// const DocumentEtudiant = require('./models/DocumentEtudiant');
 
+// ✅ Route pour récupérer la fiche de santé d'un étudiant (auto-remplie si elle n'existe pas encore)
+app.get('/api/etudiants/:id/fiche-sante', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ error: 'Étudiant introuvable' });
+    }
+
+    let doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'sante' });
+
+    if (!doc) {
+      // Pas encore de fiche santé -> on renvoie un modèle pré-rempli depuis l'étudiant
+      return res.json({
+        existe: false,
+        etudiant: {
+          nomComplet: etudiant.nomComplet,
+          telephoneEtudiant: etudiant.telephoneEtudiant,
+          telephonePere: etudiant.telephonePere,
+          telephoneMere: etudiant.telephoneMere
+        },
+        data: {
+          contactUrgenceNom: '',
+          contactUrgenceLien: '',
+          contactUrgenceTel: '',
+          asthme: false,
+          diabete: false,
+          ellipse: false,
+          migraine: false,
+          hernie: false,
+          varicelle: false,
+          rougeole: false,
+          troubleComportement: false,
+          troubleComportementType: '',
+          troubleAttention: false,
+          troubleAttentionType: '',
+          santeMentale: '',
+          autre: '',
+          hospitalise: false,
+          hospitaliseDate: null,
+          hospitaliseDescription: '',
+          suiviProfessionnel: false,
+          suiviProfessionnelDetails: ''
+        },
+        complet: false
+      });
+    }
+
+    res.json({
+      existe: true,
+      _id: doc._id,
+      data: doc.data,
+      complet: doc.complet,
+      dernierModifiePar: doc.dernierModifiePar,
+      dernierModifieParRole: doc.dernierModifieParRole,
+      updatedAt: doc.updatedAt
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur récupération fiche santé:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Route pour créer ou mettre à jour la fiche de santé (upsert + historique automatique)
+app.put('/api/etudiants/:id/fiche-sante', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+    const { data, complet } = req.body;
+
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ error: 'Étudiant introuvable' });
+    }
+
+    // Récupérer le nom + rôle de la personne connectée (admin ou manager)
+    const modifiePar = req.user?.nom || req.user?.nomComplet || 'Inconnu';
+    const modifieParRole = req.userRole || req.role || 'admin';
+
+    let doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'sante' });
+
+    if (doc) {
+      // Sauvegarder l'ancienne version dans l'historique avant d'écraser
+      doc.historique.push({
+        data: doc.data,
+        modifiePar: doc.dernierModifiePar,
+        modifieParRole: doc.dernierModifieParRole,
+        dateModification: doc.updatedAt
+      });
+
+      doc.data = data;
+      doc.complet = complet === true;
+      doc.dernierModifiePar = modifiePar;
+      doc.dernierModifieParRole = modifieParRole;
+
+      await doc.save();
+      console.log('✅ Fiche santé mise à jour pour:', etudiant.nomComplet);
+
+    } else {
+      // Première création, pas d'historique
+      doc = await DocumentEtudiant.create({
+        etudiant: etudiantId,
+        type: 'sante',
+        data: data,
+        complet: complet === true,
+        dernierModifiePar: modifiePar,
+        dernierModifieParRole: modifieParRole,
+        historique: []
+      });
+      console.log('✅ Fiche santé créée pour:', etudiant.nomComplet);
+    }
+
+    res.json({ message: 'Fiche santé enregistrée avec succès', doc });
+
+  } catch (err) {
+    console.error('❌ Erreur enregistrement fiche santé:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Route pour consulter l'historique des versions de la fiche santé
+app.get('/api/etudiants/:id/fiche-sante/historique', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+
+    const doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'sante' });
+    if (!doc) {
+      return res.json({ historique: [] });
+    }
+
+    res.json({ historique: doc.historique });
+
+  } catch (err) {
+    console.error('❌ Erreur récupération historique fiche santé:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ============================================
 // 10. GÉNÉRER RAPPORT PDF
 // ============================================

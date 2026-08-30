@@ -23,6 +23,7 @@ import {
   Mail,
   GraduationCap
 } from "lucide-react";
+import { Heart } from "lucide-react";
 
 // Liste complète des pays pour le select nationalité
 const countriesList = [
@@ -37,6 +38,7 @@ const ListeEtudiants = () => {
   const [filtreCours, setFiltreCours] = useState('');
   const [filtreNiveau, setFiltreNiveau] = useState('');
   const [filtreActif, setFiltreActif] = useState('');
+  const [filtreAnneeScolaire, setFiltreAnneeScolaire] = useState('2026/2027');
   const [pageActuelle, setPageActuelle] = useState(1);
   const [etudiantsParPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ const ListeEtudiants = () => {
     paye: false,
     pourcentageBourse: 0,
     typePaiement: 'Cash',
-    anneeScolaire: '2025/2026'
+    anneeScolaire: '2026/2027'
   });
   const [vueMode, setVueMode] = useState('tableau');
   const [imageFile, setImageFile] = useState(null);
@@ -235,7 +237,7 @@ const ListeEtudiants = () => {
 
   useEffect(() => {
     filtrerEtudiants();
-  }, [etudiants, recherche, filtreGenre, filtreCours, filtreNiveau, filtreActif]);
+  }, [etudiants, recherche, filtreGenre, filtreCours, filtreNiveau, filtreActif, filtreAnneeScolaire]);
 
   const fetchEtudiants = async () => {
     try {
@@ -298,6 +300,10 @@ const ListeEtudiants = () => {
 
     if (filtreActif !== '') {
       resultats = resultats.filter(e => e.actif === (filtreActif === 'true'));
+    }
+
+    if (filtreAnneeScolaire) {
+      resultats = resultats.filter(e => e.anneeScolaire === filtreAnneeScolaire);
     }
 
     setEtudiantsFiltres(resultats);
@@ -424,7 +430,7 @@ const ListeEtudiants = () => {
         paye: false,
         pourcentageBourse: 0,
         typePaiement: 'Cash',
-        anneeScolaire: '2025/2026'
+        anneeScolaire: '2026/2027'
       });
       setImageFile(null);
 
@@ -506,7 +512,7 @@ const ListeEtudiants = () => {
       paye: false,
       pourcentageBourse: 0,
       typePaiement: 'Cash',
-      anneeScolaire: '2025/2026'
+      anneeScolaire: '2026/2027'
     });
     setImageFileModifier(null);
     setMessageModifier('');
@@ -653,6 +659,7 @@ const ListeEtudiants = () => {
     setFiltreCours('');
     setFiltreNiveau('');
     setFiltreActif('');
+    setFiltreAnneeScolaire('2026/2027');
   };
 
   const formatDate = (isoDate) => {
@@ -692,6 +699,7 @@ const ListeEtudiants = () => {
 
   // Obtenir tous les cours uniques pour le filtre
   const coursUniques = [...new Set(etudiants.flatMap(e => e.cours))];
+  const anneesUniques = [...new Set(etudiants.map(e => e.anneeScolaire).filter(Boolean))].sort().reverse();
 
   if (loading) {
     return <div className="loading">Chargement des étudiants...</div>;
@@ -893,6 +901,20 @@ const ListeEtudiants = () => {
             </select>
           </div>
 
+          <div className="filtre-groupe">
+            <label>Année Scolaire:</label>
+            <select
+              value={filtreAnneeScolaire}
+              onChange={(e) => setFiltreAnneeScolaire(e.target.value)}
+              className="select-filtre"
+            >
+              <option value="">Toutes les années</option>
+              {anneesUniques.map(annee => (
+                <option key={annee} value={annee}>{annee}</option>
+              ))}
+            </select>
+          </div>
+
           <button onClick={viderFiltres} className="btn-vider-filtres">
             Vider les filtres
           </button>
@@ -1032,6 +1054,13 @@ const ListeEtudiants = () => {
                           Modifier
                         </button>
                         <button 
+                          onClick={() => navigate(`/etudiants/${e._id}/fiche-sante`)}
+                          title="Fiche Santé"
+                          style={{ background: '#EF4444', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <Heart size={12} /> Santé
+                        </button>
+                        <button 
                           onClick={() => handleDelete(e)}
                           title="Supprimer"
                           style={{
@@ -1162,6 +1191,14 @@ const ListeEtudiants = () => {
                       title="Modifier"
                     >
                       <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={() => navigate(`/etudiants/${e._id}/fiche-sante`)}
+                      className="btn-carte btn-sante"
+                      title="Fiche Santé"
+                      style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px' }}
+                    >
+                      <Heart size={16} />
                     </button>
                     <button 
                       onClick={() => handleToggleActif(e._id)}
