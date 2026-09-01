@@ -23,7 +23,7 @@ import {
   Mail,
   GraduationCap
 } from "lucide-react";
-import { Heart } from "lucide-react";
+import { Heart, FileText } from "lucide-react";
 
 // Liste complète des pays pour le select nationalité
 const countriesList = [
@@ -126,7 +126,7 @@ const ListeEtudiants = () => {
     paye: false,
     pourcentageBourse: 0,
     typePaiement: 'Cash',
-    anneeScolaire: '2025/2026'
+    anneeScolaire: '2026/2027'
   });
   const [imageFileModifier, setImageFileModifier] = useState(null);
   const [messageModifier, setMessageModifier] = useState('');
@@ -344,7 +344,7 @@ const ListeEtudiants = () => {
       paye: false,
       pourcentageBourse: 0,
       typePaiement: 'Cash',
-      anneeScolaire: '2025/2026'
+      anneeScolaire: '2026/2027'
     });
     setImageFile(null);
     setMessageAjout('');
@@ -476,7 +476,7 @@ const ListeEtudiants = () => {
       paye: etudiant.paye === true,
       pourcentageBourse: etudiant.pourcentageBourse || 0,
       typePaiement: etudiant.typePaiement || 'Cash',
-      anneeScolaire: etudiant.anneeScolaire || '2025/2026'
+      anneeScolaire: etudiant.anneeScolaire || '2026/2027'
     });
     setImageFileModifier(null);
     setMessageModifier('');
@@ -1061,6 +1061,13 @@ const ListeEtudiants = () => {
                           <Heart size={12} /> Santé
                         </button>
                         <button 
+                          onClick={() => navigate(`/etudiants/${e._id}/reglement`)}
+                          title="Règlement Intérieur"
+                          style={{ background: '#8B5CF6', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <FileText size={12} /> Règlement
+                        </button>
+                        <button 
                           onClick={() => handleDelete(e)}
                           title="Supprimer"
                           style={{
@@ -1543,7 +1550,7 @@ const ListeEtudiants = () => {
                   <input
                     type="text"
                     name="anneeScolaire"
-                    placeholder="ex: 2025/2026"
+                    placeholder="ex: 2026/2027"
                     value={formAjout.anneeScolaire}
                     onChange={handleChangeAjout}
                     required
@@ -1869,7 +1876,7 @@ const ListeEtudiants = () => {
                 <input
                   type="text"
                   name="anneeScolaire"
-                  placeholder="ex: 2025/2026"
+                  placeholder="ex: 2026/2027"
                   value={formModifier.anneeScolaire}
                   onChange={handleChangeModifier}
                   required

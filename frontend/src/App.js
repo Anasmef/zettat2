@@ -2,6 +2,8 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
+import Reglement from './pages/Reglement';
+import BilanAnnuelPresences2025_2026 from './pages/BilanAnnuelPresences2025_2026';
 
 // Import des pages
 import FicheSante from './pages/FicheSante';
@@ -361,7 +363,7 @@ function AppContent() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/prof/qr-scanner" element={<ProfQRScanner />} />
-
+<Route path="/etudiants/:id/reglement" element={<Reglement />} />
         <Route path="/badge-generator" element={<BadgeGeneratorModern />} />
         <Route path="/professeur/mes-rapports" element={<MesRapports />} />
         <Route path="/professeur/rapports" element={<PageProfesseurRapports />} />
@@ -378,7 +380,7 @@ function AppContent() {
         <Route path="/liste-etudiants" element={<ListeEtudiants />} />
         <Route path="/manager/etudiants" element={<ManagerEtudiants />} />
 <Route path="/etudiants/:id/fiche-sante" element={<FicheSante />} />
-
+<Route path="/bilan-annuel-2025-2026" element={<BilanAnnuelPresences2025_2026 />} />
 
         <Route path="/notification-absences" element={<NotificationAbsences />} />
         <Route path="/ajouter-paiement" element={<AjouterPaiement />} />

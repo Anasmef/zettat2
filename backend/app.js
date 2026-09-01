@@ -11519,6 +11519,7 @@ app.patch('/api/paiements-mensuels/cheques/:id/statut', authInscripteur, async (
 // const DocumentEtudiant = require('./models/DocumentEtudiant');
 
 // ✅ Route pour récupérer la fiche de santé d'un étudiant (auto-remplie si elle n'existe pas encore)
+// ✅ Route pour récupérer la fiche de santé d'un étudiant (auto-remplie si elle n'existe pas encore)
 app.get('/api/etudiants/:id/fiche-sante', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const etudiantId = req.params.id;
@@ -11528,18 +11529,25 @@ app.get('/api/etudiants/:id/fiche-sante', authAdminOrInscripteurOrPaiementManage
       return res.status(404).json({ error: 'Étudiant introuvable' });
     }
 
+    // Infos de l'étudiant utilisées pour pré-remplir la fiche et le PDF
+    // (nom, date de naissance pour l'âge, coordonnées des parents)
+    const infosEtudiant = {
+      nomComplet: etudiant.nomComplet,
+      dateNaissance: etudiant.dateNaissance,
+      telephoneEtudiant: etudiant.telephoneEtudiant,
+      nomCompletPere: etudiant.nomCompletPere,
+      telephonePere: etudiant.telephonePere,
+      nomCompletMere: etudiant.nomCompletMere,
+      telephoneMere: etudiant.telephoneMere
+    };
+
     let doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'sante' });
 
     if (!doc) {
       // Pas encore de fiche santé -> on renvoie un modèle pré-rempli depuis l'étudiant
       return res.json({
         existe: false,
-        etudiant: {
-          nomComplet: etudiant.nomComplet,
-          telephoneEtudiant: etudiant.telephoneEtudiant,
-          telephonePere: etudiant.telephonePere,
-          telephoneMere: etudiant.telephoneMere
-        },
+        etudiant: infosEtudiant,
         data: {
           contactUrgenceNom: '',
           contactUrgenceLien: '',
@@ -11570,6 +11578,7 @@ app.get('/api/etudiants/:id/fiche-sante', authAdminOrInscripteurOrPaiementManage
     res.json({
       existe: true,
       _id: doc._id,
+      etudiant: infosEtudiant,
       data: doc.data,
       complet: doc.complet,
       dernierModifiePar: doc.dernierModifiePar,
@@ -11653,6 +11662,124 @@ app.get('/api/etudiants/:id/fiche-sante/historique', authAdminOrInscripteurOrPai
 
   } catch (err) {
     console.error('❌ Erreur récupération historique fiche santé:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// ✅ Route pour récupérer l'engagement au règlement intérieur d'un étudiant
+app.get('/api/etudiants/:id/reglement', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ error: 'Étudiant introuvable' });
+    }
+
+    const infosEtudiant = {
+      nomComplet: etudiant.nomComplet,
+      nomCompletPere: etudiant.nomCompletPere,
+      nomCompletMere: etudiant.nomCompletMere
+    };
+
+    let doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'reglement' });
+
+    if (!doc) {
+      return res.json({
+        existe: false,
+        etudiant: infosEtudiant,
+        data: {
+          nomSignataire: '',
+          accepte: false,
+          dateSignature: null
+        },
+        complet: false
+      });
+    }
+
+    res.json({
+      existe: true,
+      _id: doc._id,
+      etudiant: infosEtudiant,
+      data: doc.data,
+      complet: doc.complet,
+      dernierModifiePar: doc.dernierModifiePar,
+      dernierModifieParRole: doc.dernierModifieParRole,
+      updatedAt: doc.updatedAt
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur récupération règlement intérieur:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Route pour créer ou mettre à jour l'engagement au règlement intérieur (upsert + historique)
+app.put('/api/etudiants/:id/reglement', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+    const { data, complet } = req.body;
+
+    const etudiant = await Etudiant.findById(etudiantId);
+    if (!etudiant) {
+      return res.status(404).json({ error: 'Étudiant introuvable' });
+    }
+
+    const modifiePar = req.user?.nom || req.user?.nomComplet || 'Inconnu';
+    const modifieParRole = req.userRole || req.role || 'admin';
+
+    let doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'reglement' });
+
+    if (doc) {
+      doc.historique.push({
+        data: doc.data,
+        modifiePar: doc.dernierModifiePar,
+        modifieParRole: doc.dernierModifieParRole,
+        dateModification: doc.updatedAt
+      });
+
+      doc.data = data;
+      doc.complet = complet === true;
+      doc.dernierModifiePar = modifiePar;
+      doc.dernierModifieParRole = modifieParRole;
+
+      await doc.save();
+      console.log('✅ Règlement intérieur mis à jour pour:', etudiant.nomComplet);
+
+    } else {
+      doc = await DocumentEtudiant.create({
+        etudiant: etudiantId,
+        type: 'reglement',
+        data: data,
+        complet: complet === true,
+        dernierModifiePar: modifiePar,
+        dernierModifieParRole: modifieParRole,
+        historique: []
+      });
+      console.log('✅ Règlement intérieur créé pour:', etudiant.nomComplet);
+    }
+
+    res.json({ message: 'Règlement intérieur enregistré avec succès', doc });
+
+  } catch (err) {
+    console.error('❌ Erreur enregistrement règlement intérieur:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Route pour consulter l'historique des versions du règlement intérieur
+app.get('/api/etudiants/:id/reglement/historique', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const etudiantId = req.params.id;
+
+    const doc = await DocumentEtudiant.findOne({ etudiant: etudiantId, type: 'reglement' });
+    if (!doc) {
+      return res.json({ historique: [] });
+    }
+
+    res.json({ historique: doc.historique });
+
+  } catch (err) {
+    console.error('❌ Erreur récupération historique règlement intérieur:', err);
     res.status(500).json({ error: err.message });
   }
 });

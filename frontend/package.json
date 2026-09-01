@@ -9,6 +9,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.10.0",
     "exceljs": "^4.4.0",
+    "html2pdf.js": "^0.14.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",

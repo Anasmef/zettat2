@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download, Edit, Trash2, Save } from 'lucide-react';
+import { Calendar, Book, Eye, X, Users, Check, AlertCircle, FileText, Search, Filter, ChevronDown, User, Clock, Download, Edit, Trash2, Save, Archive } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx-js-style';
 import Sidebar from '../components/Sidebar'; // ✅ استيراد صحيح
 
 const ListePresences = () => {
+  const navigate = useNavigate();
   const [presences, setPresences] = useState([]);
   const [groupedSessions, setGroupedSessions] = useState([]);
   const [filteredSessions, setFilteredSessions] = useState([]);
@@ -1676,6 +1678,19 @@ const exportByProfessor = (professorName) => {
                   </button>
                 )}
                 
+                <button
+                  onClick={() => navigate('/bilan-annuel-2025-2026')}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#7c3aed',
+                    color: 'white',
+                    gap: '8px'
+                  }}
+                >
+                  <Archive size={16} />
+                  Bilan annuel 2025/2026
+                </button>
+
                 <button
                   onClick={() => setShowExportModal(true)}
                   style={{

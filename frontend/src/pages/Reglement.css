@@ -1,0 +1,191 @@
+/* ============================================================
+   Reglement.css — s'aligne visuellement sur FicheSante.css
+   (en-tête + sections + grille + action bar partagés)
+   Ce fichier ne contient QUE les spécificités du texte arabe (RTL)
+   et du template PDF.
+   ============================================================ */
+
+/* ============ SECTION CONTENANT LE TEXTE ARABE (lecture seule) ============ */
+
+.reg-texte-arabe {
+  font-family: 'Segoe UI', 'Traditional Arabic', Tahoma, sans-serif;
+  text-align: right;
+}
+
+/* Titre arabe dans la carte — encadré compact, même esprit que la section */
+.reg-titre-boite {
+  border: 1px solid var(--fs-accent);
+  background: var(--fs-accent-light);
+  border-radius: var(--fs-radius);
+  padding: 8px 10px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.reg-titre-arabe {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--fs-accent);
+  line-height: 1.4;
+}
+
+/* Paragraphes d'intro en arabe */
+.reg-intro {
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--fs-text-muted);
+  margin-bottom: 8px;
+  text-align: justify;
+}
+
+/* Liste numérotée des règles */
+.reg-liste {
+  padding-right: 20px;
+  margin: 10px 0 12px 0;
+  counter-reset: none;
+}
+
+.reg-liste li {
+  font-size: 12.5px;
+  line-height: 1.8;
+  margin-bottom: 6px;
+  color: var(--fs-text);
+  text-align: justify;
+}
+
+/* Paragraphe de conclusion */
+.reg-paragraphe {
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--fs-text-muted);
+  margin-bottom: 8px;
+  text-align: justify;
+}
+
+/* Mise en valeur d'un passage */
+.reg-gras {
+  font-weight: 600;
+  color: var(--fs-text);
+}
+
+/* Encadré final pour l'engagement — léger accent bleu, cohérent avec le thème */
+.reg-engagement-final {
+  background: var(--fs-accent-light);
+  border-right: 3px solid var(--fs-accent);
+  border-radius: var(--fs-radius);
+  padding: 8px 10px;
+  margin-top: 10px;
+  color: var(--fs-text) !important;
+}
+
+/* ============ TEMPLATE PDF (reproduction exacte, RTL) ============ */
+
+.reg-pdf-page {
+  font-family: 'Traditional Arabic', 'Segoe UI', Tahoma, sans-serif;
+  direction: rtl;
+}
+
+.reg-pdf-header {
+  justify-content: space-between;
+}
+
+.reg-pdf-logo {
+  height: 90px;
+  width: auto;
+  object-fit: contain;
+}
+
+.reg-pdf-titre-boite {
+  border: 2px solid #111;
+  border-radius: 4px;
+  padding: 8px;
+  text-align: center;
+  margin: 10px 0 14px 0;
+}
+
+.reg-pdf-titre {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.reg-pdf-intro {
+  font-size: 11px;
+  line-height: 1.8;
+  text-align: justify;
+  margin-bottom: 8px;
+}
+
+.reg-pdf-gras {
+  font-weight: 700;
+}
+
+.reg-pdf-liste {
+  padding-right: 22px;
+  margin: 12px 0;
+  list-style-position: outside;
+}
+
+.reg-pdf-liste li {
+  font-size: 11.5px;
+  line-height: 1.8;
+  margin-bottom: 6px;
+  text-align: justify;
+}
+
+.reg-pdf-paragraphe {
+  font-size: 11px;
+  line-height: 1.8;
+  text-align: justify;
+  margin: 12px 0;
+}
+
+.reg-pdf-signature-bloc {
+  margin-top: 16px;
+}
+
+.reg-pdf-signature-bloc p {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.reg-pdf-engagement {
+  font-weight: 600;
+  line-height: 1.8;
+  margin-top: 10px !important;
+}
+
+.reg-pdf-toqia {
+  margin-top: 40px;
+  text-align: left;
+}
+
+.reg-pdf-toqia-titre {
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  margin-bottom: 6px !important;
+}
+
+.reg-pdf-date {
+  font-weight: 400 !important;
+  font-size: 11px;
+}
+
+/* ============ RESPONSIVE — aligné sur FicheSante ============ */
+
+@media (max-width: 640px) {
+  .reg-liste li {
+    font-size: 12px;
+  }
+  .reg-titre-boite {
+    padding: 6px 8px;
+  }
+  .reg-titre-arabe {
+    font-size: 13px;
+  }
+  .reg-engagement-final {
+    padding: 6px 8px;
+  }
+}
