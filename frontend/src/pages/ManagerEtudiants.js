@@ -22,7 +22,9 @@ import {
   RotateCcw, X,
   Trash2,
   Mail,
-  GraduationCap
+  GraduationCap,
+  Heart,
+  FileText
 } from "lucide-react";
 
 // Liste complète des pays pour le select nationalité
@@ -899,8 +901,9 @@ const handleConfirmDelete = async (e) => {
             </button>
           </div>
           
-          {/* Boutons supprimés : Archives, Exporter Excel, Ajouter un étudiant */}
-          
+          <button onClick={openModal} className="btn-ajouter-etudiant">
+            Ajouter un étudiant
+          </button>
         </div>
       </div>
 
@@ -996,15 +999,13 @@ const handleConfirmDelete = async (e) => {
                 <th>Classe</th>
                 <th>Statut</th>
                 <th>Image</th>
-                {canViewFinance() && <th>Prix Total</th>}
-                {canViewFinance() && <th>Statut Paiement</th>}
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {etudiantsActuels.length === 0 ? (
                 <tr>
-                  <td colSpan={canViewFinance() ? "13" : "11"} className="aucun-resultat">
+                  <td colSpan="11" className="aucun-resultat">
                     Aucun étudiant trouvé
                   </td>
                 </tr>
@@ -1053,16 +1054,6 @@ const handleConfirmDelete = async (e) => {
                         <div className="pas-image">N/A</div>
                       )}
                     </td>
-                    {canViewFinance() && (
-                      <td>{e.prixTotal || 0} DH</td>
-                    )}
-                    {canViewFinance() && (
-                      <td>
-                        <span className={`paiement-badge ${e.paye ? 'paye' : 'non-paye'}`}>
-                          {e.paye ? '✅ Payé' : '❌ Non payé'}
-                        </span>
-                      </td>
-                    )}
                     <td className="actions-colonne" style={{ 
                       minWidth: '300px', 
                       width: '300px', 
@@ -1122,6 +1113,21 @@ const handleConfirmDelete = async (e) => {
                         >
                           <Edit size={12} />
                           Modifier
+                        </button>
+
+                        <button 
+                          onClick={() => navigate(`/etudiants/${e._id}/fiche-sante`)}
+                          title="Fiche Santé"
+                          style={{ background: '#EF4444', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <Heart size={12} /> Santé
+                        </button>
+                        <button 
+                          onClick={() => navigate(`/etudiants/${e._id}/reglement`)}
+                          title="Règlement Intérieur"
+                          style={{ background: '#8B5CF6', color: 'white', border: 'none', borderRadius: '4px', padding: '5px 8px', cursor: 'pointer', fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <FileText size={12} /> Règlement
                         </button>
                       </div>
                     </td>
@@ -1233,6 +1239,23 @@ const handleConfirmDelete = async (e) => {
               title="Modifier"
             >
               <Edit size={16} />
+            </button>
+
+            <button
+              onClick={() => navigate(`/etudiants/${e._id}/fiche-sante`)}
+              className="btn-carte"
+              title="Fiche Santé"
+              style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px' }}
+            >
+              <Heart size={16} />
+            </button>
+            <button
+              onClick={() => navigate(`/etudiants/${e._id}/reglement`)}
+              className="btn-carte"
+              title="Règlement Intérieur"
+              style={{ background: '#8b5cf6', color: '#fff', border: 'none', padding: '8px', borderRadius: '6px' }}
+            >
+              <FileText size={16} />
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import Sidebar from '../components/Sidebar';
+import SidebarManager from '../components/Sidebarmanager';
 import logoKastler from '../assets/logo-kastler.png';
 import logoMaroc from '../assets/logo-maroc.png';
 import {
@@ -14,6 +15,8 @@ import './FicheSante.css';
 const FicheSante = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const userRole = localStorage.getItem('role');
+  const SidebarComponent = userRole === 'manager' || userRole === 'paiement_manager' ? SidebarManager : Sidebar;
   const pdfRef = useRef(null); // template caché, exactement comme la feuille papier
 
   const [loading, setLoading] = useState(true);
@@ -146,7 +149,7 @@ const FicheSante = () => {
   if (loading) {
     return (
       <div className="fs-page">
-        <Sidebar />
+        <SidebarComponent />
         <div className="fs-loading">
           <div className="fs-spinner"></div>
           <p>Chargement de la fiche santé...</p>
@@ -158,13 +161,13 @@ const FicheSante = () => {
   if (etudiantIntrouvable) {
     return (
       <div className="fs-page">
-        <Sidebar />
+        <SidebarComponent />
         <div className="fs-container">
           <div className="fs-empty-state">
             <FileWarning size={40} />
             <h2>Étudiant non trouvé</h2>
             <p>Il faut d'abord inscrire l'étudiant dans le système avant de pouvoir remplir sa fiche de santé.</p>
-            <button className="fs-btn fs-btn-primary" onClick={() => navigate('/liste-etudiants')}>
+            <button className="fs-btn fs-btn-primary" onClick={() => navigate('/manager/etudiants')}>
               Aller à la liste des étudiants
             </button>
           </div>
@@ -175,13 +178,13 @@ const FicheSante = () => {
 
   return (
     <div className="fs-page">
-      <Sidebar />
+      <SidebarComponent />
 
       <div className="fs-container">
         {/* En-tête compact : tout sur une seule barre */}
         <div className="fs-header">
           <div className="fs-header-left">
-            <button className="fs-btn-retour" onClick={() => navigate('/liste-etudiants')}>
+            <button className="fs-btn-retour" onClick={() => navigate('/manager/etudiants')}>
               <ArrowLeft size={16} /> Retour
             </button>
             <div className="fs-header-title">

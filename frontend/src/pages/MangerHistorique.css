@@ -1,0 +1,386 @@
+/* MangerHistorique.css
+   Réutilise les variables définies dans AdminDashboard.css
+   (--primary-blue, --primary-green, --shadow-*, --border-radius-*, etc.)
+   Assurez-vous qu'AdminDashboard.css est importé quelque part dans l'app
+   (ex: dans App.jsx) pour que ces variables soient disponibles.
+*/
+
+.mh-container {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.mh-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.mh-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.mh-header p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* ── Carte filtre ── */
+.mh-filter-card {
+  background: var(--bg-white);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.mh-filter-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 640px) {
+  .mh-filter-row { grid-template-columns: 1fr; }
+}
+
+.mh-search-wrap {
+  position: relative;
+}
+
+.mh-search-wrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.mh-input,
+.mh-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  border: 1px solid #E5E7EB;
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.mh-search-wrap .mh-input { padding-left: 38px; }
+
+.mh-input:focus,
+.mh-select:focus {
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.mh-reset-btn {
+  padding: 10px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-gray-50);
+  border: 1px solid #E5E7EB;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.mh-reset-btn:hover {
+  background: var(--bg-gray-100);
+}
+
+/* ── Liste des étudiants ── */
+.mh-list-card {
+  background: var(--bg-white);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.mh-list-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid #F3F4F6;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.mh-list-header h3 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.mh-count-badge {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-gray-50);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #E5E7EB;
+}
+
+.mh-student-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: 14px var(--spacing-lg);
+  border-bottom: 1px solid #F3F4F6;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.mh-student-row:last-child { border-bottom: none; }
+.mh-student-row:hover { background: var(--bg-gray-50); }
+
+.mh-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: white;
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-indigo) 100%);
+}
+
+.mh-student-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.mh-student-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.mh-tag {
+  font-size: 0.75rem;
+  color: var(--primary-indigo);
+  background: #EEF2FF;
+  padding: 1px 8px;
+  border-radius: 6px;
+}
+
+.mh-taux-pill {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.mh-taux-high { background: #DCFCE7; color: #166534; }
+.mh-taux-mid  { background: #FEF9C3; color: #854D0E; }
+.mh-taux-low  { background: #FEE2E2; color: #991B1B; }
+
+.mh-empty {
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.mh-empty svg { margin-bottom: 10px; opacity: 0.4; }
+.mh-empty-title { font-size: 0.875rem; font-weight: 700; color: var(--text-secondary); }
+.mh-empty-sub { font-size: 0.8125rem; margin-top: 4px; }
+
+/* ── Vue détail étudiant ── */
+.mh-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-white);
+  border: 1px solid #E5E7EB;
+  border-radius: var(--border-radius);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-bottom: var(--spacing-md);
+}
+
+.mh-back-btn:hover { background: var(--bg-gray-50); }
+
+.mh-profile-card {
+  background: var(--bg-white);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.mh-profile-top {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.mh-profile-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Les cartes KPI réutilisent .stat-card d'AdminDashboard.css directement */
+.mh-kpi-grid {
+  margin-top: var(--spacing-lg);
+  margin-bottom: 0;
+}
+
+/* Filtres de l'historique — carte séparée, tous les champs visibles */
+.mh-history-filters {
+  background: var(--bg-white);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.mh-history-filters-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--spacing-md);
+}
+
+.mh-history-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.mh-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  display: block;
+}
+
+.mh-history-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.mh-export-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: linear-gradient(135deg, var(--primary-green) 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.mh-export-btn:disabled {
+  background: #D1D5DB;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Table historique complète */
+.mh-table-card {
+  background: var(--bg-white);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.mh-table-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid #F3F4F6;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.mh-table-header h3 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.mh-table-wrap { overflow-x: auto; }
+
+.mh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.mh-table thead tr { background: var(--bg-gray-50); }
+
+.mh-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #E5E7EB;
+  white-space: nowrap;
+}
+
+.mh-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #F3F4F6;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.mh-table tr:hover td { background: var(--bg-gray-50); }
+
+.mh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mh-badge.present { background: #DCFCE7; color: #166534; }
+.mh-badge.retard  { background: #FEF9C3; color: #854D0E; }
+.mh-badge.absent  { background: #FEE2E2; color: #991B1B; }
+
+.mh-loading {
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.mh-loading svg { animation: mh-spin 1s linear infinite; margin-bottom: 10px; }
+
+@keyframes mh-spin { to { transform: rotate(360deg); } }
