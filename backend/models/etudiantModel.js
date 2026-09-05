@@ -89,11 +89,12 @@ const etudiantSchema = new mongoose.Schema(
       type: String, 
       trim: true 
     },
-    codeMassar: { 
-      type: String, 
-      unique: true, 
-      trim: true 
-    },
+ codeMassar: { 
+  type: String, 
+  unique: true, 
+  sparse: true,   // ← زيد هادي
+  trim: true 
+},
     
     // Informations familiales
     nomCompletPere: { 
@@ -402,7 +403,7 @@ etudiantSchema.statics.getEtudiantsAvecPaiementsMensuels = function(anneeScolair
 // ========================================
 
 etudiantSchema.index({ email: 1 }, { unique: true });
-etudiantSchema.index({ codeMassar: 1 }, { unique: true });
+etudiantSchema.index({ codeMassar: 1 }, { unique: true, sparse: true });
 etudiantSchema.index({ cin: 1 }, { unique: true, sparse: true });
 etudiantSchema.index({ hidden: 1 });
 etudiantSchema.index({ actif: 1 });
