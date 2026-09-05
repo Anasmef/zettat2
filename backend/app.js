@@ -3,7 +3,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
 const DocumentEtudiant = require('./models/DocumentEtudiant');
-
+const PointageProf = require('./models/PointageProf');
 const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
