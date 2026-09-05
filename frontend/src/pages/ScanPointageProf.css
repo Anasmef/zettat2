@@ -1,0 +1,302 @@
+/* ScanPointageProf.css */
+
+.scan-page {
+  min-height: 100vh;
+  background: #F5F8FC;
+  display: flex;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.scan-container {
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.scan-titre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1F2937;
+  margin-bottom: 24px;
+}
+
+/* Zone de scan */
+.scan-zone {
+  background: white;
+  border: 2px solid #2563EB;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.scan-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.scan-input {
+  width: 100%;
+  max-width: 500px;
+  padding: 16px 20px;
+  font-size: 20px;
+  text-align: center;
+  border: 2px solid #93C5FD;
+  border-radius: 10px;
+  outline: none;
+  color: #1F2937;
+  background: #EFF6FF;
+}
+
+.scan-input:focus {
+  border-color: #2563EB;
+  background: white;
+}
+
+/* Confirmation apres scan */
+.scan-confirmation {
+  margin-top: 18px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.scan-confirmation.succes {
+  background: #F0FDF4;
+  border: 2px solid #16A34A;
+  color: #166534;
+}
+
+.scan-confirmation.attention {
+  background: #FFFBEB;
+  border: 2px solid #F59E0B;
+  color: #92400E;
+}
+
+.scan-confirmation.erreur {
+  background: #FEF2F2;
+  border: 2px solid #DC2626;
+  color: #991B1B;
+}
+
+.scan-confirmation strong {
+  display: block;
+  font-size: 17px;
+}
+
+.scan-confirmation p {
+  margin: 2px 0 0 0;
+  font-size: 14px;
+}
+
+/* Stats */
+.scan-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.stat-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.date-picker input {
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2563EB;
+  outline: none;
+}
+
+/* Tableau */
+.scan-tableau-wrapper {
+  background: white;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.scan-tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.scan-tableau th {
+  background: #F9FAFB;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #6B7280;
+  font-size: 13px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.scan-tableau td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.scan-tableau tr.ligne-presente {
+  background: #F0FDF4;
+}
+
+.scan-tableau tr.ligne-absente {
+  background: white;
+}
+
+.col-nom {
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.badge-statut {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.badge-statut.present {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.badge-statut.absent {
+  background: #F3F4F6;
+  color: #6B7280;
+}
+
+.heure-arrivee {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: #2563EB;
+}
+
+.scan-aucun {
+  text-align: center;
+  color: #9CA3AF;
+  padding: 30px;
+}
+
+.scan-chargement {
+  text-align: center;
+  padding: 30px;
+  color: #6B7280;
+}
+
+@media (max-width: 600px) {
+  .scan-input {
+    font-size: 16px;
+  }
+  .scan-tableau {
+    font-size: 12px;
+  }
+  .scan-tableau th, .scan-tableau td {
+    padding: 8px;
+  }
+}/* ==== A AJOUTER dans ScanPointageProf.css ==== */
+
+.camera-wrapper {
+  position: relative;
+  max-width: 400px;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #93C5FD;
+  background: #0F172A;
+}
+
+/* html5-qrcode injecte lui-même un <video> et un <canvas> dans #camera-reader.
+   On force leur taille pour qu'ils remplissent bien le conteneur. */
+.camera-reader {
+  width: 100%;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-reader video {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: 10px;
+  display: block;
+}
+
+/* La bordure de visée que html5-qrcode dessine par-dessus la vidéo */
+.camera-reader #qr-shaded-region {
+  border-color: #2563EB !important;
+}
+
+.camera-erreur {
+  color: #DC2626;
+  background: #FEF2F2;
+  border: 1px solid #DC2626;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.camera-info {
+  color: #6B7280;
+  font-size: 14px;
+  padding: 30px 10px;
+  text-align: center;
+}
+
+.camera-overlay-scanning {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(37, 99, 235, 0.92);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  z-index: 10;
+}
+
+.scan-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}

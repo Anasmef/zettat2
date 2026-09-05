@@ -113,10 +113,16 @@ const Sidebar = ({ onLogout }) => {
       label: 'Gestion Professeurs',
       icon: Users
     },
-    
-
-
- 
+    {
+      path: '/badges-professeurs',
+      label: 'Badges Professeurs',
+      icon: QrCode
+    },
+    {
+      path: '/pointage-professeurs',
+      label: 'Pointage Professeurs',
+      icon: User
+    },
 
     {
       path: '/notification-absences',

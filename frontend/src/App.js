@@ -113,6 +113,8 @@ import AdminQRGenerator
  import ManagerEtudiants from './pages/ManagerEtudiants';
  import  MangerHistorique
  from './pages/MangerHistorique';
+import BadgeGeneratorProfesseurs from './pages/BadgeGeneratorProfesseurs';
+import ScanPointageProf from './pages/ScanPointageProf';
 
  
 
@@ -359,6 +361,8 @@ function AppContent() {
         <Route path="/Vie-Scolaire" element={<VieScolairePage />} />
 <Route path="/admin/gestionnaire-paiement" element={<GestionPaiementManagers />} />
         <Route path="/admin/pointages" element={<AdminPointagesView />} />
+        <Route path="/badges-professeurs" element={<BadgeGeneratorProfesseurs />} />
+        <Route path="/pointage-professeurs" element={<ScanPointageProf />} />
         {/* Auth public */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

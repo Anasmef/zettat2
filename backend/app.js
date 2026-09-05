@@ -11783,6 +11783,100 @@ app.get('/api/etudiants/:id/reglement/historique', authAdminOrInscripteurOrPaiem
     res.status(500).json({ error: err.message });
   }
 });
+
+// ⚠️ Ne pas oublier en haut de app.js :
+// const PointageProf = require('./models/PointageProf');
+
+// ✅ Route SCAN - appelée à chaque scan du badge (rapide, idempotente)
+app.post('/api/pointage-profs/scan', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { professeurId } = req.body;
+
+    if (!professeurId) {
+      return res.status(400).json({ error: 'professeurId manquant' });
+    }
+
+    const professeur = await Professeur.findById(professeurId.trim());
+    if (!professeur) {
+      return res.status(404).json({ error: 'Professeur introuvable' });
+    }
+
+    const maintenant = new Date();
+    const aujourdhui = maintenant.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+    // Chercher si déjà scanné aujourd'hui
+    let pointage = await PointageProf.findOne({ professeur: professeur._id, date: aujourdhui });
+
+    if (pointage) {
+      // Déjà scanné aujourd'hui -> on renvoie l'heure existante (pas d'erreur, juste info)
+      return res.json({
+        message: 'Déjà pointé aujourd\'hui',
+        dejaScanne: true,
+        professeur: { nomComplet: professeur.nom, matiere: professeur.matiere },
+        heureArrivee: pointage.heureArrivee
+      });
+    }
+
+    // Premier scan du jour -> créer le pointage
+    pointage = await PointageProf.create({
+      professeur: professeur._id,
+      date: aujourdhui,
+      heureArrivee: maintenant
+    });
+
+    console.log('✅ Pointage enregistré:', professeur.nom, '-', maintenant.toLocaleTimeString('fr-FR'));
+
+    res.json({
+      message: 'Pointage enregistré avec succès',
+      dejaScanne: false,
+      professeur: { nomComplet: professeur.nom, matiere: professeur.matiere },
+      heureArrivee: pointage.heureArrivee
+    });
+
+  } catch (err) {
+    console.error('❌ Erreur pointage scan:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Route pour le tableau du jour (tous les profs actifs + leur heure d'arrivee si scannee)
+app.get('/api/pointage-profs/jour/:date', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const dateJour = req.params.date; // "YYYY-MM-DD"
+
+    const professeurs = await Professeur.find({ actif: true })
+      .select('nom matiere')
+      .sort({ nom: 1 });
+
+    const pointages = await PointageProf.find({ date: dateJour });
+    const pointageParProf = {};
+    pointages.forEach(p => {
+      pointageParProf[p.professeur.toString()] = p.heureArrivee;
+    });
+
+    const resultat = professeurs.map(prof => ({
+      _id: prof._id,
+      nomComplet: prof.nom,
+      matiere: prof.matiere,
+      heureArrivee: pointageParProf[prof._id.toString()] || null,
+      present: !!pointageParProf[prof._id.toString()]
+    }));
+
+    // Trier: presents en premier (par heure d'arrivee), puis absents par nom
+    resultat.sort((a, b) => {
+      if (a.present && !b.present) return -1;
+      if (!a.present && b.present) return 1;
+      if (a.present && b.present) return new Date(a.heureArrivee) - new Date(b.heureArrivee);
+      return a.nomComplet.localeCompare(b.nomComplet, 'fr');
+    });
+
+    res.json(resultat);
+
+  } catch (err) {
+    console.error('❌ Erreur tableau pointage:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ============================================
 // 10. GÉNÉRER RAPPORT PDF
 // ============================================
