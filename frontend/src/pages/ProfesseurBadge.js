@@ -23,7 +23,7 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
 
   return (
     <div className="card-wrapper-pvc">
-      <div className="card-container-pvc">
+      <div className="card-container-pvc" style={{ overflow: 'hidden' }}>
         <div className="header-pvc">
           <div className="logo-section-pvc">
             <div className="logo-pvc">
@@ -38,7 +38,10 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
         </div>
 
         <div className="card-body-pvc">
-          <div className="decorative-circles-pvc">
+          <div
+            className="decorative-circles-pvc"
+            style={{ left: 0, right: 'auto' }}
+          >
             {[...Array(9)].map((_, i) => (
               <div key={i} className="circle-pvc"></div>
             ))}
@@ -46,7 +49,8 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
 
           <div className="content-wrapper-pvc">
             <div className="photo-section-pvc">
-              <div className="student-photo-pvc photo-rouge">
+              {/* Photo un peu moins haute qu'avant */}
+              <div className="student-photo-pvc photo-rouge" style={{ height: '75%' }}>
                 {professeur.image ? (
                   <img
                     src={professeur.image.startsWith('http') ? professeur.image : `${window.location.origin}${professeur.image}`}
@@ -67,33 +71,64 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
               <h2 className="card-title-pvc">CARTE PROFESSEUR</h2>
 
               <div className="info-row-pvc">
-                <span className="info-label-pvc">Nom Complet</span>
-                <span className="info-value-pvc">: {professeur.nom || 'N/A'}</span>
+                <span className="info-label-pvc" style={{ fontSize: '9px' }}>Nom Complet</span>
+                <span className="info-value-pvc" style={{ fontSize: '9px' }}>: {professeur.nom || 'N/A'}</span>
               </div>
 
-              <div className="info-with-qr-pvc">
-                <div className="info-left-pvc">
-                  {professeur.cin && (
-                    <div className="info-row-pvc">
-                      <span className="info-label-pvc">CIN</span>
-                      <span className="info-value-pvc">: {professeur.cin}</span>
-                    </div>
-                  )}
+              <div
+                className="info-with-qr-pvc"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div className="info-left-pvc" style={{ flex: 1, minWidth: 0 }}>
                   <div className="info-row-pvc">
-                    <span className="info-label-pvc">Matière</span>
-                    <span className="info-value-pvc">: {professeur.matiere || 'N/A'}</span>
-                  </div>
-                  <div className="info-row-pvc">
-                    <span className="info-label-pvc">Téléphone</span>
-                    <span className="info-value-pvc">: {professeur.telephone || 'N/A'}</span>
+                    <span className="info-label-pvc" style={{ fontSize: '9px' }}>Matière</span>
+                    <span
+                      className="info-value-pvc"
+                      style={{
+                        fontSize: '9px',
+                        whiteSpace: 'normal',
+                        overflow: 'visible',
+                        wordBreak: 'break-word',
+                        display: 'block',
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      : {professeur.matiere || 'N/A'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="qr-side-pvc">
+                <div
+                  className="qr-side-pvc"
+                  style={{
+                    flexShrink: 0,
+                    width: '58px',
+                    height: '58px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="QR Code" className="qrcode-small-pvc" />
+                    <img
+                      src={qrDataUrl}
+                      alt="QR Code"
+                      className="qrcode-small-pvc"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                    />
                   ) : (
-                    <div className="qr-placeholder-small-pvc">QR</div>
+                    <div
+                      className="qr-placeholder-small-pvc"
+                      style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      QR
+                    </div>
                   )}
                 </div>
               </div>

@@ -1,20 +1,20 @@
 {
   "files": {
-    "main.css": "/static/css/main.d6f66762.css",
-    "main.js": "/static/js/main.c7b7ffc9.js",
+    "main.css": "/static/css/main.29ad70b6.css",
+    "main.js": "/static/js/main.5db3fe7d.js",
     "static/js/977.4e994f94.chunk.js": "/static/js/977.4e994f94.chunk.js",
     "static/js/455.578a2727.chunk.js": "/static/js/455.578a2727.chunk.js",
     "static/media/logo-kastler.png": "/static/media/logo-kastler.08537a9084074efaf669.png",
     "static/media/logo-maroc.png": "/static/media/logo-maroc.2723682dafbfb9009f0c.png",
     "static/media/axios.cjs": "/static/media/axios.bd91d4005236f3ccd56e.cjs",
     "index.html": "/index.html",
-    "main.d6f66762.css.map": "/static/css/main.d6f66762.css.map",
-    "main.c7b7ffc9.js.map": "/static/js/main.c7b7ffc9.js.map",
+    "main.29ad70b6.css.map": "/static/css/main.29ad70b6.css.map",
+    "main.5db3fe7d.js.map": "/static/js/main.5db3fe7d.js.map",
     "977.4e994f94.chunk.js.map": "/static/js/977.4e994f94.chunk.js.map",
     "455.578a2727.chunk.js.map": "/static/js/455.578a2727.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.d6f66762.css",
-    "static/js/main.c7b7ffc9.js"
+    "static/css/main.29ad70b6.css",
+    "static/js/main.5db3fe7d.js"
   ]
 }
