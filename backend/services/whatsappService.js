@@ -1,5 +1,5 @@
 // ============================================
-// ✅ DUAL API - UltraMsg FIRST → WaSender AUTO
+// ✅ WABRIDGES (remplace Green-API)
 // Messages bilingues FR + AR avec période matin/soir
 // ============================================
 
@@ -8,24 +8,14 @@ const axios = require('axios');
 class WhatsAppService {
   constructor() {
 
-    // ✅ API 1 - UltraMsg (RAPIDE - PRINCIPALE)
-    this.ULTRAMSG_TOKEN = '67zb1kmeym6y31as';
-    this.ULTRAMSG_URL   = 'https://api.ultramsg.com/instance164744/messages/chat';
+    // ✅ WABridges - identifiants (à mettre dans .env de préférence)
+    this.WA_API_KEY  = process.env.WA_API_KEY || 'TON_API_KEY';       // depuis https://wabridges.com/dashboard/api-key
+    this.WA_BRIDGE_ID = process.env.WA_BRIDGE_ID || 'TON_BRIDGE_ID';  // depuis https://wabridges.com/dashboard (créé une fois le numéro connecté)
+    this.WA_BASE_URL  = 'https://wabridges.com/api';
 
-    // ✅ API 2 - WaSender (BACKUP AUTO)
-    this.WASENDER_TOKEN = '6fb0a3f2b3ab2ac2afdd71f8a3c68f8614a515c922f769cf0f7f914a065cb513';
-    this.WASENDER_URL   = 'https://www.wasenderapi.com/api/send-message';
-
-    // UltraMsg état
-    this.ultraFails  = 0;
-    this.ultraActive = true;
-
-    // WaSender délais
-    this.waSenderCount = 0;
-    this.lastSentTime  = 0;
-    this.WA_DELAY    = 3000;
-    this.WA_PAUSE_AT = 15;
-    this.WA_PAUSE_MS = 120000;
+    // Délai minimum recommandé entre 2 envois (anti rate-limit)
+    this.lastSentTime = 0;
+    this.MIN_DELAY_MS = 600;
   }
 
   // ============================================
@@ -44,9 +34,7 @@ class WhatsAppService {
     const p = this.getPeriodeLabel(periode);
 
     const templates = [
-
-      () =>
-`🔴 *Notification d'absence | إشعار غياب*
+      () => `🔴 *Notification d'absence | إشعار غياب*
 ――――――――――――――――――――
 🇫🇷 *Français :*
 Cher parent, *${nom}* était absent(e) au cours de *${cours}*
@@ -59,9 +47,7 @@ ${remarque ? `Remarque: ${remarque}` : 'Veuillez contacter l\'école pour justif
 ${remarque ? `ملاحظة: ${remarque}` : 'يرجى الاتصال بالإدارة لتبرير الغياب.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⚠️ *Alerte absence | تنبيه غياب*
+      () => `⚠️ *Alerte absence | تنبيه غياب*
 ――――――――――――――――――――
 🇫🇷 Votre enfant *${nom}* n'a pas assisté au cours de *${cours}*
 📅 ${date}${p.fr ? ` - ${p.fr}` : ''}
@@ -72,9 +58,7 @@ ${remarque ? `Note: ${remarque}` : 'Merci de justifier cette absence.'}
 ${remarque ? `ملاحظة: ${remarque}` : 'شكراً لتواصلكم مع الإدارة.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`📌 *Absence constatée | غياب مسجّل*
+      () => `📌 *Absence constatée | غياب مسجّل*
 ――――――――――――――――――――
 🇫🇷 *${nom}* - Cours: *${cours}*
 📅 ${date}${p.fr ? ` | Session: ${p.fr}` : ''}
@@ -85,9 +69,7 @@ ${remarque ? `Observation: ${remarque}` : 'Nous apprécions votre vigilance.'}
 ${remarque ? `ملاحظة: ${remarque}` : 'نقدر تعاونكم ومتابعتكم.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`❌ *Absence signalée | إشعار بالغياب*
+      () => `❌ *Absence signalée | إشعار بالغياب*
 ――――――――――――――――――――
 🇫🇷 *${nom}* absent(e) du cours *${cours}*
 📅 ${date}${p.fr ? ` (${p.fr})` : ''}
@@ -98,9 +80,7 @@ ${remarque ? `Détail: ${remarque}` : 'SVP contactez l\'administration.'}
 ${remarque ? `تفاصيل: ${remarque}` : 'يرجى التواصل مع الإدارة.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🚨 *Avis d'absence | إخطار بالغياب*
+      () => `🚨 *Avis d'absence | إخطار بالغياب*
 ――――――――――――――――――――
 🇫🇷 L'élève *${nom}* n'a pas participé au cours de *${cours}*
 📅 ${date}${p.fr ? ` - ${p.fr}` : ''}
@@ -111,9 +91,7 @@ ${remarque ? `Info: ${remarque}` : 'Merci de votre compréhension.'}
 ${remarque ? `معلومة: ${remarque}` : 'شكراً على تفهمكم.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`📋 *Absence enregistrée | تسجيل الغياب*
+      () => `📋 *Absence enregistrée | تسجيل الغياب*
 ――――――――――――――――――――
 🇫🇷 *${nom}* absent(e) durant *${cours}*
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -124,9 +102,7 @@ ${remarque ? `Motif: ${remarque}` : 'Merci de vérifier avec votre enfant.'}
 ${remarque ? `السبب: ${remarque}` : 'يرجى الاستفسار من التلميذ(ة).'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⏱️ *Absence détectée | رصد الغياب*
+      () => `⏱️ *Absence détectée | رصد الغياب*
 ――――――――――――――――――――
 🇫🇷 *${nom}* a manqué la session de *${cours}*
 📅 ${date}${p.fr ? ` - ${p.fr}` : ''}
@@ -137,9 +113,7 @@ ${remarque ? `Raison: ${remarque}` : 'Équipe pédagogique à votre disposition.
 ${remarque ? `السبب: ${remarque}` : 'الفريق التربوي رهن إشارتكم.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`✋ *Notification absence | إعلام بالغياب*
+      () => `✋ *Notification absence | إعلام بالغياب*
 ――――――――――――――――――――
 🇫🇷 *${nom}* - Matière: *${cours}*
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -150,7 +124,6 @@ ${remarque ? `${remarque}` : 'Nous restons disponibles pour toute question.'}
 ${remarque ? `${remarque}` : 'نحن في خدمتكم لأي استفسار.'}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`
-
     ];
 
     return templates[Math.floor(Math.random() * templates.length)]();
@@ -163,9 +136,7 @@ ${remarque ? `${remarque}` : 'نحن في خدمتكم لأي استفسار.'}
     const p = this.getPeriodeLabel(periode);
 
     const templates = [
-
-      () =>
-`🟡 *Notification de retard | إشعار تأخر*
+      () => `🟡 *Notification de retard | إشعار تأخر*
 ――――――――――――――――――――
 🇫🇷 *Français :*
 Cher parent, *${nom}* est arrivé(e) avec *${min} minutes de retard*
@@ -178,9 +149,7 @@ Merci de veiller à la ponctualité.
 يرجى الحرص على الانضباط في المواعيد. شكراً.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⏰ *Retard signalé | تسجيل تأخر*
+      () => `⏰ *Retard signalé | تسجيل تأخر*
 ――――――――――――――――――――
 🇫🇷 *${nom}* était en retard de *${min} min* pour *${cours}*
 📅 ${date}${p.fr ? ` - ${p.fr}` : ''}
@@ -191,9 +160,7 @@ Nous comptons sur votre vigilance.
 نرجو متابعة مواعيد الحضور.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`📍 *Arrivée tardive | حضور متأخر*
+      () => `📍 *Arrivée tardive | حضور متأخر*
 ――――――――――――――――――――
 🇫🇷 *${nom}* - *${min} minutes* de retard
 Cours: *${cours}* | 📅 ${date}${p.fr ? ` (${p.fr})` : ''}
@@ -204,9 +171,7 @@ Merci pour votre compréhension.
 شكراً على تفهمكم.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⚡ *Retard enfant | تأخر التلميذ*
+      () => `⚡ *Retard enfant | تأخر التلميذ*
 ――――――――――――――――――――
 🇫🇷 *${nom}* arrivé(e) avec ${min}min de retard en *${cours}*
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -217,9 +182,7 @@ SVP prendre note.
 يرجى الاطلاع والمتابعة.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🕐 *Retard scolaire | تأخر مدرسي*
+      () => `🕐 *Retard scolaire | تأخر مدرسي*
 ――――――――――――――――――――
 🇫🇷 *${nom}* a manqué le début de *${cours}* (retard: ${min}min)
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -228,9 +191,7 @@ SVP prendre note.
 📅 ${date}${p.ar ? ` | ${p.ar}` : ''}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`📢 *Retard enregistré | تأخر مسجّل*
+      () => `📢 *Retard enregistré | تأخر مسجّل*
 ――――――――――――――――――――
 🇫🇷 *${nom}* - *${min} minutes* - Cours: *${cours}*
 📅 ${date}${p.fr ? ` - ${p.fr}` : ''}
@@ -239,9 +200,7 @@ SVP prendre note.
 📅 ${date}${p.ar ? ` - ${p.ar}` : ''}
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⏳ *Retard détecté | رصد التأخر*
+      () => `⏳ *Retard détecté | رصد التأخر*
 ――――――――――――――――――――
 🇫🇷 *${nom}* arrivé(e) tard (${min}min) à *${cours}*
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -252,9 +211,7 @@ SVP prendre note.
 الفريق التربوي.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`✋ *Retard à signaler | إشعار تأخر*
+      () => `✋ *Retard à signaler | إشعار تأخر*
 ――――――――――――――――――――
 🇫🇷 *${nom}* - Retard: ${min} min - Matière: *${cours}*
 📅 ${date}${p.fr ? ` | ${p.fr}` : ''}
@@ -265,7 +222,6 @@ Merci de votre attention.
 شكراً على اهتمامكم.
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`
-
     ];
 
     return templates[Math.floor(Math.random() * templates.length)]();
@@ -276,9 +232,7 @@ Merci de votre attention.
   // ============================================
   buildAnniversaireMessage(nom) {
     const templates = [
-
-      () =>
-`🎂 *Joyeux anniversaire ! | عيد ميلاد سعيد !*
+      () => `🎂 *Joyeux anniversaire ! | عيد ميلاد سعيد !*
 ――――――――――――――――――――
 🇫🇷 *Français :*
 Cher parent, toute l'équipe de l'école Alfred Kastler est heureuse de souhaiter un
@@ -291,9 +245,7 @@ Nous lui souhaitons une journée pleine de joie, de bonheur et de réussite scol
 نتمنى له/لها يوماً مليئاً بالفرح والسعادة والتوفيق الدراسي 🌟
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🌟 *Anniversaire élève | عيد ميلاد تلميذ*
+      () => `🌟 *Anniversaire élève | عيد ميلاد تلميذ*
 ――――――――――――――――――――
 🇫🇷 Toute l'équipe pédagogique félicite *${nom}* pour son anniversaire 🎂
 Que cette nouvelle année soit synonyme de succès et de bonheur ! 🎊
@@ -302,210 +254,126 @@ Que cette nouvelle année soit synonyme de succès et de bonheur ! 🎊
 نتمنى أن يكون هذا العام حافلاً بالنجاح والسعادة ! 🎊
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🎊 *Joyeux anniversaire | مبروك عيد الميلاد*
+      () => `🎊 *Joyeux anniversaire | مبروك عيد الميلاد*
 ――――――――――――――――――――
-🇫🇷 L'école Alfred Kastler souhaite un très
-🎂 *Joyeux anniversaire à ${nom}* 🎂
+🇫🇷 L'école Alfred Kastler souhaite un très 🎂 *Joyeux anniversaire à ${nom}* 🎂
 Beaucoup de bonheur, de santé et de réussite ! ✨
 
-🇲🇦 تُهدي مؤسسة ألفريد كاستلر أجمل التهاني لـ
-🎂 *${nom}* بمناسبة عيد ميلاده/ها 🎂
+🇲🇦 تُهدي مؤسسة ألفريد كاستلر أجمل التهاني لـ 🎂 *${nom}* بمناسبة عيد ميلاده/ها 🎂
 كل عام وأنتم بخير، وعمر مديد بالصحة والنجاح ! ✨
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🎈 *Bonne fête ! | كل عام وأنتم بخير !*
+      () => `🎈 *Bonne fête ! | كل عام وأنتم بخير !*
 ――――――――――――――――――――
-🇫🇷 Cher parent, nous avons la joie de vous informer que
-*${nom}* fête son anniversaire aujourd'hui 🎂
+🇫🇷 Cher parent, nous avons la joie de vous informer que *${nom}* fête son anniversaire aujourd'hui 🎂
 Toute l'équipe lui souhaite une magnifique journée pleine de rires et de bonheur ! 🥳
 
-🇲🇦 ولي الأمر الكريم، يسعدنا إعلامكم بأن
-*${nom}* يحتفل/تحتفل بعيد ميلاده/ها اليوم 🎂
+🇲🇦 ولي الأمر الكريم، يسعدنا إعلامكم بأن *${nom}* يحتفل/تحتفل بعيد ميلاده/ها اليوم 🎂
 يتمنى له/لها الفريق كامل يوماً رائعاً مليئاً بالضحكات والسعادة ! 🥳
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🥳 *Célébration anniversaire | احتفال عيد الميلاد*
+      () => `🥳 *Célébration anniversaire | احتفال عيد الميلاد*
 ――――――――――――――――――――
 🇫🇷 *${nom}* souffle ses bougies aujourd'hui ! 🕯️🎂
-L'équipe d'Alfred Kastler lui adresse ses vœux les plus chaleureux.
-Santé, bonheur et excellence scolaire ! 💫
+L'équipe d'Alfred Kastler lui adresse ses vœux les plus chaleureux. Santé, bonheur et excellence scolaire ! 💫
 
 🇲🇦 *${nom}* ينفخ/تنفخ الشموع اليوم ! 🕯️🎂
-يبعث فريق ألفريد كاستلر بأصدق التمنيات.
-صحة، سعادة وتميز دراسي ! 💫
+يبعث فريق ألفريد كاستلر بأصدق التمنيات. صحة، سعادة وتميز دراسي ! 💫
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🎁 *Joyeux anniversaire ! | عيد ميلاد مبارك !*
+      () => `🎁 *Joyeux anniversaire ! | عيد ميلاد مبارك !*
 ――――――――――――――――――――
-🇫🇷 En ce jour spécial, l'école Alfred Kastler tient à féliciter
-🌸 *${nom}* 🌸
-pour son anniversaire et lui souhaite tout le bonheur du monde ! 🌈
+🇫🇷 En ce jour spécial, l'école Alfred Kastler tient à féliciter 🌸 *${nom}* 🌸 pour son anniversaire et lui souhaite tout le bonheur du monde ! 🌈
 
-🇲🇦 في هذا اليوم المميز، تتقدم مؤسسة ألفريد كاستلر بالتهنئة لـ
-🌸 *${nom}* 🌸
-بمناسبة عيد ميلاده/ها وتتمنى له/لها كل السعادة ! 🌈
+🇲🇦 في هذا اليوم المميز، تتقدم مؤسسة ألفريد كاستلر بالتهنئة لـ 🌸 *${nom}* 🌸 بمناسبة عيد ميلاده/ها وتتمنى له/لها كل السعادة ! 🌈
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`⭐ *Happy Birthday ! | عيد ميلاد سعيد !*
+      () => `⭐ *Happy Birthday ! | عيد ميلاد سعيد !*
 ――――――――――――――――――――
-🇫🇷 *${nom}*, toute la famille Alfred Kastler te souhaite un
-🎂 *Joyeux anniversaire* 🎂
+🇫🇷 *${nom}*, toute la famille Alfred Kastler te souhaite un 🎂 *Joyeux anniversaire* 🎂
 Que tes rêves se réalisent et que cette année t'apporte joie et succès ! 🌟
 
-🇲🇦 *${nom}*، تتمنى لك عائلة ألفريد كاستلر كاملة
-🎂 *عيد ميلاد سعيد* 🎂
+🇲🇦 *${nom}*، تتمنى لك عائلة ألفريد كاستلر كاملة 🎂 *عيد ميلاد سعيد* 🎂
 لتتحقق أحلامك وتكون هذه السنة مليئة بالفرح والنجاح ! 🌟
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-
-      () =>
-`🌈 *Félicitations ! | مبروك !*
+      () => `🌈 *Félicitations ! | مبروك !*
 ――――――――――――――――――――
-🇫🇷 Cher parent, c'est avec grand plaisir que nous vous souhaitons
-un *joyeux anniversaire pour ${nom}* ! 🎂🎉
+🇫🇷 Cher parent, c'est avec grand plaisir que nous vous souhaitons un *joyeux anniversaire pour ${nom}* ! 🎂🎉
 Que cette belle journée soit le début d'une année remplie de succès ! ✨
 
-🇲🇦 ولي الأمر الكريم، يسعدنا أن نُهنئكم بمناسبة
-عيد ميلاد *${nom}* ! 🎂🎉
+🇲🇦 ولي الأمر الكريم، يسعدنا أن نُهنئكم بمناسبة عيد ميلاد *${nom}* ! 🎂🎉
 نتمنى أن يكون هذا اليوم الجميل بداية عام مليء بالنجاحات ! ✨
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`
-
     ];
 
     return templates[Math.floor(Math.random() * templates.length)]();
   }
 
   // ============================================
-  // NORMALIZE PHONE
+  // NORMALIZE PHONE → format WABridges : chiffres uniquement, avec indicatif pays (ex: 212XXXXXXXXX)
   // ============================================
   normalizePhone(phone) {
     if (!phone) return null;
     let p = phone.trim().replace(/\s+/g, '');
-    if (p.startsWith('0'))    p = '212' + p.substring(1);
-    else if (p.startsWith('+')) p = p.substring(1);
+    p = p.replace(/\D/g, ''); // garder que les chiffres
+
+    if (p.startsWith('212')) {
+      // deja bon
+    } else if (p.startsWith('0')) {
+      p = '212' + p.substring(1);
+    } else if (p.length === 9) {
+      p = '212' + p;
+    }
     return p;
   }
 
   // ============================================
-  // ENVOI ULTRAMSG (rapide)
-  // ============================================
-  async sendViaUltraMsg(phone, message) {
-    try {
-      const to = phone.startsWith('+') ? phone : '+' + this.normalizePhone(phone);
-      const params = new URLSearchParams();
-      params.append('token', this.ULTRAMSG_TOKEN);
-      params.append('to', to);
-      params.append('body', message);
-
-      const res = await axios.post(this.ULTRAMSG_URL, params.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        timeout: 10000
-      });
-
-      const d = res.data;
-      if (d && (d.sent === 'true' || d.sent === true || d.id)) {
-        this.ultraFails = 0;
-        console.log(`✅ [UltraMsg] → ${to}`);
-        return { success: true, api: 'ultramsg', data: d };
-      } else {
-        throw new Error(d?.error || JSON.stringify(d));
-      }
-    } catch (err) {
-      this.ultraFails++;
-      const msg = err.response?.data?.error || err.message;
-      console.warn(`⚠️ [UltraMsg] Échec #${this.ultraFails}: ${msg}`);
-      if (this.ultraFails >= 3) {
-        this.ultraActive = false;
-        console.error(`🔴 [UltraMsg] DÉSACTIVÉ 3 min`);
-        setTimeout(() => {
-          this.ultraActive = true;
-          this.ultraFails = 0;
-          console.log(`🟢 [UltraMsg] RÉACTIVÉ`);
-        }, 3 * 60 * 1000);
-      }
-      return { success: false, api: 'ultramsg', error: msg };
-    }
-  }
-
-  // ============================================
-  // ENVOI WASENDER (backup)
-  // ============================================
-  async sendViaWaSender(phone, message) {
-    try {
-      const phoneNorm = this.normalizePhone(phone);
-      if (!phoneNorm) return { success: false, error: 'Numéro invalide' };
-
-      const elapsed = Date.now() - this.lastSentTime;
-      if (elapsed < 1500) await this.delay(1500 - elapsed);
-      this.lastSentTime = Date.now();
-
-      const res = await axios.post(this.WASENDER_URL, {
-        to: phoneNorm,
-        text: message
-      }, {
-        headers: {
-          'Authorization': `Bearer ${this.WASENDER_TOKEN}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 20000
-      });
-
-      console.log(`✅ [WaSender] → ${phoneNorm}`);
-      return { success: true, api: 'wasender', data: res.data };
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message;
-      console.error(`❌ [WaSender] Échec: ${msg}`);
-      if (err.response?.status === 429) {
-        console.warn(`⚠️ [WaSender] Rate limit → attente 20s`);
-        await this.delay(20000);
-      }
-      return { success: false, api: 'wasender', error: msg };
-    }
-  }
-
-  // ============================================
-  // ✅ ENVOI PRINCIPAL - UltraMsg FIRST → WaSender AUTO
+  // ✅ ENVOI VIA WABRIDGES (remplace Green-API)
   // ============================================
   async envoyerMessage(phone, message) {
-    if (this.ultraActive) {
-      const result = await this.sendViaUltraMsg(phone, message);
-      if (result.success) return result;
-      console.log(`🔄 Bascule automatique → WaSender`);
-    } else {
-      console.log(`⏭️ UltraMsg inactif → WaSender direct`);
+    try {
+      const phoneNorm = this.normalizePhone(phone);
+      if (!phoneNorm) return { success: false, api: 'wabridges', error: 'Numéro invalide' };
+
+      // Respecte le délai minimum recommandé entre 2 envois
+      const elapsed = Date.now() - this.lastSentTime;
+      if (elapsed < this.MIN_DELAY_MS) {
+        await this.delay(this.MIN_DELAY_MS - elapsed);
+      }
+      this.lastSentTime = Date.now();
+
+      const res = await axios.post(
+        `${this.WA_BASE_URL}/instances/${this.WA_BRIDGE_ID}/proxy/send/text`,
+        {
+          chat: phoneNorm,
+          body: message
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.WA_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 15000
+        }
+      );
+
+      console.log(`✅ [WABridges] → ${phoneNorm} (message_id: ${res.data?.message_id || 'N/A'})`);
+      return { success: true, api: 'wabridges', data: res.data };
+
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      console.error(`❌ [WABridges] Échec: ${msg}`);
+      return { success: false, api: 'wabridges', error: msg };
     }
-    return await this.sendViaWaSender(phone, message);
   }
 
   // ============================================
-  // DÉLAI INTELLIGENT
+  // DÉLAI entre chaque envoi
   // ============================================
   async smartDelay() {
-    if (this.ultraActive && this.ultraFails === 0) {
-      await this.delay(200);
-      return;
-    }
-    this.waSenderCount++;
-    if (this.waSenderCount % this.WA_PAUSE_AT === 0) {
-      console.log(`⏸️ [WaSender] Pause 2 min...`);
-      await this.delay(this.WA_PAUSE_MS);
-      console.log(`▶️ [WaSender] Reprise`);
-    } else {
-      const d = this.WA_DELAY + Math.random() * 1000;
-      console.log(`⏱️ [WaSender] Attente ${Math.round(d/1000)}s...`);
-      await this.delay(d);
-    }
+    await this.delay(this.MIN_DELAY_MS);
   }
 
   formatDate(dateSession) {
@@ -675,19 +543,16 @@ Que cette belle journée soit le début d'une année remplie de succès ! ✨
   // TEST
   // ============================================
   async testerConnexion(phone = '0660079060') {
-    const msg = `✅ *Test WhatsApp*\nÉcole Alfred Kastler\n${new Date().toLocaleString('fr-FR')}`;
-    const u = await this.sendViaUltraMsg(phone, msg + '\n[UltraMsg]');
-    console.log(`UltraMsg: ${u.success ? '✅ OK' : '❌ ' + u.error}`);
-    const w = await this.sendViaWaSender(phone, msg + '\n[WaSender]');
-    console.log(`WaSender: ${w.success ? '✅ OK' : '❌ ' + w.error}`);
-    return { ultraMsg: u, waSender: w };
+    const msg = `✅ *Test WhatsApp*\nÉcole Alfred Kastler\n${new Date().toLocaleString('fr-FR')}\n[WABridges]`;
+    const r = await this.envoyerMessage(phone, msg);
+    console.log(`WABridges: ${r.success ? '✅ OK' : '❌ ' + r.error}`);
+    return { wabridges: r };
   }
 
   getStatus() {
     return {
-      ultraMsg : { actif: this.ultraActive, echecs: this.ultraFails },
-      waSender : { messagesEnvoyes: this.waSenderCount },
-      apiActive: this.ultraActive ? '🟢 UltraMsg (rapide)' : '🟡 WaSender (backup)'
+      apiActive: '🟢 WABridges',
+      bridgeId: this.WA_BRIDGE_ID
     };
   }
 

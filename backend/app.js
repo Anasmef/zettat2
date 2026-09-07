@@ -11783,9 +11783,11 @@ app.get('/api/etudiants/:id/reglement/historique', authAdminOrInscripteurOrPaiem
     res.status(500).json({ error: err.message });
   }
 });
-
 // ⚠️ Ne pas oublier en haut de app.js :
 // const PointageProf = require('./models/PointageProf');
+
+// ✅ Durée minimale entre deux scans du même professeur
+const COOLDOWN_POINTAGE_MS = 60 * 60 * 1000; // 1 heure
 
 // ✅ Route SCAN - appelée à chaque scan du badge (rapide, idempotente)
 app.post('/api/pointage-profs/scan', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
@@ -11804,21 +11806,30 @@ app.post('/api/pointage-profs/scan', authAdminOrInscripteurOrPaiementManager, as
     const maintenant = new Date();
     const aujourdhui = maintenant.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-    // Chercher si déjà scanné aujourd'hui
-    let pointage = await PointageProf.findOne({ professeur: professeur._id, date: aujourdhui });
+    // ✅ On cherche le DERNIER pointage de ce professeur, tous jours confondus
+    // (utile si le scan a lieu juste après minuit par exemple)
+    const dernierPointage = await PointageProf.findOne({ professeur: professeur._id })
+      .sort({ heureArrivee: -1 });
 
-    if (pointage) {
-      // Déjà scanné aujourd'hui -> on renvoie l'heure existante (pas d'erreur, juste info)
-      return res.json({
-        message: 'Déjà pointé aujourd\'hui',
-        dejaScanne: true,
-        professeur: { nomComplet: professeur.nom, matiere: professeur.matiere },
-        heureArrivee: pointage.heureArrivee
-      });
+    if (dernierPointage) {
+      const diffMs = maintenant - new Date(dernierPointage.heureArrivee);
+
+      if (diffMs < COOLDOWN_POINTAGE_MS) {
+        // Trop tôt pour un nouveau scan -> on informe sans créer de doublon
+        const minutesRestantes = Math.ceil((COOLDOWN_POINTAGE_MS - diffMs) / 60000);
+
+        return res.json({
+          message: `Déjà pointé récemment, réessayez dans ${minutesRestantes} min`,
+          dejaScanne: true,
+          professeur: { nomComplet: professeur.nom, matiere: professeur.matiere },
+          heureArrivee: dernierPointage.heureArrivee, // dernier pointage connu
+          minutesRestantes
+        });
+      }
     }
 
-    // Premier scan du jour -> créer le pointage
-    pointage = await PointageProf.create({
+    // ✅ Plus d'une heure depuis le dernier scan (ou aucun scan avant) -> on enregistre
+    const pointage = await PointageProf.create({
       professeur: professeur._id,
       date: aujourdhui,
       heureArrivee: maintenant
@@ -11839,7 +11850,7 @@ app.post('/api/pointage-profs/scan', authAdminOrInscripteurOrPaiementManager, as
   }
 });
 
-// ✅ Route pour le tableau du jour (tous les profs actifs + leur heure d'arrivee si scannee)
+// ✅ Route pour le tableau du jour (tous les profs actifs + TOUS leurs pointages du jour)
 app.get('/api/pointage-profs/jour/:date', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {
     const dateJour = req.params.date; // "YYYY-MM-DD"
@@ -11848,21 +11859,32 @@ app.get('/api/pointage-profs/jour/:date', authAdminOrInscripteurOrPaiementManage
       .select('nom matiere')
       .sort({ nom: 1 });
 
-    const pointages = await PointageProf.find({ date: dateJour });
-    const pointageParProf = {};
+    // ✅ Tous les pointages du jour, triés par heure croissante
+    const pointages = await PointageProf.find({ date: dateJour }).sort({ heureArrivee: 1 });
+
+    // ✅ Regroupe les pointages par professeur (un prof peut en avoir plusieurs : matin, soir...)
+    const pointagesParProf = {};
     pointages.forEach(p => {
-      pointageParProf[p.professeur.toString()] = p.heureArrivee;
+      const key = p.professeur.toString();
+      if (!pointagesParProf[key]) pointagesParProf[key] = [];
+      pointagesParProf[key].push(p.heureArrivee);
     });
 
-    const resultat = professeurs.map(prof => ({
-      _id: prof._id,
-      nomComplet: prof.nom,
-      matiere: prof.matiere,
-      heureArrivee: pointageParProf[prof._id.toString()] || null,
-      present: !!pointageParProf[prof._id.toString()]
-    }));
+    const resultat = professeurs.map(prof => {
+      const heures = pointagesParProf[prof._id.toString()] || [];
+      return {
+        _id: prof._id,
+        nomComplet: prof.nom,
+        matiere: prof.matiere,
+        heures,                                  // ✅ tableau de TOUTES les heures scannées ce jour-là
+        heureArrivee: heures[0] || null,          // premier passage (compat. avec l'existant)
+        dernierPointage: heures[heures.length - 1] || null, // dernier passage du jour
+        nombrePointages: heures.length,
+        present: heures.length > 0
+      };
+    });
 
-    // Trier: presents en premier (par heure d'arrivee), puis absents par nom
+    // Trier: presents en premier (par heure du premier pointage), puis absents par nom
     resultat.sort((a, b) => {
       if (a.present && !b.present) return -1;
       if (!a.present && b.present) return 1;

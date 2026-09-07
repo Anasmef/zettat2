@@ -18,7 +18,11 @@ const pointageProfSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Un seul pointage par professeur par jour
-pointageProfSchema.index({ professeur: 1, date: 1 }, { unique: true });
+// ✅ Plusieurs pointages par jour sont maintenant autorisés (matin + soir, entrée + sortie...)
+// L'ancien index "unique" empêchait un 2e scan le même jour — on le retire.
+// On garde un index (non-unique) pour accélérer les requêtes par professeur + date,
+// et un autre pour retrouver rapidement le DERNIER scan d'un professeur (contrôle du cooldown 1h).
+pointageProfSchema.index({ professeur: 1, date: 1 });
+pointageProfSchema.index({ professeur: 1, heureArrivee: -1 });
 
 module.exports = mongoose.model('PointageProf', pointageProfSchema);

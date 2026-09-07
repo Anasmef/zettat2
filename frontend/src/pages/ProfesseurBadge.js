@@ -11,7 +11,7 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
   useEffect(() => {
     if (qrData) {
       QRCode.toDataURL(qrData, {
-        width: 200,
+        width: 300,              // ✅ résolution augmentée (était 200) pour un rendu net même agrandi
         margin: 1,
         color: { dark: '#000000', light: '#FFFFFF' },
         errorCorrectionLevel: 'M'
@@ -68,7 +68,7 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
             </div>
 
             <div className="info-section-pvc">
-              <h2 className="card-title-pvc">CARTE PROFESSEUR</h2>
+              <h2 className="card-title-pvc" style={{ fontSize: '11px', padding: '2px 10px' }}>CARTE PROFESSEUR</h2>
 
               <div className="info-row-pvc">
                 <span className="info-label-pvc" style={{ fontSize: '9px' }}>Nom Complet</span>
@@ -108,11 +108,12 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
                   className="qr-side-pvc"
                   style={{
                     flexShrink: 0,
-                    width: '58px',
-                    height: '58px',
+                    width: '70px',   // ✅ QR agrandi (était 58px) pour un scan plus facile au téléphone — taille de carte inchangée
+                    height: '70px',  // ✅ QR agrandi (était 58px)
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    marginTop: '-10px', // ✅ QR remonté légèrement vers le haut
                   }}
                 >
                   {qrDataUrl ? (

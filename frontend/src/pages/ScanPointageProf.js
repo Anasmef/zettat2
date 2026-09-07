@@ -6,13 +6,13 @@ import Sidebar from '../components/Sidebar';
 import './ScanPointageProf.css';
 
 const READER_ELEMENT_ID = 'camera-reader';
-const COOLDOWN_MS = 3000; // évite de re-scanner le même badge en boucle
+const COOLDOWN_MS = 3000; // évite de re-scanner le même badge en boucle côté caméra (anti-doublon lecture)
 
 const ScanPointageProf = () => {
   const [tableauJour, setTableauJour] = useState([]);
   const [loadingTableau, setLoadingTableau] = useState(true);
   const [dateSelectionnee, setDateSelectionnee] = useState(new Date().toISOString().slice(0, 10));
-  const [dernierScan, setDernierScan] = useState(null); // { nom, heure, dejaScanne, erreur }
+  const [dernierScan, setDernierScan] = useState(null); // { nom, heure, dejaScanne, minutesRestantes, erreur }
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraErreur, setCameraErreur] = useState(null);
@@ -205,6 +205,8 @@ const ScanPointageProf = () => {
     const maintenant = Date.now();
 
     // Anti-doublon : ignore si c'est le même code lu il y a moins de COOLDOWN_MS
+    // (ceci évite juste de renvoyer 10 requêtes par seconde pendant que le badge
+    // reste devant la caméra — le VRAI cooldown de 1h est géré côté serveur)
     if (
       dernierCodeRef.current.code === codeDetecte &&
       maintenant - dernierCodeRef.current.ts < COOLDOWN_MS
@@ -235,6 +237,7 @@ const ScanPointageProf = () => {
         matiere: res.data.professeur.matiere,
         heure: new Date(res.data.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         dejaScanne: res.data.dejaScanne,
+        minutesRestantes: res.data.minutesRestantes || null, // ✅ affiché si trop tôt pour rescanner
         erreur: false
       });
 
@@ -335,7 +338,9 @@ const ScanPointageProf = () => {
                     <strong>{dernierScan.nom}</strong>
                     <p>
                       {dernierScan.dejaScanne
-                        ? `Déjà pointé aujourd'hui à ${dernierScan.heure}`
+                        ? (dernierScan.minutesRestantes
+                            ? `Déjà pointé, réessayez dans ${dernierScan.minutesRestantes} min`
+                            : `Déjà pointé aujourd'hui à ${dernierScan.heure}`)
                         : `Pointé avec succès à ${dernierScan.heure}`}
                     </p>
                   </div>
@@ -379,7 +384,7 @@ const ScanPointageProf = () => {
                   <th>Statut</th>
                   <th>Nom du Professeur</th>
                   <th>Matière</th>
-                  <th>Heure d'arrivée</th>
+                  <th>Pointages du jour</th>
                 </tr>
               </thead>
               <tbody>
@@ -398,10 +403,15 @@ const ScanPointageProf = () => {
                       <td className="col-nom">{prof.nomComplet}</td>
                       <td>{prof.matiere || '—'}</td>
                       <td>
-                        {prof.heureArrivee ? (
-                          <span className="heure-arrivee">
-                            <Clock size={14} /> {new Date(prof.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                        {/* ✅ Affiche TOUS les passages du jour (matin, soir, etc.) au lieu d'un seul */}
+                        {prof.heures && prof.heures.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {prof.heures.map((h, idx) => (
+                              <span key={idx} className="heure-arrivee">
+                                <Clock size={14} /> {new Date(h).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            ))}
+                          </div>
                         ) : '—'}
                       </td>
                     </tr>
