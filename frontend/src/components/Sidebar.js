@@ -103,16 +103,8 @@ const Sidebar = ({ onLogout }) => {
       label: 'Professeurs',
       icon: User
     },
-    {
-      path: '/admin/qr-generator',
-      label: 'QR Code Generator',
-      icon: QrCode
-    },
-    {
-      path: '/admin/pointages',
-      label: 'Gestion Professeurs',
-      icon: Users
-    },
+  
+    
     {
       path: '/badges-professeurs',
       label: 'Badges Professeurs',

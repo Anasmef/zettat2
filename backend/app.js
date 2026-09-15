@@ -11899,6 +11899,76 @@ app.get('/api/pointage-profs/jour/:date', authAdminOrInscripteurOrPaiementManage
     res.status(500).json({ error: err.message });
   }
 });
+// ✅ Route pour les données d'un mois entier (utilisée pour l'export Excel mensuel)
+// Format attendu : "YYYY-MM" (ex: "2026-09")
+app.get('/api/pointage-profs/mois/:anneeMois', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const anneeMois = req.params.anneeMois; // "YYYY-MM"
+
+    const professeurs = await Professeur.find({ actif: true })
+      .select('nom matiere')
+      .sort({ nom: 1 });
+
+    // ✅ Tous les pointages dont le champ "date" commence par "YYYY-MM"
+    const pointages = await PointageProf.find({
+      date: { $regex: `^${anneeMois}` }
+    }).sort({ date: 1, heureArrivee: 1 });
+
+    // Regroupe par professeur, puis par jour : { profId: { "2026-09-01": [heure1, heure2], ... } }
+    const parProf = {};
+    pointages.forEach(p => {
+      const profKey = p.professeur.toString();
+      if (!parProf[profKey]) parProf[profKey] = {};
+      if (!parProf[profKey][p.date]) parProf[profKey][p.date] = [];
+      parProf[profKey][p.date].push(p.heureArrivee);
+    });
+
+    const resultat = professeurs.map(prof => ({
+      _id: prof._id,
+      nomComplet: prof.nom,
+      matiere: prof.matiere,
+      jours: parProf[prof._id.toString()] || {} // { "2026-09-01": [Date, Date], ... }
+    }));
+
+    res.json({ anneeMois, professeurs: resultat });
+
+  } catch (err) {
+    console.error('❌ Erreur export mois pointage:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// ✅ Route pour récupérer tous les pointages entre deux dates (pour export mois/période)
+// Usage: GET /api/pointage-profs/periode?debut=2026-09-01&fin=2026-09-30
+app.get('/api/pointage-profs/periode', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
+  try {
+    const { debut, fin } = req.query;
+
+    if (!debut || !fin) {
+      return res.status(400).json({ error: 'Paramètres debut et fin requis (format YYYY-MM-DD)' });
+    }
+
+    const pointages = await PointageProf.find({
+      date: { $gte: debut, $lte: fin }
+    })
+      .populate('professeur', 'nom matiere')
+      .sort({ date: 1, heureArrivee: 1 });
+
+    const resultat = pointages
+      .filter(p => p.professeur) // ignore si le professeur a été supprimé
+      .map(p => ({
+        date: p.date,
+        nomComplet: p.professeur.nom,
+        matiere: p.professeur.matiere,
+        heureArrivee: p.heureArrivee
+      }));
+
+    res.json(resultat);
+
+  } catch (err) {
+    console.error('❌ Erreur récupération pointages période:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 // ============================================
 // 10. GÉNÉRER RAPPORT PDF
 // ============================================

@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
-import { ScanLine, Clock, CheckCircle, XCircle, Users, Calendar, Camera, CameraOff, RefreshCw } from 'lucide-react';
+import * as XLSX from 'xlsx-js-style';
+import {
+  ScanLine, Clock, CheckCircle, XCircle, Users, Calendar,
+  Camera, CameraOff, RefreshCw, FileSpreadsheet, Download
+} from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import './ScanPointageProf.css';
 
 const READER_ELEMENT_ID = 'camera-reader';
 const COOLDOWN_MS = 3000; // évite de re-scanner le même badge en boucle côté caméra (anti-doublon lecture)
+
+// Style de bordure fine réutilisé pour toutes les cellules du tableau Excel
+const BORDURE_FINE = {
+  top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+};
 
 const ScanPointageProf = () => {
   const [tableauJour, setTableauJour] = useState([]);
@@ -17,6 +29,12 @@ const ScanPointageProf = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraErreur, setCameraErreur] = useState(null);
   const [facingMode, setFacingMode] = useState('environment'); // 'environment' = arriere, 'user' = avant
+
+  // ✅ États pour les exports Excel
+  const [moisSelectionne, setMoisSelectionne] = useState(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
+  const [periodeDebut, setPeriodeDebut] = useState(new Date().toISOString().slice(0, 10));
+  const [periodeFin, setPeriodeFin] = useState(new Date().toISOString().slice(0, 10));
+  const [exportEnCours, setExportEnCours] = useState(null); // 'jour' | 'mois' | 'periode' | null
 
   const html5QrCodeRef = useRef(null);
   const dernierCodeRef = useRef({ code: null, ts: 0 });
@@ -80,7 +98,6 @@ const ScanPointageProf = () => {
     // demarrerCamera() sera relance automatiquement par le useEffect ci-dessus
     // grace au changement de `facingMode`
   };
-
 
   const chargerTableau = async (silencieux = false) => {
     try {
@@ -259,6 +276,181 @@ const ScanPointageProf = () => {
     }
   };
 
+  // =====================================================================
+  // ✅ EXPORT EXCEL — 3 modes : jour affiché / mois / période libre
+  // =====================================================================
+
+  // Récupère les pointages d'une période via la route backend /periode
+  const recupererPointagesPeriode = async (debut, fin) => {
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/pointage-profs/periode', {
+      params: { debut, fin },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return res.data; // [{ date, nomComplet, matiere, heureArrivee }, ...]
+  };
+
+  // Construit un classeur Excel stylé (xlsx-js-style) à partir de lignes
+  // {date, nomComplet, matiere, heureArrivee} et l'écrit sur le disque du navigateur
+  const genererEtTelechargerExcel = (lignes, titre, nomFichier) => {
+    const entetes = ['Date', 'Nom du Professeur', 'Matière', "Heure d'arrivée"];
+
+    const donnees = [
+      [titre],
+      [],
+      entetes,
+      ...lignes.map(l => ([
+        new Date(l.date).toLocaleDateString('fr-FR'),
+        l.nomComplet,
+        l.matiere || '—',
+        new Date(l.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      ]))
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(donnees);
+
+    // Fusionne la cellule de titre sur les 4 colonnes
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+    // Style du titre
+    ws['A1'].s = {
+      font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '2563EB' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+
+    // Style de la ligne d'en-têtes (ligne d'index 2, càd la 3e ligne de la feuille)
+    const indexLigneEntetes = 2;
+    entetes.forEach((_, colIdx) => {
+      const ref = XLSX.utils.encode_cell({ r: indexLigneEntetes, c: colIdx });
+      if (ws[ref]) {
+        ws[ref].s = {
+          font: { bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { fgColor: { rgb: '1E3A8A' } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: BORDURE_FINE
+        };
+      }
+    });
+
+    // Style des lignes de données (bordures + alternance de couleur)
+    lignes.forEach((_, i) => {
+      const rowIdx = indexLigneEntetes + 1 + i;
+      for (let c = 0; c < entetes.length; c++) {
+        const ref = XLSX.utils.encode_cell({ r: rowIdx, c });
+        if (ws[ref]) {
+          ws[ref].s = {
+            border: BORDURE_FINE,
+            fill: { fgColor: { rgb: i % 2 === 0 ? 'F0FDF4' : 'FFFFFF' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+          };
+        }
+      }
+    });
+
+    // Largeur des colonnes
+    ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 16 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
+    XLSX.writeFile(wb, nomFichier);
+  };
+
+  // --- Export du jour actuellement affiché (utilise le tableau déjà chargé) ---
+  const exporterJourAffiche = () => {
+    const lignes = [];
+    tableauJour.forEach(prof => {
+      if (prof.heures && prof.heures.length > 0) {
+        prof.heures.forEach(h => {
+          lignes.push({
+            date: dateSelectionnee,
+            nomComplet: prof.nomComplet,
+            matiere: prof.matiere,
+            heureArrivee: h
+          });
+        });
+      }
+    });
+
+    if (lignes.length === 0) {
+      alert("Aucun pointage à exporter pour cette date.");
+      return;
+    }
+
+    const dateFr = new Date(dateSelectionnee).toLocaleDateString('fr-FR');
+    genererEtTelechargerExcel(
+      lignes,
+      `Pointages du ${dateFr}`,
+      `pointages_${dateSelectionnee}.xlsx`
+    );
+  };
+
+  // --- Export d'un mois complet choisi via <input type="month"> ---
+  const exporterMois = async () => {
+    if (!moisSelectionne) return;
+    setExportEnCours('mois');
+    try {
+      const [annee, mois] = moisSelectionne.split('-');
+      const debut = `${annee}-${mois}-01`;
+      // new Date(annee, mois, 0) donne le dernier jour du mois choisi
+      // (car "mois" ici est 1-indexé, donc utilisé tel quel comme mois "suivant" 0-indexé)
+      const dernierJour = new Date(Number(annee), Number(mois), 0).getDate();
+      const fin = `${annee}-${mois}-${String(dernierJour).padStart(2, '0')}`;
+
+      const data = await recupererPointagesPeriode(debut, fin);
+      if (!data || data.length === 0) {
+        alert("Aucun pointage trouvé pour ce mois.");
+        return;
+      }
+
+      const libelleMois = new Date(Number(annee), Number(mois) - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+      genererEtTelechargerExcel(
+        data,
+        `Pointages — ${libelleMois}`,
+        `pointages_${annee}-${mois}.xlsx`
+      );
+    } catch (err) {
+      console.error('Erreur export mois:', err);
+      alert("Erreur lors de l'export du mois.");
+    } finally {
+      setExportEnCours(null);
+    }
+  };
+
+  // --- Export d'une période libre (deux dates choisies) ---
+  const exporterPeriode = async () => {
+    if (!periodeDebut || !periodeFin) return;
+    if (periodeDebut > periodeFin) {
+      alert("La date de début doit être avant la date de fin.");
+      return;
+    }
+
+    setExportEnCours('periode');
+    try {
+      const data = await recupererPointagesPeriode(periodeDebut, periodeFin);
+      if (!data || data.length === 0) {
+        alert("Aucun pointage trouvé pour cette période.");
+        return;
+      }
+
+      const debutFr = new Date(periodeDebut).toLocaleDateString('fr-FR');
+      const finFr = new Date(periodeFin).toLocaleDateString('fr-FR');
+
+      genererEtTelechargerExcel(
+        data,
+        `Pointages du ${debutFr} au ${finFr}`,
+        `pointages_${periodeDebut}_au_${periodeFin}.xlsx`
+      );
+    } catch (err) {
+      console.error('Erreur export période:', err);
+      alert("Erreur lors de l'export de la période.");
+    } finally {
+      setExportEnCours(null);
+    }
+  };
+
   const nbPresents = tableauJour.filter(p => p.present).length;
   const nbTotal = tableauJour.length;
 
@@ -370,6 +562,65 @@ const ScanPointageProf = () => {
               onChange={(e) => setDateSelectionnee(e.target.value)}
               max={new Date().toISOString().slice(0, 10)}
             />
+          </div>
+        </div>
+
+        {/* ✅ Barre d'export Excel */}
+        <div className="export-bar">
+          <div className="export-groupe">
+            <button
+              type="button"
+              className="btn-export btn-export-principal"
+              onClick={exporterJourAffiche}
+            >
+              <FileSpreadsheet size={16} />
+              Exporter le jour affiché
+            </button>
+          </div>
+
+          <div className="export-groupe">
+            <Calendar size={16} className="export-icone" />
+            <input
+              type="month"
+              value={moisSelectionne}
+              onChange={(e) => setMoisSelectionne(e.target.value)}
+              max={new Date().toISOString().slice(0, 7)}
+            />
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exporterMois}
+              disabled={exportEnCours === 'mois'}
+            >
+              <Download size={16} />
+              {exportEnCours === 'mois' ? 'Export en cours...' : 'Exporter le mois'}
+            </button>
+          </div>
+
+          <div className="export-groupe">
+            <Calendar size={16} className="export-icone" />
+            <input
+              type="date"
+              value={periodeDebut}
+              onChange={(e) => setPeriodeDebut(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <span className="export-separateur">→</span>
+            <input
+              type="date"
+              value={periodeFin}
+              onChange={(e) => setPeriodeFin(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exporterPeriode}
+              disabled={exportEnCours === 'periode'}
+            >
+              <Download size={16} />
+              {exportEnCours === 'periode' ? 'Export en cours...' : 'Exporter la période'}
+            </button>
           </div>
         </div>
 

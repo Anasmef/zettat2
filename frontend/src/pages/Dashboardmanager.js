@@ -1,575 +1,636 @@
-import React, { useState, useEffect } from 'react';
-import { QrCode, Users, Clock, Trash2, CheckCircle, AlertTriangle, Download, Plus, BarChart3, Eye } from 'lucide-react';
-import SidebarProf from '../components/Sidebarmanager';
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import * as XLSX from 'xlsx-js-style';
+import {
+  ScanLine, Clock, CheckCircle, XCircle, Users, Calendar,
+  Camera, CameraOff, RefreshCw, FileSpreadsheet, Download
+} from 'lucide-react';
+import Sidebar from '../components/Sidebarmanager'; // ✅ Sidebar Manager (au lieu de Sidebar Admin)
+import './ScanPointageProf.css'; // ✅ on reutilise le meme CSS que la version admin
 
-const AdminQRPage = () => {
-  const [qrCode, setQrCode] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [description, setDescription] = useState('');
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [pointages, setPointages] = useState(null);
-  const [qrCodesActifs, setQrCodesActifs] = useState([]);
+const READER_ELEMENT_ID = 'camera-reader-manager';
+const COOLDOWN_MS = 3000;
+
+// Style de bordure fine réutilisé pour toutes les cellules du tableau Excel
+const BORDURE_FINE = {
+  top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+  right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+};
+
+const ScanPointageProfManager = () => {
+  const [tableauJour, setTableauJour] = useState([]);
+  const [loadingTableau, setLoadingTableau] = useState(true);
+  const [dateSelectionnee, setDateSelectionnee] = useState(new Date().toISOString().slice(0, 10));
+  const [dernierScan, setDernierScan] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraErreur, setCameraErreur] = useState(null);
+  const [facingMode, setFacingMode] = useState('environment');
+
+  // ✅ États pour les exports Excel
+  const [moisSelectionne, setMoisSelectionne] = useState(new Date().toISOString().slice(0, 7)); // "YYYY-MM"
+  const [periodeDebut, setPeriodeDebut] = useState(new Date().toISOString().slice(0, 10));
+  const [periodeFin, setPeriodeFin] = useState(new Date().toISOString().slice(0, 10));
+  const [exportEnCours, setExportEnCours] = useState(null); // 'mois' | 'periode' | null
+
+  const html5QrCodeRef = useRef(null);
+  const dernierCodeRef = useRef({ code: null, ts: 0 });
+  const traitementEnCoursRef = useRef(false);
+  const startPromiseRef = useRef(null);
+  const enTrainDeDemarrer = useRef(false);
+
+  const estAujourdhui = dateSelectionnee === new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
-    fetchPointages();
-    fetchQRCodesActifs();
-    const interval = setInterval(() => {
-      fetchPointages();
-      fetchQRCodesActifs();
-    }, 60000);
-    return () => clearInterval(interval);
+    const filtrerErreurPlayInterrompu = (event) => {
+      const message = event?.reason?.message || event?.reason || '';
+      if (typeof message === 'string' && message.includes('play() request was interrupted')) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', filtrerErreurPlayInterrompu);
+    return () => window.removeEventListener('unhandledrejection', filtrerErreurPlayInterrompu);
   }, []);
 
-  const fetchPointages = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/pointages', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) setPointages(await res.json());
-    } catch (error) { console.error('Erreur pointages:', error); }
+  useEffect(() => {
+    chargerTableau();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateSelectionnee]);
+
+  useEffect(() => {
+    if (!estAujourdhui) return;
+
+    const intervalId = setInterval(() => {
+      chargerTableau(true);
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estAujourdhui, dateSelectionnee]);
+
+  useEffect(() => {
+    if (estAujourdhui) {
+      demarrerCamera();
+    } else {
+      arreterCamera();
+    }
+    return () => {
+      arreterCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estAujourdhui, facingMode]);
+
+  const basculerCamera = async () => {
+    await arreterCamera();
+    setFacingMode(prev => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  const fetchQRCodesActifs = async () => {
+  const chargerTableau = async (silencieux = false) => {
     try {
+      if (!silencieux) setLoadingTableau(true);
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/qr-codes-actifs', {
+      const res = await axios.get(`/api/pointage-profs/jour/${dateSelectionnee}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setQrCodesActifs(data.qrCodesActifs);
-      }
-    } catch (error) { console.error('Erreur QR codes:', error); }
-  };
-
-  const genererQR = async () => {
-    setLoading(true);
-    setMessage({ type: '', text: '' });
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ description: description || `Pointage du ${new Date().toLocaleDateString('fr-FR')}` })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setQrCode(data.qrCode);
-        setMessage({ type: 'success', text: data.message || 'QR Code généré avec succès!' });
-        fetchQRCodesActifs();
-      } else {
-        setMessage({ type: 'error', text: data.message });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur de connexion' });
+      setTableauJour(res.data);
+    } catch (err) {
+      console.error('Erreur chargement tableau:', err);
     } finally {
-      setLoading(false);
+      if (!silencieux) setLoadingTableau(false);
     }
   };
 
-  const supprimerQR = async (qrId) => {
+  const demarrerCamera = async () => {
+    if (html5QrCodeRef.current || enTrainDeDemarrer.current) return;
+    enTrainDeDemarrer.current = true;
+
+    try {
+      const html5QrCode = new Html5Qrcode(READER_ELEMENT_ID, {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR,
+        ],
+        verbose: false,
+      });
+      html5QrCodeRef.current = html5QrCode;
+
+      const startPromise = html5QrCode.start(
+        { facingMode },
+        {
+          fps: 15,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          videoConstraints: {
+            facingMode,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+        },
+        (decodedText, decodedResult) => {
+          console.log('Code détecté:', decodedText, decodedResult);
+          onCodeDetecte(decodedText);
+        },
+        (errorMessage) => {
+          // ignore silencieusement
+        }
+      );
+      startPromiseRef.current = startPromise;
+
+      await startPromise.catch((err) => {
+        console.warn('Camera start interrompu:', err?.message || err);
+        throw err;
+      });
+
+      if (!html5QrCodeRef.current) {
+        await html5QrCode.stop().catch(() => {});
+        await html5QrCode.clear().catch(() => {});
+        return;
+      }
+
+      setCameraActive(true);
+      setCameraErreur(null);
+    } catch (err) {
+      console.error('Erreur démarrage caméra:', err);
+      setCameraErreur("Impossible d'accéder à la caméra. Vérifiez les autorisations du navigateur.");
+      setCameraActive(false);
+      html5QrCodeRef.current = null;
+    } finally {
+      enTrainDeDemarrer.current = false;
+    }
+  };
+
+  const arreterCamera = async () => {
+    const instance = html5QrCodeRef.current;
+    if (!instance) return;
+
+    html5QrCodeRef.current = null;
+
+    try {
+      if (startPromiseRef.current) {
+        await startPromiseRef.current.catch(() => {});
+      }
+      await instance.stop();
+      await instance.clear();
+    } catch (err) {
+      // deja arretee, on ignore
+    } finally {
+      setCameraActive(false);
+    }
+  };
+
+  const onCodeDetecte = (codeDetecte) => {
+    const maintenant = Date.now();
+
+    if (
+      dernierCodeRef.current.code === codeDetecte &&
+      maintenant - dernierCodeRef.current.ts < COOLDOWN_MS
+    ) {
+      return;
+    }
+    if (traitementEnCoursRef.current) return;
+
+    dernierCodeRef.current = { code: codeDetecte, ts: maintenant };
+    envoyerScan(codeDetecte);
+  };
+
+  const envoyerScan = async (professeurId) => {
+    if (!professeurId) return;
+
+    traitementEnCoursRef.current = true;
+    setScanning(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/qr-code/${qrId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.post(
+        '/api/pointage-profs/scan',
+        { professeurId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setDernierScan({
+        nom: res.data.professeur.nomComplet,
+        matiere: res.data.professeur.matiere,
+        heure: new Date(res.data.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        dejaScanne: res.data.dejaScanne,
+        minutesRestantes: res.data.minutesRestantes || null,
+        erreur: false
       });
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'QR Code supprimé' });
-        fetchQRCodesActifs();
-        if (qrCode && qrCode.id === qrId) setQrCode(null);
+
+      if (estAujourdhui) {
+        chargerTableau(true);
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur suppression' });
+    } catch (err) {
+      console.error('Erreur scan:', err);
+      setDernierScan({
+        erreur: true,
+        message: err.response?.data?.error || 'Badge non reconnu'
+      });
+    } finally {
+      setScanning(false);
+      setTimeout(() => {
+        setDernierScan(null);
+        traitementEnCoursRef.current = false;
+      }, 2500);
     }
   };
 
-  const telechargerQR = () => {
-    if (!qrCode) return;
-    const link = document.createElement('a');
-    link.download = `qr-pointage-${new Date().toISOString().split('T')[0]}.png`;
-    link.href = qrCode.dataURL;
-    link.click();
+  // =====================================================================
+  // ✅ EXPORT EXCEL — 3 modes : jour affiché / mois / période libre
+  // =====================================================================
+
+  // Récupère les pointages d'une période via la route backend /periode
+  const recupererPointagesPeriode = async (debut, fin) => {
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/pointage-profs/periode', {
+      params: { debut, fin },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return res.data; // [{ date, nomComplet, matiere, heureArrivee }, ...]
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
+  // Construit un classeur Excel stylé (xlsx-js-style) à partir de lignes
+  // {date, nomComplet, matiere, heureArrivee} et l'écrit sur le disque du navigateur
+  const genererEtTelechargerExcel = (lignes, titre, nomFichier) => {
+    const entetes = ['Date', 'Nom du Professeur', 'Matière', "Heure d'arrivée"];
+
+    const donnees = [
+      [titre],
+      [],
+      entetes,
+      ...lignes.map(l => ([
+        new Date(l.date).toLocaleDateString('fr-FR'),
+        l.nomComplet,
+        l.matiere || '—',
+        new Date(l.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      ]))
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(donnees);
+
+    // Fusionne la cellule de titre sur les 4 colonnes
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+    // Style du titre
+    ws['A1'].s = {
+      font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '2563EB' } },
+      alignment: { horizontal: 'center', vertical: 'center' }
+    };
+
+    // Style de la ligne d'en-têtes (ligne d'index 2, càd la 3e ligne de la feuille)
+    const indexLigneEntetes = 2;
+    entetes.forEach((_, colIdx) => {
+      const ref = XLSX.utils.encode_cell({ r: indexLigneEntetes, c: colIdx });
+      if (ws[ref]) {
+        ws[ref].s = {
+          font: { bold: true, color: { rgb: 'FFFFFF' } },
+          fill: { fgColor: { rgb: '1E3A8A' } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: BORDURE_FINE
+        };
+      }
+    });
+
+    // Style des lignes de données (bordures + alternance de couleur)
+    lignes.forEach((_, i) => {
+      const rowIdx = indexLigneEntetes + 1 + i;
+      for (let c = 0; c < entetes.length; c++) {
+        const ref = XLSX.utils.encode_cell({ r: rowIdx, c });
+        if (ws[ref]) {
+          ws[ref].s = {
+            border: BORDURE_FINE,
+            fill: { fgColor: { rgb: i % 2 === 0 ? 'F0FDF4' : 'FFFFFF' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+          };
+        }
+      }
+    });
+
+    // Largeur des colonnes
+    ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 16 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
+    XLSX.writeFile(wb, nomFichier);
   };
+
+  // --- Export du jour actuellement affiché (utilise le tableau déjà chargé) ---
+  const exporterJourAffiche = () => {
+    const lignes = [];
+    tableauJour.forEach(prof => {
+      if (prof.heures && prof.heures.length > 0) {
+        prof.heures.forEach(h => {
+          lignes.push({
+            date: dateSelectionnee,
+            nomComplet: prof.nomComplet,
+            matiere: prof.matiere,
+            heureArrivee: h
+          });
+        });
+      }
+    });
+
+    if (lignes.length === 0) {
+      alert("Aucun pointage à exporter pour cette date.");
+      return;
+    }
+
+    const dateFr = new Date(dateSelectionnee).toLocaleDateString('fr-FR');
+    genererEtTelechargerExcel(
+      lignes,
+      `Pointages du ${dateFr}`,
+      `pointages_${dateSelectionnee}.xlsx`
+    );
+  };
+
+  // --- Export d'un mois complet choisi via <input type="month"> ---
+  const exporterMois = async () => {
+    if (!moisSelectionne) return;
+    setExportEnCours('mois');
+    try {
+      const [annee, mois] = moisSelectionne.split('-');
+      const debut = `${annee}-${mois}-01`;
+      // new Date(annee, mois, 0) donne le dernier jour du mois choisi
+      // (car "mois" ici est 1-indexé, donc utilisé tel quel comme mois "suivant" 0-indexé)
+      const dernierJour = new Date(Number(annee), Number(mois), 0).getDate();
+      const fin = `${annee}-${mois}-${String(dernierJour).padStart(2, '0')}`;
+
+      const data = await recupererPointagesPeriode(debut, fin);
+      if (!data || data.length === 0) {
+        alert("Aucun pointage trouvé pour ce mois.");
+        return;
+      }
+
+      const libelleMois = new Date(Number(annee), Number(mois) - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+      genererEtTelechargerExcel(
+        data,
+        `Pointages — ${libelleMois}`,
+        `pointages_${annee}-${mois}.xlsx`
+      );
+    } catch (err) {
+      console.error('Erreur export mois:', err);
+      alert("Erreur lors de l'export du mois.");
+    } finally {
+      setExportEnCours(null);
+    }
+  };
+
+  // --- Export d'une période libre (deux dates choisies) ---
+  const exporterPeriode = async () => {
+    if (!periodeDebut || !periodeFin) return;
+    if (periodeDebut > periodeFin) {
+      alert("La date de début doit être avant la date de fin.");
+      return;
+    }
+
+    setExportEnCours('periode');
+    try {
+      const data = await recupererPointagesPeriode(periodeDebut, periodeFin);
+      if (!data || data.length === 0) {
+        alert("Aucun pointage trouvé pour cette période.");
+        return;
+      }
+
+      const debutFr = new Date(periodeDebut).toLocaleDateString('fr-FR');
+      const finFr = new Date(periodeFin).toLocaleDateString('fr-FR');
+
+      genererEtTelechargerExcel(
+        data,
+        `Pointages du ${debutFr} au ${finFr}`,
+        `pointages_${periodeDebut}_au_${periodeFin}.xlsx`
+      );
+    } catch (err) {
+      console.error('Erreur export période:', err);
+      alert("Erreur lors de l'export de la période.");
+    } finally {
+      setExportEnCours(null);
+    }
+  };
+
+  const nbPresents = tableauJour.filter(p => p.present).length;
+  const nbTotal = tableauJour.length;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f3e8ff 100%)',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-    }}>
-      <style>{`
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .qr-card {
-          background: rgba(255,255,255,0.95);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-radius: 16px;
-          box-shadow: 0 8px 25px rgba(0,0,0,0.08);
-          animation: fadeIn 0.4s ease;
-        }
-        
-        .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border: none;
-          border-radius: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(102,126,234,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          width: 100%;
-          padding: 14px 20px;
-          font-size: 15px;
-        }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
-        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+    <div className="scan-page">
+      <Sidebar />
 
-        .btn-danger {
-          background: #ef4444;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          padding: 8px 12px;
-          cursor: pointer;
-          font-size: 12px;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          transition: background 0.2s;
-          white-space: nowrap;
-          flex-shrink: 0;
-        }
-        .btn-danger:hover { background: #dc2626; }
+      <div className="scan-container">
+        <h1 className="scan-titre">
+          <ScanLine size={28} /> Pointage des Professeurs
+        </h1>
 
-        .btn-download {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border: none;
-          border-radius: 10px;
-          padding: 10px 18px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          transition: all 0.3s ease;
-          margin-top: 12px;
-        }
-        .btn-download:hover { transform: translateY(-1px); }
+        <div className="scan-zone">
+          <div className="scan-zone-header">
+            <label className="scan-label">
+              {cameraActive ? (
+                <><Camera size={16} /> Présentez le badge (QR code) devant la caméra</>
+              ) : (
+                <><CameraOff size={16} /> Caméra inactive</>
+              )}
+            </label>
 
-        .qr-input {
-          width: 100%;
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 12px;
-          font-size: 14px;
-          background: white;
-          transition: border-color 0.2s;
-          outline: none;
-          box-sizing: border-box;
-        }
-        .qr-input:focus { border-color: #667eea; }
-
-        .stat-card {
-          text-align: center;
-          padding: 16px 12px;
-          border-radius: 14px;
-          color: white;
-        }
-        .stat-value { font-size: 26px; font-weight: 700; margin-bottom: 2px; }
-        .stat-label { font-size: 12px; font-weight: 500; opacity: 0.9; }
-
-        .pointage-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 14px 16px;
-          border-radius: 12px;
-          margin-bottom: 8px;
-          flex-wrap: wrap;
-          gap: 8px;
-          transition: background 0.2s;
-        }
-        .pointage-row:hover { background: rgba(248,250,252,0.9) !important; }
-
-        /* ===== RESPONSIVE ===== */
-        .page-wrapper {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 20px 16px;
-        }
-
-        .page-header {
-          text-align: center;
-          padding: 28px 20px;
-          margin-bottom: 24px;
-        }
-
-        .main-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-          margin-bottom: 24px;
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 12px;
-        }
-
-        .qr-active-item {
-          background: rgba(255,255,255,0.8);
-          border: 1px solid rgba(255,255,255,0.3);
-          border-left: 4px solid #10b981;
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 14px;
-        }
-
-        .qr-active-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-          margin-bottom: 12px;
-        }
-
-        .qr-active-meta {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          flex-wrap: wrap;
-          margin-bottom: 10px;
-        }
-
-        .qr-image-wrapper {
-          margin-top: 24px;
-          padding: 20px;
-          text-align: center;
-          background: rgba(255,255,255,0.6);
-          border-radius: 14px;
-          border: 2px dashed rgba(102,126,234,0.3);
-        }
-
-        .pointage-info { flex: 1; min-width: 0; }
-        .pointage-name { font-weight: 600; color: #1a202c; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .pointage-email { font-size: 13px; color: #64748b; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .pointage-times { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
-        .time-block { text-align: right; }
-        .time-label { font-size: 11px; color: #64748b; margin-bottom: 2px; }
-        .time-value { font-size: 14px; font-weight: 600; }
-
-        .section-title {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 20px;
-        }
-        .section-title h2, .section-title h3 {
-          margin: 0;
-          color: #1a202c;
-          font-size: 20px;
-          font-weight: 700;
-        }
-
-        .badge {
-          background: #667eea;
-          color: white;
-          padding: 3px 10px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        /* Tablet */
-        @media (max-width: 900px) {
-          .main-grid {
-            grid-template-columns: 1fr;
-          }
-          .page-header h1 { font-size: 24px; }
-        }
-
-        /* Mobile */
-        @media (max-width: 600px) {
-          .page-wrapper { padding: 12px; }
-          .page-header { padding: 20px 16px; margin-bottom: 16px; }
-          .page-header h1 { font-size: 20px; }
-          .page-header p { font-size: 13px; }
-          .qr-card { border-radius: 12px; }
-          .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-          .stat-value { font-size: 22px; }
-          .stat-card { padding: 12px 8px; }
-          .pointage-row { padding: 12px; }
-          .pointage-times { gap: 10px; }
-          .time-value { font-size: 13px; }
-          .main-grid { gap: 16px; }
-          .qr-active-header { flex-direction: column; }
-          .btn-danger { width: 100%; justify-content: center; }
-          .qr-image-wrapper img { width: 160px !important; height: 160px !important; }
-          .section-title h2, .section-title h3 { font-size: 17px; }
-        }
-
-        @media (max-width: 380px) {
-          .stats-grid { grid-template-columns: 1fr 1fr; }
-          .stat-value { font-size: 20px; }
-        }
-      `}</style>
-
-      <SidebarProf onLogout={handleLogout} />
-
-      <div className="page-wrapper">
-
-        {/* ── HEADER ── */}
-        <div className="qr-card page-header">
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '64px', height: '64px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            marginBottom: '16px'
-          }}>
-            <QrCode size={32} color="white" />
-          </div>
-          <h1 style={{
-            margin: '0 0 8px 0', fontWeight: '700',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
-          }}>
-            Générateur QR Code
-          </h1>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px', fontWeight: '500' }}>
-            Système de pointage — UN QR par jour (20 heures)
-          </p>
-        </div>
-
-        {/* ── MAIN GRID ── */}
-        <div className="main-grid">
-
-          {/* ── COLONNE GAUCHE : Génération ── */}
-          <div className="qr-card" style={{ padding: '24px' }}>
-            <div className="section-title">
-              <Plus size={22} color="#667eea" />
-              <h2>QR Code du Jour</h2>
-            </div>
-
-            {/* Message */}
-            {message.text && (
-              <div style={{
-                padding: '14px 16px', borderRadius: '10px', marginBottom: '20px',
-                backgroundColor: message.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                color: message.type === 'success' ? '#15803d' : '#dc2626',
-                border: `1px solid ${message.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '500'
-              }}>
-                {message.type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
-                {message.text}
-              </div>
+            {estAujourdhui && (
+              <button
+                type="button"
+                className="btn-switch-camera"
+                onClick={basculerCamera}
+                title="Changer de caméra (avant / arrière)"
+              >
+                <RefreshCw size={16} />
+                {facingMode === 'environment' ? 'Caméra arrière' : 'Caméra avant'}
+              </button>
             )}
+          </div>
 
-            {/* Input */}
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#374151', fontSize: '13px' }}>
-                Description (Optionnel)
-              </label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="ex: Pointage matinée"
-                className="qr-input"
-              />
-              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>
-                ⚠️ Un seul QR code par jour, valable 20 heures
-              </p>
-            </div>
+          <div
+            className="camera-wrapper"
+            style={{ display: estAujourdhui ? 'block' : 'none' }}
+          >
+            <div id={READER_ELEMENT_ID} className="camera-reader" />
+            {cameraErreur && (
+              <p className="camera-erreur">{cameraErreur}</p>
+            )}
+            {scanning && (
+              <div className="camera-overlay-scanning">Traitement du scan...</div>
+            )}
+          </div>
 
-            {/* Bouton */}
-            <button onClick={genererQR} disabled={loading} className="btn-primary">
-              {loading ? (
+          {!estAujourdhui && (
+            <p className="camera-info">
+              La caméra n'est active que pour la journée en cours. Sélectionnez la date d'aujourd'hui pour scanner.
+            </p>
+          )}
+
+          {dernierScan && (
+            <div className={`scan-confirmation ${dernierScan.erreur ? 'erreur' : dernierScan.dejaScanne ? 'attention' : 'succes'}`}>
+              {dernierScan.erreur ? (
                 <>
-                  <div style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                  Génération...
+                  <XCircle size={32} />
+                  <div>
+                    <strong>Erreur</strong>
+                    <p>{dernierScan.message}</p>
+                  </div>
                 </>
               ) : (
-                <><QrCode size={18} /> Générer / Récupérer QR du Jour</>
-              )}
-            </button>
-
-            {/* QR Code affiché */}
-            {qrCode && (
-              <div className="qr-image-wrapper">
-                <img src={qrCode.dataURL} alt="QR Code" style={{ width: '190px', height: '190px', borderRadius: '12px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)' }} />
-                <div style={{ marginTop: '14px' }}>
-                  <p style={{ fontSize: '13px', color: '#64748b', margin: '6px 0' }}>
-                    <strong>Description :</strong> {qrCode.description}
-                  </p>
-                  <p style={{ fontSize: '13px', color: '#64748b', margin: '6px 0' }}>
-                    <strong>Expire le :</strong> {new Date(qrCode.expiresAt).toLocaleString('fr-FR')}
-                  </p>
-                  <button onClick={telechargerQR} className="btn-download">
-                    <Download size={15} /> Télécharger
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── COLONNE DROITE : Stats + QR actifs ── */}
-          <div>
-
-            {/* Stats */}
-            {pointages && (
-              <div className="qr-card" style={{ padding: '24px', marginBottom: '20px' }}>
-                <div className="section-title">
-                  <BarChart3 size={22} color="#667eea" />
-                  <h3>Statistiques du Jour</h3>
-                </div>
-
-                <div className="stats-grid">
-                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 4px 15px rgba(16,185,129,0.3)' }}>
-                    <div className="stat-value">{pointages.stats.presents}</div>
-                    <div className="stat-label">Présents</div>
+                <>
+                  <CheckCircle size={32} />
+                  <div>
+                    <strong>{dernierScan.nom}</strong>
+                    <p>
+                      {dernierScan.dejaScanne
+                        ? (dernierScan.minutesRestantes
+                            ? `Déjà pointé, réessayez dans ${dernierScan.minutesRestantes} min`
+                            : `Déjà pointé aujourd'hui à ${dernierScan.heure}`)
+                        : `Pointé avec succès à ${dernierScan.heure}`}
+                    </p>
                   </div>
-                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', boxShadow: '0 4px 15px rgba(239,68,68,0.3)' }}>
-                    <div className="stat-value">{pointages.stats.absents}</div>
-                    <div className="stat-label">Absents</div>
-                  </div>
-                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', boxShadow: '0 4px 15px rgba(245,158,11,0.3)' }}>
-                    <div className="stat-value">{pointages.stats.sansSortie || 0}</div>
-                    <div className="stat-label">Sans Sortie</div>
-                  </div>
-                  <div className="stat-card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', boxShadow: '0 4px 15px rgba(59,130,246,0.3)' }}>
-                    <div className="stat-value">{pointages.stats.tauxPresence}%</div>
-                    <div className="stat-label">Taux Présence</div>
-                  </div>
-                </div>
-
-                <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginTop: '12px', marginBottom: 0, fontWeight: '500' }}>
-                  Total : {pointages.stats.totalProfesseurs} professeurs
-                </p>
-              </div>
-            )}
-
-            {/* QR Codes Actifs */}
-            <div className="qr-card" style={{ padding: '24px' }}>
-              <div className="section-title">
-                <Clock size={22} color="#667eea" />
-                <h3>QR Code Actif</h3>
-                <span className="badge">{qrCodesActifs.length}</span>
-              </div>
-
-              {qrCodesActifs.length === 0 ? (
-                <div style={{ textAlign: 'center', color: '#64748b', padding: '32px 16px', background: 'rgba(248,250,252,0.8)', borderRadius: '12px' }}>
-                  <QrCode size={44} style={{ marginBottom: '12px', opacity: 0.4 }} />
-                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '500' }}>Aucun QR code actif</p>
-                  <p style={{ margin: 0, fontSize: '13px', opacity: 0.7 }}>Générez le QR code du jour</p>
-                </div>
-              ) : (
-                <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
-                  {qrCodesActifs.map((qr) => (
-                    <div key={qr.id} className="qr-active-item">
-                      <div className="qr-active-header">
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '600', color: '#1a202c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {qr.description}
-                          </h4>
-                          <div className="qr-active-meta">
-                            <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Clock size={13} /> {qr.tempsRestant} min restantes
-                            </span>
-                            <span style={{ fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <Eye size={13} /> {qr.scansCount} scans
-                            </span>
-                          </div>
-                        </div>
-                        <button onClick={() => supprimerQR(qr.id)} className="btn-danger">
-                          <Trash2 size={13} /> Supprimer
-                        </button>
-                      </div>
-
-                      {/* Barre de progression */}
-                      <div style={{ width: '100%', height: '5px', backgroundColor: 'rgba(226,232,240,0.8)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${Math.max(0, Math.min(100, (qr.tempsRestant / 1200) * 100))}%`,
-                          height: '100%',
-                          background: qr.tempsRestant < 120 ? 'linear-gradient(90deg, #ef4444, #dc2626)' :
-                                       qr.tempsRestant < 300 ? 'linear-gradient(90deg, #f59e0b, #d97706)' :
-                                       'linear-gradient(90deg, #10b981, #059669)',
-                          borderRadius: '3px',
-                          transition: 'width 0.3s ease'
-                        }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                </>
               )}
             </div>
+          )}
+        </div>
+
+        <div className="scan-stats">
+          <div className="stat-box">
+            <Users size={20} />
+            <span>{nbPresents} / {nbTotal} présents</span>
+          </div>
+          {estAujourdhui && (
+            <div className="stat-box live-indicator">
+              <span className="live-dot"></span>
+              <span>En direct</span>
+            </div>
+          )}
+          <div className="stat-box date-picker">
+            <Calendar size={20} />
+            <input
+              type="date"
+              value={dateSelectionnee}
+              onChange={(e) => setDateSelectionnee(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
           </div>
         </div>
 
-        {/* ── POINTAGES RÉCENTS ── */}
-        {pointages && pointages.pointages.length > 0 && (
-          <div className="qr-card" style={{ padding: '24px' }}>
-            <div className="section-title">
-              <Users size={22} color="#667eea" />
-              <h3>Pointages Récents</h3>
-            </div>
-
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {pointages.pointages.slice(0, 10).map((pointage, index) => (
-                <div
-                  key={index}
-                  className="pointage-row"
-                  style={{ backgroundColor: index % 2 === 0 ? 'rgba(248,250,252,0.8)' : 'rgba(255,255,255,0.8)' }}
-                >
-                  <div className="pointage-info">
-                    <div className="pointage-name">{pointage.nomProfesseur}</div>
-                    <div className="pointage-email">{pointage.emailProfesseur}</div>
-                  </div>
-
-                  <div className="pointage-times">
-                    <div className="time-block">
-                      <div className="time-label">Entrée</div>
-                      <div className="time-value" style={{ color: '#10b981' }}>{pointage.heureEntree}</div>
-                    </div>
-                    <div className="time-block">
-                      <div className="time-label">Sortie</div>
-                      <div className="time-value" style={{ color: pointage.heureSortie ? '#ef4444' : '#9ca3af' }}>
-                        {pointage.heureSortie || '--:--'}
-                      </div>
-                    </div>
-                    {pointage.tempsPresence > 0 && (
-                      <div style={{
-                        fontSize: '12px', padding: '5px 10px', borderRadius: '20px', fontWeight: '600',
-                        backgroundColor: 'rgba(59,130,246,0.1)', color: '#2563eb', whiteSpace: 'nowrap'
-                      }}>
-                        {Math.floor(pointage.tempsPresence / 60)}h {pointage.tempsPresence % 60}min
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* ✅ Barre d'export Excel */}
+        <div className="export-bar">
+          <div className="export-groupe">
+            <button
+              type="button"
+              className="btn-export btn-export-principal"
+              onClick={exporterJourAffiche}
+            >
+              <FileSpreadsheet size={16} />
+              Exporter le jour affiché
+            </button>
           </div>
-        )}
+
+          <div className="export-groupe">
+            <Calendar size={16} className="export-icone" />
+            <input
+              type="month"
+              value={moisSelectionne}
+              onChange={(e) => setMoisSelectionne(e.target.value)}
+              max={new Date().toISOString().slice(0, 7)}
+            />
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exporterMois}
+              disabled={exportEnCours === 'mois'}
+            >
+              <Download size={16} />
+              {exportEnCours === 'mois' ? 'Export en cours...' : 'Exporter le mois'}
+            </button>
+          </div>
+
+          <div className="export-groupe">
+            <Calendar size={16} className="export-icone" />
+            <input
+              type="date"
+              value={periodeDebut}
+              onChange={(e) => setPeriodeDebut(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <span className="export-separateur">→</span>
+            <input
+              type="date"
+              value={periodeFin}
+              onChange={(e) => setPeriodeFin(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <button
+              type="button"
+              className="btn-export"
+              onClick={exporterPeriode}
+              disabled={exportEnCours === 'periode'}
+            >
+              <Download size={16} />
+              {exportEnCours === 'periode' ? 'Export en cours...' : 'Exporter la période'}
+            </button>
+          </div>
+        </div>
+
+        <div className="scan-tableau-wrapper">
+          {loadingTableau ? (
+            <p className="scan-chargement">Chargement...</p>
+          ) : (
+            <table className="scan-tableau">
+              <thead>
+                <tr>
+                  <th>Statut</th>
+                  <th>Nom du Professeur</th>
+                  <th>Matière</th>
+                  <th>Pointages du jour</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableauJour.length === 0 ? (
+                  <tr><td colSpan={4} className="scan-aucun">Aucun professeur trouvé</td></tr>
+                ) : (
+                  tableauJour.map(prof => (
+                    <tr key={prof._id} className={prof.present ? 'ligne-presente' : 'ligne-absente'}>
+                      <td>
+                        {prof.present ? (
+                          <span className="badge-statut present"><CheckCircle size={14} /> Présent</span>
+                        ) : (
+                          <span className="badge-statut absent"><XCircle size={14} /> Non pointé</span>
+                        )}
+                      </td>
+                      <td className="col-nom">{prof.nomComplet}</td>
+                      <td>{prof.matiere || '—'}</td>
+                      <td>
+                        {prof.heures && prof.heures.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {prof.heures.map((h, idx) => (
+                              <span key={idx} className="heure-arrivee">
+                                <Clock size={14} /> {new Date(h).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            ))}
+                          </div>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default AdminQRPage;
+export default ScanPointageProfManager;
