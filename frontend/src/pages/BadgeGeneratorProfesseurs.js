@@ -17,8 +17,6 @@ const BadgeGeneratorProfesseurs = () => {
   const [selectedIds, setSelectedIds] = useState([]);
 
   const [exportFormat, setExportFormat] = useState(() => localStorage.getItem('exportFormat') || 'png');
-  const [logoUrl, setLogoUrl] = useState(() => localStorage.getItem('schoolLogo') || '/images/logo-ecole.jpg');
-  const [anneeScolaire, setAnneeScolaire] = useState(() => localStorage.getItem('anneeScolaire') || '2026/2027');
 
   useEffect(() => { fetchProfesseurs(); }, []);
   useEffect(() => { filtrerProfesseurs(); }, [professeurs, recherche, filtreMatiere]);
@@ -65,7 +63,8 @@ const BadgeGeneratorProfesseurs = () => {
     try {
       setDownloadingId(professeur._id);
       await new Promise(resolve => setTimeout(resolve, 300));
-      const cardElement = document.querySelector(`[data-prof-id="${professeur._id}"] .card-container-pvc`);
+      // ✅ sélecteur mis à jour : le nouveau design utilise .prof-card-container
+      const cardElement = document.querySelector(`[data-prof-id="${professeur._id}"] .prof-card-container`);
       if (!cardElement) { alert('❌ Impossible de trouver la carte'); return; }
 
       const canvas = await html2canvas(cardElement, {
@@ -224,11 +223,7 @@ const BadgeGeneratorProfesseurs = () => {
                     {selectedIds.includes(professeur._id) ? <CheckSquare size={24} color="#6366f1" /> : <Square size={24} color="#9ca3af" />}
                   </div>
                 </div>
-                <ProfesseurBadge
-                  professeur={professeur}
-                  logoUrl={logoUrl}
-                  anneeScolaire={anneeScolaire}
-                />
+                <ProfesseurBadge professeur={professeur} />
               </div>
             ))}
           </div>

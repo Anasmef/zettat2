@@ -1,0 +1,764 @@
+/* =========================================================
+   PROFESSEUR BADGE
+   DESIGN PROFESSIONNEL PVC
+   IMPORTANT :
+   Ce fichier est UNIQUEMENT pour ProfesseurBadge.jsx
+   Il ne modifie PAS StudentBadgeModern.css
+   ========================================================= */
+
+
+/* =========================================================
+   WRAPPER
+   ========================================================= */
+
+.prof-card-wrapper {
+  width: 324px;
+  height: 204px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 10px;
+  padding: 0;
+
+  box-sizing: border-box;
+
+  page-break-inside: avoid;
+}
+
+
+/* =========================================================
+   CARTE PRINCIPALE
+   ========================================================= */
+
+.prof-card-container {
+  position: relative;
+
+  width: 324px;
+  height: 204px;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ffffff 0%,
+      #fbfcfd 55%,
+      #f7f8fa 100%
+    );
+
+  border: 1.5px solid #d9dde2;
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 4px 15px rgba(0, 0, 0, 0.08);
+
+  font-family:
+    "Segoe UI",
+    Arial,
+    "Noto Sans Arabic",
+    sans-serif;
+
+  color: #20252b;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.prof-card-header {
+  position: absolute;
+
+  top: 10px;
+  right: 8px;
+
+  width: 190px;
+  height: 30px;
+
+  display: flex;
+  align-items: center;
+
+  background: #a71920;
+
+  border-radius: 0 16px 16px 0;
+
+  overflow: hidden;
+
+  z-index: 5;
+}
+
+
+/* =========================================================
+   DIAGONALE BLANCHE
+   ========================================================= */
+
+.prof-header-slash {
+  width: 18px;
+  height: 55px;
+
+  margin-left: -7px;
+
+  flex-shrink: 0;
+
+  background: #ffffff;
+
+  transform: skewX(-25deg);
+}
+
+
+/* =========================================================
+   TITRE HEADER
+   ========================================================= */
+
+.prof-header-title {
+  flex: 1;
+
+  padding-left: 10px;
+
+  color: #ffffff;
+
+  font-size: 12px;
+
+  font-weight: 900;
+
+  letter-spacing: 1px;
+
+  line-height: 1;
+
+  white-space: nowrap;
+
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   CONTENU PRINCIPAL
+   ========================================================= */
+
+.prof-card-content {
+  position: absolute;
+
+  left: 10px;
+  right: 10px;
+
+  top: 55px;
+
+  height: 120px;
+
+  display: flex;
+
+  align-items: center;
+
+  box-sizing: border-box;
+}
+
+
+/* =========================================================
+   PHOTO SECTION
+   ========================================================= */
+
+.prof-photo-section {
+  width: 94px;
+  height: 112px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* =========================================================
+   CADRE PHOTO
+   ========================================================= */
+
+.prof-photo-frame {
+  width: 88px;
+  height: 106px;
+
+  box-sizing: border-box;
+
+  overflow: hidden;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background: #f1f2f4;
+
+  border: 3px solid #a71920;
+
+  border-radius: 12px;
+}
+
+
+/* =========================================================
+   PHOTO
+   ========================================================= */
+
+.prof-photo {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+}
+
+
+/* =========================================================
+   PLACEHOLDER PHOTO
+   ========================================================= */
+
+.prof-photo-placeholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background:
+    linear-gradient(
+      145deg,
+      #f1f2f4,
+      #e5e7eb
+    );
+
+  color: #555b61;
+}
+
+
+/* =========================================================
+   INFORMATION SECTION
+   ========================================================= */
+
+.prof-info-section {
+  flex: 1;
+
+  min-width: 0;
+
+  height: 105px;
+
+  box-sizing: border-box;
+
+  padding-left: 12px;
+  padding-right: 8px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  justify-content: center;
+}
+
+
+/* =========================================================
+   INFORMATION BLOCK
+   ========================================================= */
+
+.prof-info-block {
+  width: 100%;
+
+  min-width: 0;
+
+  display: flex;
+
+  flex-direction: column;
+}
+
+
+/* =========================================================
+   LABEL
+   ========================================================= */
+
+.prof-info-label {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  color: #a71920;
+
+  font-size: 10px;
+
+  font-weight: 900;
+
+  letter-spacing: 0.65px;
+
+  line-height: 1;
+
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   VALUE
+   ========================================================= */
+
+.prof-info-value {
+  margin-top: 3px;
+
+  padding-left: 24px;
+
+  color: #20252b;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  line-height: 1.2;
+
+  min-width: 0;
+
+  max-width: 100%;
+
+  white-space: nowrap;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   VALEUR NOM COMPLET (pleine largeur, plus d'espace)
+   ========================================================= */
+
+.prof-nom-value {
+  font-size: 13px;
+
+  white-space: normal;
+
+  overflow: visible;
+
+  text-overflow: unset;
+
+  word-break: break-word;
+
+  line-height: 1.2;
+}
+
+
+/* =========================================================
+   LIGNE MATIERE + QR (meme ligne)
+   ========================================================= */
+
+.prof-bottom-row {
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  width: 100%;
+
+  min-width: 0;
+}
+
+
+.prof-matiere-block {
+  flex: 1;
+
+  min-width: 0;
+}
+
+
+/* =========================================================
+   PETITE SEPARATION VERTICALE (avant QR)
+   ========================================================= */
+
+.prof-mini-vline {
+  width: 1px;
+
+  height: 78px;
+
+  flex-shrink: 0;
+
+  background: #d5d9dd;
+}
+
+
+/* =========================================================
+   CADRE QR MINI (aligne avec la ligne Matiere)
+   ========================================================= */
+
+.prof-qr-frame-mini {
+  width: 82px;
+  height: 82px;
+
+  flex-shrink: 0;
+
+  box-sizing: border-box;
+
+  padding: 6px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+
+  border: 1.5px solid #d9dde2;
+
+  border-radius: 10px;
+
+  box-shadow:
+    0 2px 7px rgba(0, 0, 0, 0.06);
+}
+
+
+/* =========================================================
+   MATIERE ARABE
+   ========================================================= */
+
+.prof-arabic {
+  direction: rtl;
+
+  text-align: left;
+
+  font-family:
+    "Noto Sans Arabic",
+    "Segoe UI",
+    Arial,
+    sans-serif;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  white-space: normal;
+
+  overflow: visible;
+
+  text-overflow: unset;
+
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   SEPARATEUR HORIZONTAL
+   ========================================================= */
+
+.prof-horizontal-line {
+  width: 100%;
+
+  height: 1px;
+
+  margin: 5px 0;
+
+  background: #d9dde2;
+
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   SEPARATEUR VERTICAL
+   ========================================================= */
+
+.prof-vertical-line {
+  width: 1px;
+
+  height: 92px;
+
+  background: #d5d9dd;
+
+  flex-shrink: 0;
+}
+
+
+/* =========================================================
+   QR SECTION
+   ========================================================= */
+
+.prof-qr-section {
+  width: 91px;
+  height: 108px;
+
+  flex-shrink: 0;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* =========================================================
+   QR FRAME
+   ========================================================= */
+
+.prof-qr-frame {
+  width: 84px;
+  height: 84px;
+
+  box-sizing: border-box;
+
+  padding: 6px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background: #ffffff;
+
+  border: 1.5px solid #d9dde2;
+
+  border-radius: 10px;
+
+  box-shadow:
+    0 2px 7px rgba(0, 0, 0, 0.06);
+}
+
+
+/* =========================================================
+   QR CODE
+   ========================================================= */
+
+.prof-qr-code {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: contain;
+
+  image-rendering: pixelated;
+}
+
+
+/* =========================================================
+   QR PLACEHOLDER
+   ========================================================= */
+
+.prof-qr-placeholder {
+  width: 100%;
+  height: 100%;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  background: #f3f4f6;
+
+  color: #9ca3af;
+
+  font-size: 10px;
+
+  font-weight: 800;
+
+  border-radius: 5px;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.prof-card-footer {
+  position: absolute;
+
+  left: 10px;
+  right: 10px;
+
+  bottom: 10px;
+
+  height: 15px;
+
+  display: flex;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+}
+
+
+/* =========================================================
+   FOOTER LINES
+   ========================================================= */
+
+.prof-footer-line {
+  height: 1.5px;
+
+  flex: 1;
+
+  background: #a71920;
+}
+
+
+/* =========================================================
+   DIAMONDS
+   ========================================================= */
+
+.prof-footer-diamonds {
+  height: 15px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 7px;
+}
+
+
+/* petit losange */
+
+.prof-footer-diamonds span {
+  width: 7px;
+  height: 7px;
+
+  display: block;
+
+  background: #a71920;
+
+  transform: rotate(45deg);
+}
+
+
+/* grand losange */
+
+.prof-footer-diamonds span.large {
+  width: 12px;
+  height: 12px;
+}
+
+
+/* =========================================================
+   PRINT
+   ========================================================= */
+
+@media print {
+
+  @page {
+    size: 85.6mm 54mm;
+    margin: 0;
+  }
+
+
+  .prof-card-wrapper {
+    width: 85.6mm;
+    height: 54mm;
+
+    margin: 0;
+
+    page-break-inside: avoid;
+    page-break-after: always;
+  }
+
+
+  .prof-card-container {
+    width: 85.6mm;
+    height: 54mm;
+
+    background: #ffffff !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+
+    box-shadow: none;
+  }
+
+
+  .prof-card-header {
+    background: #a71920 !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .prof-header-slash {
+    background: #ffffff !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .prof-photo-frame {
+    border-color: #a71920 !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .prof-info-label {
+    color: #a71920 !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .prof-footer-line {
+    background: #a71920 !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+
+  .prof-footer-diamonds span {
+    background: #a71920 !important;
+
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media screen and (max-width: 1024px) {
+
+  .prof-card-container {
+    transform: scale(1.5);
+
+    margin: 50px;
+  }
+
+}
+
+
+@media screen and (max-width: 768px) {
+
+  .prof-card-container {
+    transform: scale(1.25);
+
+    margin: 35px;
+  }
+
+}
+
+
+@media screen and (max-width: 480px) {
+
+  .prof-card-container {
+    transform: scale(1);
+
+    margin: 10px;
+  }
+
+}

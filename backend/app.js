@@ -11787,8 +11787,7 @@ app.get('/api/etudiants/:id/reglement/historique', authAdminOrInscripteurOrPaiem
 // const PointageProf = require('./models/PointageProf');
 
 // ✅ Durée minimale entre deux scans du même professeur
-const COOLDOWN_POINTAGE_MS = 60 * 60 * 1000; // 1 heure
-
+const COOLDOWN_POINTAGE_MS = 30 * 60 * 1000; // 30 minutes
 // ✅ Route SCAN - appelée à chaque scan du badge (rapide, idempotente)
 app.post('/api/pointage-profs/scan', authAdminOrInscripteurOrPaiementManager, async (req, res) => {
   try {

@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import './StudentBadgeModern.css'; // ✅ on reutilise le meme CSS que le badge etudiant
+import './ProfesseurBadge.css'; // ✅ design dédié UNIQUEMENT au badge professeur
 
-const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) => {
+const ProfesseurBadge = ({ professeur }) => {
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   // Le QR code contient directement l'ID (pas une URL) pour un scan rapide
@@ -11,7 +11,7 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
   useEffect(() => {
     if (qrData) {
       QRCode.toDataURL(qrData, {
-        width: 300,              // ✅ résolution augmentée (était 200) pour un rendu net même agrandi
+        width: 300,
         margin: 1,
         color: { dark: '#000000', light: '#FFFFFF' },
         errorCorrectionLevel: 'M'
@@ -22,122 +22,86 @@ const ProfesseurBadge = ({ professeur, logoUrl, anneeScolaire = '2025/2026' }) =
   }, [qrData]);
 
   return (
-    <div className="card-wrapper-pvc">
-      <div className="card-container-pvc" style={{ overflow: 'hidden' }}>
-        <div className="header-pvc">
-          <div className="logo-section-pvc">
-            <div className="logo-pvc">
-              {logoUrl ? <img src={logoUrl} alt="Logo" className="logo-img-pvc" /> : 'AK'}
-            </div>
-            <div className="company-name-pvc">
-              <h1>ALFRED KASTLER</h1>
-              <p>{anneeScolaire}</p>
-            </div>
-          </div>
-          <div className="header-accent-pvc"></div>
+    <div className="prof-card-wrapper">
+      <div className="prof-card-container">
+
+        {/* HEADER (rouge, sans logo ni nom d'école) */}
+        <div className="prof-card-header">
+          <div className="prof-header-slash"></div>
+          <div className="prof-header-title">Carte Professeur</div>
         </div>
 
-        <div className="card-body-pvc">
-          <div
-            className="decorative-circles-pvc"
-            style={{ left: 0, right: 'auto' }}
-          >
-            {[...Array(9)].map((_, i) => (
-              <div key={i} className="circle-pvc"></div>
-            ))}
+        {/* CONTENU PRINCIPAL */}
+        <div className="prof-card-content">
+
+          {/* PHOTO */}
+          <div className="prof-photo-section">
+            <div className="prof-photo-frame">
+              {professeur.image ? (
+                <img
+                  src={professeur.image.startsWith('http') ? professeur.image : `${window.location.origin}${professeur.image}`}
+                  alt={professeur.nom}
+                  className="prof-photo"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div class="prof-photo-placeholder">👤</div>';
+                  }}
+                />
+              ) : (
+                <div className="prof-photo-placeholder">👤</div>
+              )}
+            </div>
           </div>
 
-          <div className="content-wrapper-pvc">
-            <div className="photo-section-pvc">
-              {/* Photo un peu moins haute qu'avant */}
-              <div className="student-photo-pvc photo-rouge" style={{ height: '75%' }}>
-                {professeur.image ? (
+          <div className="prof-vertical-line"></div>
+
+          {/* INFORMATIONS */}
+          <div className="prof-info-section">
+
+            {/* Ligne Nom Complet : pleine largeur */}
+            <div className="prof-info-block">
+              <div className="prof-info-label">Nom Complet</div>
+              <div className="prof-info-value prof-nom-value">{professeur.nom || 'N/A'}</div>
+            </div>
+
+            <div className="prof-horizontal-line"></div>
+
+            {/* Ligne Matière + QR code sur la même ligne */}
+            <div className="prof-bottom-row">
+              <div className="prof-info-block prof-matiere-block">
+                <div className="prof-info-label">Matière</div>
+                <div className="prof-info-value prof-arabic">{professeur.matiere || 'N/A'}</div>
+              </div>
+
+              <div className="prof-mini-vline"></div>
+
+              <div className="prof-qr-frame-mini">
+                {qrDataUrl ? (
                   <img
-                    src={professeur.image.startsWith('http') ? professeur.image : `${window.location.origin}${professeur.image}`}
-                    alt={professeur.nom}
-                    className="photo-img-pvc"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                      e.target.parentElement.innerHTML = '<div class="photo-placeholder-pvc">👤</div>';
-                    }}
+                    src={qrDataUrl}
+                    alt="QR Code"
+                    className="prof-qr-code"
                   />
                 ) : (
-                  <div className="photo-placeholder-pvc">👤</div>
+                  <div className="prof-qr-placeholder">QR</div>
                 )}
               </div>
             </div>
 
-            <div className="info-section-pvc">
-              <h2 className="card-title-pvc" style={{ fontSize: '11px', padding: '2px 10px' }}>CARTE PROFESSEUR</h2>
-
-              <div className="info-row-pvc">
-                <span className="info-label-pvc" style={{ fontSize: '9px' }}>Nom Complet</span>
-                <span className="info-value-pvc" style={{ fontSize: '9px' }}>: {professeur.nom || 'N/A'}</span>
-              </div>
-
-              <div
-                className="info-with-qr-pvc"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div className="info-left-pvc" style={{ flex: 1, minWidth: 0 }}>
-                  <div className="info-row-pvc">
-                    <span className="info-label-pvc" style={{ fontSize: '9px' }}>Matière</span>
-                    <span
-                      className="info-value-pvc"
-                      style={{
-                        fontSize: '9px',
-                        whiteSpace: 'normal',
-                        overflow: 'visible',
-                        wordBreak: 'break-word',
-                        display: 'block',
-                        lineHeight: 1.25,
-                      }}
-                    >
-                      : {professeur.matiere || 'N/A'}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className="qr-side-pvc"
-                  style={{
-                    flexShrink: 0,
-                    width: '70px',   // ✅ QR agrandi (était 58px) pour un scan plus facile au téléphone — taille de carte inchangée
-                    height: '70px',  // ✅ QR agrandi (était 58px)
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginTop: '-10px', // ✅ QR remonté légèrement vers le haut
-                  }}
-                >
-                  {qrDataUrl ? (
-                    <img
-                      src={qrDataUrl}
-                      alt="QR Code"
-                      className="qrcode-small-pvc"
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                    />
-                  ) : (
-                    <div
-                      className="qr-placeholder-small-pvc"
-                      style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      QR
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
-        <div className="footer-accent-pvc"></div>
+        {/* FOOTER décoratif */}
+        <div className="prof-card-footer">
+          <div className="prof-footer-line"></div>
+          <div className="prof-footer-diamonds">
+            <span></span>
+            <span className="large"></span>
+            <span></span>
+          </div>
+          <div className="prof-footer-line"></div>
+        </div>
+
       </div>
     </div>
   );
