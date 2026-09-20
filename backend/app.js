@@ -16,7 +16,6 @@ const Parent = require('./models/Parent'); // ← AJOUTER CETTE LIGNE
 const pdfMake = require('pdfmake');
 const ListeNoire = require('./models/ListeNoire');
 const Notification = require('./models/Notification');
-const whatsappService = require('./services/whatsappService');
 const notificationQueue = require('./services/notificationQueue');
 const { v4: uuidv4 } = require('uuid');
 const { Pointage, QRCode } = require('./models/Pointage'); // ou le bon chemin
