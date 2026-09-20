@@ -2,6 +2,12 @@
 // ✅ WABRIDGES (remplace Green-API)
 // Messages bilingues FR + AR avec période matin/soir
 // ============================================
+// ℹ️ La queue (notificationQueue.js) utilise seulement :
+//    - buildAbsenceMessage / buildRetardMessage / buildAnniversaireMessage
+//    - normalizePhone / formatDate
+//    - WA_API_KEY / WA_BRIDGE_ID / WA_BASE_URL
+// Les fonctions notifierAbsence / notifierRetard / notifierAnniversaire / envoyerMessage
+// ne sont plus utilisées par la queue (gardées seulement pour compatibilité et pour testerConnexion).
 
 const axios = require('axios');
 
@@ -313,24 +319,27 @@ Que cette belle journée soit le début d'une année remplie de succès ! ✨
 
   // ============================================
   // NORMALIZE PHONE → format WABridges : chiffres uniquement, avec indicatif pays (ex: 212XXXXXXXXX)
+  // ✅ CORRIGÉ : gère aussi 00212..., +212 0660..., et les numéros stockés en nombre
   // ============================================
   normalizePhone(phone) {
     if (!phone) return null;
-    let p = phone.trim().replace(/\s+/g, '');
-    p = p.replace(/\D/g, ''); // garder que les chiffres
+    let p = String(phone).replace(/\D/g, '');             // garder que les chiffres
+
+    if (p.startsWith('00')) p = p.substring(2);           // 00212660... → 212660...
+    if (p.startsWith('2120')) p = '212' + p.substring(4); // 2120660... → 212660... (0 en trop)
 
     if (p.startsWith('212')) {
-      // deja bon
+      // déjà bon
     } else if (p.startsWith('0')) {
-      p = '212' + p.substring(1);
+      p = '212' + p.substring(1);                         // 0660... → 212660...
     } else if (p.length === 9) {
-      p = '212' + p;
+      p = '212' + p;                                      // 660... → 212660...
     }
     return p;
   }
 
   // ============================================
-  // ✅ ENVOI VIA WABRIDGES (remplace Green-API)
+  // ✅ ENVOI VIA WABRIDGES (utilisé seulement par testerConnexion)
   // ============================================
   async envoyerMessage(phone, message) {
     try {
@@ -383,8 +392,12 @@ Que cette belle journée soit le début d'une année remplie de succès ! ✨
   }
 
   // ============================================
-  // ✅ NOTIFIER ABSENCE - TOUS LES PARENTS + période
+  // ⚠️ ANCIENNES FONCTIONS (plus utilisées par la queue)
+  // Si un controller les appelle directement, l'envoi passe SANS les protections
+  // (fenêtre 1 h, délai 8-12 s, pauses, anti-doublon). Utilisez notificationQueue.ajouterNotification().
   // ============================================
+
+  // ✅ NOTIFIER ABSENCE - TOUS LES PARENTS + période
   async notifierAbsence(etudiant, cours, dateSession, remarque = '', periode = '') {
     const nom  = etudiant.nomComplet;
     const date = this.formatDate(dateSession);
@@ -433,9 +446,7 @@ Que cette belle journée soit le début d'une année remplie de succès ! ✨
     return { etudiant: nom, messagesEnvoyes: resultats.length, details: resultats };
   }
 
-  // ============================================
   // ✅ NOTIFIER RETARD - TOUS LES PARENTS + période
-  // ============================================
   async notifierRetard(etudiant, cours, dateSession, retardMinutes, periode = '') {
     // ✅ Minimum 15 min toujours
     retardMinutes = Math.max(15, retardMinutes || 15);
@@ -487,9 +498,7 @@ Que cette belle journée soit le début d'une année remplie de succès ! ✨
     return { etudiant: nom, messagesEnvoyes: resultats.length, details: resultats };
   }
 
-  // ============================================
   // ✅ NOTIFIER ANNIVERSAIRE - PÈRE + MÈRE + ÉTUDIANT
-  // ============================================
   async notifierAnniversaire(etudiant) {
     const nom = etudiant.nomComplet;
     const resultats = [];

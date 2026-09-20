@@ -2,7 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config();
+const notificationQueue = require('./services/notificationQueue');
+const NumeroBloque       = require('./models/NumeroBloque');
 const DocumentEtudiant = require('./models/DocumentEtudiant');
+const whatsappService   = require('./services/whatsappService');
 const PointageProf = require('./models/PointageProf');
 const Admin = require('./models/adminModel');
 const bcrypt = require('bcryptjs');
@@ -8024,40 +8027,64 @@ app.get('/api/etudiant/profile', authEtudiant, async (req, res) => {
     res.status(500).json({ message: 'خطأ في جلب الملف الشخصي', error: err.message });
   }
 });
-// Route pour mettre à jour le statut d'une présence
+// ============================================================
+// ✅ ROUTES PRÉSENCES - adaptées à la nouvelle queue MongoDB
+// Les changements sont marqués avec  🆕
+// Il faut que ces imports existent déjà dans votre fichier :
+//   const notificationQueue = require('./services/notificationQueue');
+// ============================================================
+
+// 🆕 Normalise la période pour la queue (matin / soir / '')
+//    → évite qu'une valeur inattendue fasse planter la création de la notification
+function normaliserPeriode(p) {
+  const v = String(p || '').trim().toLowerCase();
+  if (['matin', 'morning', 'am', 'صباح', 'الصباح'].includes(v)) return 'matin';
+  if (['soir', 'evening', 'pm', 'مساء', 'المساء'].includes(v)) return 'soir';
+  return '';
+}
+
+// 🆕 Estimation réaliste : 2 messages par élève, 10,7 s par message, 2 min de pause tous les 30 messages
+function estimerEnvoi(nbNotifications) {
+  const messages = Math.max(1, nbNotifications) * 2;
+  const secondes = messages * 10.7 + Math.floor(messages / 30) * 120;
+  return {
+    texte: secondes < 90 ? `${Math.round(secondes)} secondes` : `${Math.round(secondes / 60)} minutes`,
+    risqueExpiration: secondes > 60 * 60   // au-delà d'1 h, les derniers messages seront 'expiré'
+  };
+}
+
+// ============================================================
+// PUT : inchangé (ne crée aucune notification)
+// ============================================================
 app.put('/api/presences/:id', authProfesseur, async (req, res) => {
   try {
     const { id } = req.params;
     const { present, retardMinutes, remarque } = req.body;
 
-    // Vérifier que la présence existe et appartient à ce professeur
     const presence = await Presence.findOne({ _id: id, creePar: req.professeurId });
-    
+
     if (!presence) {
       return res.status(404).json({ message: 'Présence non trouvée ou non autorisée.' });
     }
 
-    // Mettre à jour les champs
     if (present !== undefined) {
       presence.present = present;
     }
-    
+
     if (retardMinutes !== undefined) {
       presence.retardMinutes = Math.min(Math.max(retardMinutes, 0), 60);
       if (retardMinutes > 0) {
         presence.present = true; // Si retard, alors présent
       }
     }
-    
+
     if (remarque !== undefined) {
       presence.remarque = remarque;
     }
 
     await presence.save();
-    
-    // Repopuler l'étudiant avant de renvoyer
     await presence.populate('etudiant', 'nomComplet');
-    
+
     res.json(presence);
   } catch (err) {
     console.error('Erreur mise à jour présence:', err);
@@ -8065,22 +8092,23 @@ app.put('/api/presences/:id', authProfesseur, async (req, res) => {
   }
 });
 
-// ✅ API pour créer/modifier une présence avec NOTIFICATIONS WHATSAPP
-
- // ✅ API PRESENCES - النسخة الصحيحة
-
+// ============================================================
+// POST : adapté
+// ============================================================
 app.post('/api/presences', authProfesseur, async (req, res) => {
   try {
-    const { 
-      etudiant, 
-      cours, 
-      dateSession, 
+    const {
+      etudiant,
+      cours,
+      dateSession,
       present,
       retardMinutes,
-      remarque, 
-      heure, 
-      periode 
+      remarque,
+      heure,
+      periode
     } = req.body;
+
+    const periodeNotif = normaliserPeriode(periode); // 🆕
 
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📋 REQUÊTE PRÉSENCE REÇUE`);
@@ -8088,14 +8116,17 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
     console.log(`   Cours: ${cours}`);
     console.log(`   Date: ${dateSession}`);
     console.log(`   Heure: ${heure}`);
-    console.log(`   Période: ${periode}`);
+    console.log(`   Période: ${periode} → ${periodeNotif || '(vide)'}`);
     console.log(`${'='.repeat(60)}\n`);
 
     // Vérifier que ce professeur enseigne ce cours
     const prof = await Professeur.findById(req.professeurId);
+    if (!prof) { // 🆕 évite un crash si le prof n'existe plus
+      return res.status(401).json({ message: 'Professeur introuvable.' });
+    }
     if (!prof.cours.includes(cours)) {
-      return res.status(403).json({ 
-        message: 'Vous ne pouvez pas marquer la présence pour ce cours.' 
+      return res.status(403).json({
+        message: 'Vous ne pouvez pas marquer la présence pour ce cours.'
       });
     }
 
@@ -8105,12 +8136,7 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       return res.status(404).json({ message: 'Étudiant non trouvé.' });
     }
 
-    console.log(`✅ Étudiant trouvé: ${etudiantData.nomComplet}`);
-    console.log(`   Père: ${etudiantData.telephonePere || '❌ N/A'}`);
-    console.log(`   Mère: ${etudiantData.telephoneMere || '❌ N/A'}`);
-    console.log(`   Tél: ${etudiantData.telephoneEtudiant || '❌ N/A'}\n`);
-
-    // ✅ CHERCHER UNE PRÉSENCE EXISTANTE (MÊME DATE/HEURE/PÉRIODE)
+    // Chercher une présence existante (même date/heure/période)
     const existingPresence = await Presence.findOne({
       etudiant: etudiant,
       cours: cours,
@@ -8122,82 +8148,34 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
 
     let finalPresent = present || false;
     let finalRetardMinutes = 0;
-    let notificationQueued = false;
-    let queueInfo = null;
-    let isUpdate = false;
+    let typeNotif = null;            // 🆕 'retard' | 'absence' | null
+    let isUpdate = !!existingPresence;
 
     // ========================================
-    // 🟡 CAS 1 : RETARD
+    // Déterminer le cas (retard / absence / présent)
     // ========================================
     if (retardMinutes && retardMinutes > 0) {
       finalPresent = true;
       finalRetardMinutes = Math.min(retardMinutes, 60);
-      
-      console.log(`🟡 CAS RETARD: ${finalRetardMinutes} min | Période: ${periode}`);
-      
-      // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
-      if (!existingPresence) {
-        console.log(`   ➜ NOUVELLE présence: Ajout à la queue`);
-        queueInfo = await notificationQueue.ajouterNotification(
-          'retard',
-          etudiantData,
-          cours,
-          dateSession,
-          {
-            retardMinutes: finalRetardMinutes,
-            remarque: remarque || '',
-            periode: periode || '',        // ✅ AJOUTÉ
-            creePar: req.professeurId
-          }
-        );
-        notificationQueued = true;
-      } else {
-        console.log(`   ➜ PRÉSENCE EXISTANTE: Mise à jour seulement`);
-        isUpdate = true;
-      }
-    } 
-    // ========================================
-    // 🔴 CAS 2 : ABSENCE
-    // ========================================
-    else if (!present) {
+      typeNotif = 'retard';
+      console.log(`🟡 CAS RETARD: ${finalRetardMinutes} min | Période: ${periodeNotif}`);
+    } else if (!present) {
       finalPresent = false;
       finalRetardMinutes = 0;
-      
-      console.log(`🔴 CAS ABSENCE | Période: ${periode}`);
-      
-      // ✅ SEULEMENT SI NOUVELLE PRÉSENCE
-      if (!existingPresence) {
-        console.log(`   ➜ NOUVELLE présence: Ajout à la queue`);
-        queueInfo = await notificationQueue.ajouterNotification(
-          'absence',
-          etudiantData,
-          cours,
-          dateSession,
-          {
-            remarque: remarque || '',
-            periode: periode || '',        // ✅ AJOUTÉ
-            creePar: req.professeurId
-          }
-        );
-        notificationQueued = true;
-        console.log(`   ✅ Notification ajoutée à la queue [${periode}]\n`);
-      } else {
-        console.log(`   ➜ PRÉSENCE EXISTANTE: Mise à jour seulement\n`);
-        isUpdate = true;
-      }
-    }
-    // ========================================
-    // ✅ CAS 3 : PRÉSENT
-    // ========================================
-    else if (present) {
+      typeNotif = 'absence';
+      console.log(`🔴 CAS ABSENCE | Période: ${periodeNotif}`);
+    } else {
       finalPresent = true;
       finalRetardMinutes = 0;
-      console.log(`✅ CAS PRÉSENT - Pas de notification\n`);
+      console.log(`✅ CAS PRÉSENT - Pas de notification`);
     }
 
+    // ========================================
+    // 🆕 1) D'ABORD sauvegarder la présence
+    //    (avant, une erreur de queue empêchait l'enregistrement de la présence)
+    // ========================================
     let presence;
 
-    // ✅ SI PRÉSENCE EXISTE : METTRE À JOUR
     if (existingPresence) {
       console.log(`🔄 MISE À JOUR présence existante`);
       existingPresence.present = finalPresent;
@@ -8205,12 +8183,8 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
       existingPresence.remarque = remarque;
       existingPresence.matiere = prof.matiere;
       existingPresence.nomProfesseur = prof.nom;
-      
       presence = await existingPresence.save();
-      console.log(`   ✅ Mise à jour réussie\n`);
-    } 
-    // ✅ SI NOUVELLE : CRÉER
-    else {
+    } else {
       console.log(`➕ CRÉATION nouvelle présence`);
       presence = new Presence({
         etudiant,
@@ -8223,34 +8197,82 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
         periode,
         creePar: req.professeurId,
         matiere: prof.matiere,
-        nomProfesseur: prof.nom   
+        nomProfesseur: prof.nom
       });
-
       await presence.save();
-      console.log(`   ✅ Création réussie\n`);
     }
 
-    // ✅ RÉPONSE IMMÉDIATE
+    // ========================================
+    // 🆕 2) ENSUITE la notification (seulement si NOUVELLE présence, comme avant)
+    //    Une erreur ici ne fait plus échouer la route.
+    // ========================================
+    let notification = {
+      statut: isUpdate ? 'mise_a_jour' : 'aucune',
+      message: isUpdate
+        ? 'Présence mise à jour (pas de notification pour mise à jour)'
+        : "Étudiant présent à l'heure"
+    };
+
+    if (typeNotif && !existingPresence) {
+      try {
+        const options = {
+          remarque: remarque || '',
+          periode: periodeNotif,
+          creePar: req.professeurId
+        };
+        if (typeNotif === 'retard') options.retardMinutes = finalRetardMinutes;
+
+        const queueInfo = await notificationQueue.ajouterNotification(
+          typeNotif,
+          etudiantData,
+          cours,
+          dateSession,
+          options
+        );
+
+        if (queueInfo.merged) {
+          // 🆕 le cours a été ajouté au message déjà en attente (1 seul message aux parents)
+          notification = {
+            statut: 'fusionne',
+            message: queueInfo.message,
+            positionQueue: queueInfo.positionQueue,
+            periode: periodeNotif
+          };
+        } else if (queueInfo.duplicate) {
+          // 🆕 déjà en file, ou parents déjà notifiés pour cette période
+          notification = {
+            statut: queueInfo.dejaNotifie ? 'deja_notifie' : 'deja_en_file',
+            message: queueInfo.message,
+            periode: periodeNotif
+          };
+        } else {
+          const est = estimerEnvoi(queueInfo.positionQueue);
+          notification = {
+            statut: 'en_file',
+            message: "Notification ajoutée à la file d'attente",
+            positionQueue: queueInfo.positionQueue,
+            estimationEnvoi: est.texte,
+            risqueExpiration: est.risqueExpiration,
+            periode: periodeNotif
+          };
+        }
+      } catch (errQueue) {
+        console.error('⚠️ Présence enregistrée mais notification NON ajoutée:', errQueue.message);
+        notification = {
+          statut: 'erreur_notification',
+          message: 'Présence enregistrée, mais la notification WhatsApp a échoué (à renvoyer).'
+        };
+      }
+    }
+
     const response = {
       success: true,
       presence,
       action: isUpdate ? 'updated' : 'created',
-      notification: notificationQueued ? {
-        statut: 'en_file',
-        message: 'Notification ajoutée à la file d\'attente',
-        positionQueue: queueInfo.positionQueue,
-        estimationEnvoi: `${Math.round(queueInfo.positionQueue * 5)} secondes`,
-        periode: periode   // ✅ info dans la réponse aussi
-      } : {
-        statut: isUpdate ? 'mise_a_jour' : 'aucune',
-        message: isUpdate ? 'Présence mise à jour (pas de notification pour mise à jour)' : 'Étudiant présent à l\'heure'
-      }
+      notification
     };
 
-    console.log(`📤 RÉPONSE:`);
-    console.log(`   Action: ${response.action}`);
-    console.log(`   Notification: ${response.notification.statut}`);
-    console.log(`   Période: ${periode}`);
+    console.log(`📤 RÉPONSE: ${response.action} | notification: ${notification.statut} | période: ${periodeNotif}`);
     console.log(`${'='.repeat(60)}\n`);
 
     res.status(201).json(response);
@@ -8259,10 +8281,10 @@ app.post('/api/presences', authProfesseur, async (req, res) => {
     console.error('\n❌ ERREUR:');
     console.error(err);
     console.error(`${'='.repeat(60)}\n`);
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
-      error: err.message 
+      error: err.message
     });
   }
 });
@@ -13344,6 +13366,75 @@ app.get('/api/rapports/staff/rapports/:id', authAdminOrInscripteurOrPaiementMana
   } catch (err) {
     console.error('Erreur récupération rapport staff:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+// ============================================================
+// ✅ ROUTES ADMIN DE LA QUEUE - à coller dans app.js / server.js
+// (après vos autres routes, dans le même fichier où `app` existe)
+//
+// Imports nécessaires (s'ils n'existent pas déjà) :
+//   const notificationQueue = require('./services/notificationQueue');
+//   const Notification      = require('./models/Notification');
+//   const NumeroBloque      = require('./models/NumeroBloque');
+//   const whatsappService   = require('./services/whatsappService');
+//
+// ⚠️ Remplacez `authAdmin` par VOTRE middleware d'authentification admin.
+//    Ne laissez JAMAIS ces routes sans protection.
+// ============================================================
+
+// 📊 État de la queue : en pause ? pourquoi ? combien de messages par statut ? numéros bloqués ?
+app.get('/api/queue/status', authAdmin, async (req, res) => {
+  try {
+    res.json(await notificationQueue.getStatsDB());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ▶️ REPRENDRE la queue tout de suite (à appeler juste après avoir réappairé le bridge)
+app.post('/api/queue/reprendre', authAdmin, async (req, res) => {
+  try {
+    const resultat = await notificationQueue.reprendre();
+    res.json({ success: true, ...resultat, etat: notificationQueue.getStats() });
+  } catch (err) {
+    console.error('Erreur reprise queue:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🔁 Renvoyer une notification expirée / annulée / échouée (nouvelle fenêtre d'1 h)
+//    ⚠️ Un numéro bloqué reste ignoré : le débloquer d'abord (route plus bas)
+app.post('/api/notifications/:id/relancer', authAdmin, async (req, res) => {
+  try {
+    const n = await Notification.findById(req.params.id);
+    if (!n) return res.status(404).json({ message: 'Notification introuvable.' });
+
+    await n.relancer();
+    res.json({ success: true, statutGlobal: n.statutGlobal, expireLe: n.expireLe });
+  } catch (err) {
+    console.error('Erreur relance notification:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 🚫 Liste des numéros actuellement bloqués
+app.get('/api/numeros-bloques', authAdmin, async (req, res) => {
+  try {
+    const liste = await NumeroBloque.find({ bloqueJusqua: { $gt: new Date() } }).sort({ bloqueJusqua: -1 });
+    res.json(liste);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Débloquer un numéro (ex: le parent a installé WhatsApp) — accepte 0660..., +212660... ou 212660...
+app.delete('/api/numeros-bloques/:tel', authAdmin, async (req, res) => {
+  try {
+    const norm = whatsappService.normalizePhone(req.params.tel);
+    const r = await NumeroBloque.debloquer(norm);
+    res.json({ success: true, telephone: norm, supprime: r.deletedCount || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
