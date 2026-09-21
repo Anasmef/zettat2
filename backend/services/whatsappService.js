@@ -235,63 +235,60 @@ Merci de votre attention.
 
   // ============================================
   // ✅ TEMPLATES ANNIVERSAIRE bilingues FR + AR
+  // ✅ Adressés directement à l'ÉLÈVE (le message part seulement sur son numéro)
   // ============================================
   buildAnniversaireMessage(nom) {
     const templates = [
       () => `🎂 *Joyeux anniversaire ! | عيد ميلاد سعيد !*
 ――――――――――――――――――――
-🇫🇷 *Français :*
-Cher parent, toute l'équipe de l'école Alfred Kastler est heureuse de souhaiter un
-🎉 *Joyeux anniversaire à ${nom} !* 🎉
-Nous lui souhaitons une journée pleine de joie, de bonheur et de réussite scolaire 🌟
+🇫🇷 Cher(e) *${nom}*, toute l'équipe de l'école Alfred Kastler te souhaite un merveilleux anniversaire ! 🎉
+Que cette journée soit remplie de joie, de bonheur et de réussite scolaire 🌟
 
-🇲🇦 *العربية :*
-ولي الأمر الكريم، يسعد فريق مؤسسة ألفريد كاستلر أن يتقدم بأحر التهاني بمناسبة عيد ميلاد
-🎉 *${nom}* 🎉
-نتمنى له/لها يوماً مليئاً بالفرح والسعادة والتوفيق الدراسي 🌟
+🇲🇦 عزيزي/عزيزتي *${nom}*، يتمنى لك فريق مؤسسة ألفريد كاستلر عيد ميلاد سعيداً ! 🎉
+نتمنى لك يوماً مليئاً بالفرح والسعادة والتوفيق الدراسي 🌟
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-      () => `🌟 *Anniversaire élève | عيد ميلاد تلميذ*
+      () => `🌟 *Bon anniversaire | عيد ميلاد سعيد*
 ――――――――――――――――――――
-🇫🇷 Toute l'équipe pédagogique félicite *${nom}* pour son anniversaire 🎂
+🇫🇷 *${nom}*, toute l'équipe pédagogique te félicite pour ton anniversaire 🎂
 Que cette nouvelle année soit synonyme de succès et de bonheur ! 🎊
 
-🇲🇦 يُهنئ الفريق التربوي كامل التلميذ(ة) *${nom}* بعيد ميلاده/ها 🎂
+🇲🇦 *${nom}*، يهنئك الفريق التربوي بعيد ميلادك 🎂
 نتمنى أن يكون هذا العام حافلاً بالنجاح والسعادة ! 🎊
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
       () => `🎊 *Joyeux anniversaire | مبروك عيد الميلاد*
 ――――――――――――――――――――
-🇫🇷 L'école Alfred Kastler souhaite un très 🎂 *Joyeux anniversaire à ${nom}* 🎂
+🇫🇷 L'école Alfred Kastler te souhaite un très 🎂 *Joyeux anniversaire ${nom}* 🎂
 Beaucoup de bonheur, de santé et de réussite ! ✨
 
-🇲🇦 تُهدي مؤسسة ألفريد كاستلر أجمل التهاني لـ 🎂 *${nom}* بمناسبة عيد ميلاده/ها 🎂
-كل عام وأنتم بخير، وعمر مديد بالصحة والنجاح ! ✨
+🇲🇦 تهديك مؤسسة ألفريد كاستلر أجمل التهاني يا *${nom}* بمناسبة عيد ميلادك 🎂
+كل عام وأنت بخير، وعمر مديد بالصحة والنجاح ! ✨
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
-      () => `🎈 *Bonne fête ! | كل عام وأنتم بخير !*
+      () => `🎈 *Bonne fête ! | كل عام وأنت بخير !*
 ――――――――――――――――――――
-🇫🇷 Cher parent, nous avons la joie de vous informer que *${nom}* fête son anniversaire aujourd'hui 🎂
-Toute l'équipe lui souhaite une magnifique journée pleine de rires et de bonheur ! 🥳
+🇫🇷 *${nom}*, aujourd'hui c'est ton anniversaire ! 🎂
+Toute l'équipe te souhaite une magnifique journée pleine de rires et de bonheur ! 🥳
 
-🇲🇦 ولي الأمر الكريم، يسعدنا إعلامكم بأن *${nom}* يحتفل/تحتفل بعيد ميلاده/ها اليوم 🎂
-يتمنى له/لها الفريق كامل يوماً رائعاً مليئاً بالضحكات والسعادة ! 🥳
+🇲🇦 *${nom}*، اليوم عيد ميلادك ! 🎂
+يتمنى لك الفريق كاملاً يوماً رائعاً مليئاً بالضحكات والسعادة ! 🥳
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
       () => `🥳 *Célébration anniversaire | احتفال عيد الميلاد*
 ――――――――――――――――――――
-🇫🇷 *${nom}* souffle ses bougies aujourd'hui ! 🕯️🎂
-L'équipe d'Alfred Kastler lui adresse ses vœux les plus chaleureux. Santé, bonheur et excellence scolaire ! 💫
+🇫🇷 *${nom}*, tu souffles tes bougies aujourd'hui ! 🕯️🎂
+L'équipe d'Alfred Kastler t'adresse ses vœux les plus chaleureux. Santé, bonheur et excellence scolaire ! 💫
 
-🇲🇦 *${nom}* ينفخ/تنفخ الشموع اليوم ! 🕯️🎂
-يبعث فريق ألفريد كاستلر بأصدق التمنيات. صحة، سعادة وتميز دراسي ! 💫
+🇲🇦 *${nom}*، تنفخ اليوم شموع عيد ميلادك ! 🕯️🎂
+يبعث لك فريق ألفريد كاستلر بأصدق التمنيات. صحة، سعادة وتميز دراسي ! 💫
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
       () => `🎁 *Joyeux anniversaire ! | عيد ميلاد مبارك !*
 ――――――――――――――――――――
-🇫🇷 En ce jour spécial, l'école Alfred Kastler tient à féliciter 🌸 *${nom}* 🌸 pour son anniversaire et lui souhaite tout le bonheur du monde ! 🌈
+🇫🇷 En ce jour spécial, l'école Alfred Kastler tient à te féliciter, 🌸 *${nom}* 🌸, pour ton anniversaire et te souhaite tout le bonheur du monde ! 🌈
 
-🇲🇦 في هذا اليوم المميز، تتقدم مؤسسة ألفريد كاستلر بالتهنئة لـ 🌸 *${nom}* 🌸 بمناسبة عيد ميلاده/ها وتتمنى له/لها كل السعادة ! 🌈
+🇲🇦 في هذا اليوم المميز، تتقدم لك مؤسسة ألفريد كاستلر بالتهنئة يا 🌸 *${nom}* 🌸 بمناسبة عيد ميلادك وتتمنى لك كل السعادة ! 🌈
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
       () => `⭐ *Happy Birthday ! | عيد ميلاد سعيد !*
@@ -305,10 +302,10 @@ Que tes rêves se réalisent et que cette année t'apporte joie et succès ! �
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`,
       () => `🌈 *Félicitations ! | مبروك !*
 ――――――――――――――――――――
-🇫🇷 Cher parent, c'est avec grand plaisir que nous vous souhaitons un *joyeux anniversaire pour ${nom}* ! 🎂🎉
+🇫🇷 *${nom}*, c'est avec grand plaisir que nous te souhaitons un *joyeux anniversaire* ! 🎂🎉
 Que cette belle journée soit le début d'une année remplie de succès ! ✨
 
-🇲🇦 ولي الأمر الكريم، يسعدنا أن نُهنئكم بمناسبة عيد ميلاد *${nom}* ! 🎂🎉
+🇲🇦 *${nom}*، يسعدنا أن نهنئك بمناسبة عيد ميلادك ! 🎂🎉
 نتمنى أن يكون هذا اليوم الجميل بداية عام مليء بالنجاحات ! ✨
 ――――――――――――――――――――
 🏫 مؤسسة ألفريد كاستلر | École Alfred Kastler`

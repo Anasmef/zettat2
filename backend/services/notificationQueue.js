@@ -147,7 +147,7 @@ class NotificationQueue {
     return { success: true, message: "Notification ajoutée à la file d'attente", positionQueue: enAttente };
   }
 
-  /** Père + Mère (+ Étudiant pour anniversaire), sans doublon, numéros bloqués marqués 'ignoré' */
+  /** Absence/retard : Père + Mère (fallback élève). Anniversaire : élève seulement. Sans doublon, numéros bloqués marqués 'ignoré' */
   async construireDestinataires(type, e) {
     const vus = new Set();
     const resultat = [];
@@ -167,11 +167,15 @@ class NotificationQueue {
       }
     };
 
-    await ajouter('Père', e.telephonePere);
-    await ajouter('Mère', e.telephoneMere);
-    if (type === 'anniversaire') await ajouter('Étudiant', e.telephoneEtudiant);
-    // ✅ Fallback: aucun parent utilisable (vide ou bloqué) → on essaie le numéro de l'élève
-    else if (valides === 0) await ajouter('Étudiant', e.telephoneEtudiant);
+    if (type === 'anniversaire') {
+      // ✅ Anniversaire : UNIQUEMENT l'élève (ni père, ni mère) → 1 seul message
+      await ajouter('Étudiant', e.telephoneEtudiant);
+    } else {
+      await ajouter('Père', e.telephonePere);
+      await ajouter('Mère', e.telephoneMere);
+      // ✅ Fallback: aucun parent utilisable (vide ou bloqué) → on essaie le numéro de l'élève
+      if (valides === 0) await ajouter('Étudiant', e.telephoneEtudiant);
+    }
 
     return resultat;
   }
