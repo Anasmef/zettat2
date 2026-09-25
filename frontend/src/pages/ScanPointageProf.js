@@ -290,27 +290,87 @@ const ScanPointageProf = () => {
     return res.data; // [{ date, nomComplet, matiere, heureArrivee }, ...]
   };
 
+  // ✅ Regroupe les scans par professeur (+ par date) : une seule ligne par
+  // professeur au lieu d'une ligne par scan, avec tous ses pointages triés
+  // chronologiquement dans un tableau.
+  const regrouperParProfesseur = (lignes) => {
+    const groupes = {};
+
+    lignes.forEach(l => {
+      const cle = `${l.date}_${l.nomComplet}`;
+      if (!groupes[cle]) {
+        groupes[cle] = {
+          date: l.date,
+          nomComplet: l.nomComplet,
+          matiere: l.matiere,
+          pointages: []
+        };
+      }
+      groupes[cle].pointages.push(new Date(l.heureArrivee));
+    });
+
+    return Object.values(groupes).map(g => {
+      g.pointages.sort((a, b) => a - b);
+      return g;
+    });
+  };
+
+  // ✅ Calcule les heures travaillées à partir des pointages d'un professeur.
+  // Hypothèse validée : pointage 1 = entrée, pointage 2 = sortie,
+  // pointage 3 = entrée, pointage 4 = sortie, etc. (paires successives).
+  const calculerHeuresTravaillees = (pointages) => {
+    let totalMinutes = 0;
+    for (let i = 0; i < pointages.length - 1; i += 2) {
+      const entree = pointages[i];
+      const sortie = pointages[i + 1];
+      if (sortie) {
+        totalMinutes += (sortie - entree) / 60000; // ms → minutes
+      }
+    }
+    if (totalMinutes <= 0) return '—';
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    return `${h}h${m.toString().padStart(2, '0')}`;
+  };
+
   // Construit un classeur Excel stylé (xlsx-js-style) à partir de lignes
-  // {date, nomComplet, matiere, heureArrivee} et l'écrit sur le disque du navigateur
+  // {date, nomComplet, matiere, heureArrivee}, regroupe par professeur avec
+  // des colonnes Pointage 1 / 2 / 3 / ... dynamiques, et l'écrit sur le disque.
   const genererEtTelechargerExcel = (lignes, titre, nomFichier) => {
-    const entetes = ['Date', 'Nom du Professeur', 'Matière', "Heure d'arrivée"];
+    const groupes = regrouperParProfesseur(lignes);
+
+    // Nombre max de pointages dans la journée/période (détermine le nombre de colonnes)
+    const maxPointages = Math.max(1, ...groupes.map(g => g.pointages.length));
+
+    const entetesPointages = Array.from({ length: maxPointages }, (_, i) => `Pointage ${i + 1}`);
+    const entetes = ['Date', 'Nom du Professeur', 'Matière', ...entetesPointages, 'Heures travaillées'];
 
     const donnees = [
       [titre],
       [],
       entetes,
-      ...lignes.map(l => ([
-        new Date(l.date).toLocaleDateString('fr-FR'),
-        l.nomComplet,
-        l.matiere || '—',
-        new Date(l.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      ]))
+      ...groupes.map(g => {
+        const heuresFormatees = g.pointages.map(p =>
+          p.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        );
+        // Complète avec des tirets si ce prof a moins de pointages que le max de la période
+        while (heuresFormatees.length < maxPointages) heuresFormatees.push('—');
+
+        return [
+          new Date(g.date).toLocaleDateString('fr-FR'),
+          g.nomComplet,
+          g.matiere || '—',
+          ...heuresFormatees,
+          calculerHeuresTravaillees(g.pointages)
+        ];
+      })
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(donnees);
 
-    // Fusionne la cellule de titre sur les 4 colonnes
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    // Fusionne la cellule de titre sur toutes les colonnes (nombre dynamique)
+    const nbColonnes = entetes.length;
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nbColonnes - 1 } }];
 
     // Style du titre
     ws['A1'].s = {
@@ -334,7 +394,7 @@ const ScanPointageProf = () => {
     });
 
     // Style des lignes de données (bordures + alternance de couleur)
-    lignes.forEach((_, i) => {
+    groupes.forEach((_, i) => {
       const rowIdx = indexLigneEntetes + 1 + i;
       for (let c = 0; c < entetes.length; c++) {
         const ref = XLSX.utils.encode_cell({ r: rowIdx, c });
@@ -348,8 +408,12 @@ const ScanPointageProf = () => {
       }
     });
 
-    // Largeur des colonnes
-    ws['!cols'] = [{ wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 16 }];
+    // Largeur des colonnes (dynamique selon le nombre de pointages)
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 28 }, { wch: 20 },
+      ...entetesPointages.map(() => ({ wch: 14 })),
+      { wch: 16 }
+    ];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Pointages');
